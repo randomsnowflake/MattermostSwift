@@ -46,21 +46,6 @@ public struct MattermostLiveEventStream: Sendable {
                 } catch is CancellationError {
                     continuation.finish()
                 } catch {
-#if os(macOS)
-                    // Same WAF/proxy that resets URLSession HTTP also resets the WebSocket;
-                    // fall back to a python `websockets` bridge on connection-lost.
-                    if shouldUsePythonFallback(for: error) {
-                        do {
-                            try await runPythonFallback(continuation: continuation)
-                            continuation.finish()
-                        } catch is CancellationError {
-                            continuation.finish()
-                        } catch {
-                            continuation.finish(throwing: error)
-                        }
-                        return
-                    }
-#endif
                     continuation.finish(throwing: error)
                 }
             }
@@ -255,117 +240,6 @@ public struct MattermostLiveEventStream: Sendable {
         }
     }
 
-#if os(macOS)
-    private func shouldUsePythonFallback(for error: Error) -> Bool {
-        let nsError = error as NSError
-        return (nsError.domain == NSPOSIXErrorDomain && nsError.code == 57)
-            || (nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorNetworkConnectionLost)
-    }
-
-    private func runPythonFallback(
-        continuation: AsyncThrowingStream<MattermostLiveEvent, Error>.Continuation
-    ) async throws {
-        guard case .bearerToken(let token) = configuration.authentication else {
-            throw MattermostError.transportFailure("Mattermost WebSocket fallback requires bearer-token authentication.")
-        }
-
-        let processBox = MattermostProcessBox()
-        let process = processBox.process
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["python3", "-c", Self.pythonWebSocketBridgeScript]
-
-        let standardInput = Pipe()
-        let standardOutput = Pipe()
-        let standardError = Pipe()
-        process.standardInput = standardInput
-        process.standardOutput = standardOutput
-        process.standardError = standardError
-
-        return try await withTaskCancellationHandler {
-            try process.run()
-            defer {
-                processBox.terminateIfRunning()
-            }
-
-            let configurationPayload = try JSONSerialization.data(withJSONObject: [
-                "url": configuration.webSocketURL.absoluteString,
-                "token": token,
-                "userAgent": MattermostUserAgent.browser,
-            ])
-            standardInput.fileHandleForWriting.write(configurationPayload)
-            standardInput.fileHandleForWriting.write(Data("\n".utf8))
-            try standardInput.fileHandleForWriting.close()
-
-            for try await line in standardOutput.fileHandleForReading.bytes.lines {
-                try Task.checkCancellation()
-                guard let data = line.data(using: .utf8), !data.isEmpty else {
-                    continue
-                }
-
-                let envelope = try decoder.decode(MattermostWebSocketEnvelope.self, from: data)
-                if let event = envelope.liveEvent {
-                    continuation.yield(event)
-                }
-            }
-
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 || Task.isCancelled else {
-                let errorOutput = standardError.fileHandleForReading.readDataToEndOfFile()
-                let message = Self.sanitizedBridgeError(errorOutput)
-                if let message, !message.isEmpty {
-                    throw MattermostError.transportFailure(message)
-                }
-                throw MattermostError.transportFailure(
-                    "Python WebSocket bridge exited with status \(process.terminationStatus)."
-                )
-            }
-        } onCancel: {
-            processBox.terminateIfRunning()
-        }
-    }
-
-    /// Strips any line that could echo the bearer token before surfacing bridge stderr.
-    private static func sanitizedBridgeError(_ data: Data) -> String? {
-        guard let text = String(data: data, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
-            return nil
-        }
-        return text
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .filter { line in
-                !line.localizedCaseInsensitiveContains("authorization")
-                    && !line.localizedCaseInsensitiveContains("token")
-                    && !line.localizedCaseInsensitiveContains("bearer")
-            }
-            .joined(separator: "\n")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private static let pythonWebSocketBridgeScript = #"""
-import asyncio
-import json
-import sys
-
-import websockets
-
-async def main():
-    config = json.loads(sys.stdin.readline())
-    headers = {
-        "Authorization": "Bearer " + config["token"],
-        "User-Agent": config["userAgent"],
-    }
-    async with websockets.connect(config["url"], additional_headers=headers) as websocket:
-        await websocket.send(json.dumps({
-            "seq": 1,
-            "action": "authentication_challenge",
-            "data": {"token": config["token"]},
-        }))
-        async for message in websocket:
-            print(message, flush=True)
-
-asyncio.run(main())
-"""#
-#endif
 
     private func receiveEvent(from webSocketTask: URLSessionWebSocketTask) async throws -> MattermostLiveEvent? {
         try await receiveEnvelope(from: webSocketTask).liveEvent
@@ -974,19 +848,3 @@ let mattermostSnakeCaseDecoder: JSONDecoder = {
     return decoder
 }()
 
-#if os(macOS)
-private final class MattermostProcessBox: @unchecked Sendable {
-    let process = Process()
-    private let lock = NSLock()
-
-    // Lock-guarded: the stream task's `defer` and the cancellation handler can both call this
-    // concurrently, racing the isRunning-read against terminate on the same Process.
-    func terminateIfRunning() {
-        lock.withLock {
-            if process.isRunning {
-                process.terminate()
-            }
-        }
-    }
-}
-#endif

@@ -1160,18 +1160,6 @@ public extension MattermostClient {
             )
         }
 
-#if os(macOS)
-        // Some deployments reset URLSession's TLS connection (-1005); retry login via curl.
-        let curlResponse: MattermostHTTPResponse<MattermostUser> = try await httpClient.performLoginWithCurlResponse(request: request)
-        if let sessionToken = curlResponse.httpResponse.mattermostSessionToken(cookieStorage: nil) {
-            return MattermostSession(
-                user: curlResponse.value,
-                token: sessionToken.token,
-                tokenSource: sessionToken.source
-            )
-        }
-#endif
-
         throw MattermostError.missingAuthenticationToken
     }
 

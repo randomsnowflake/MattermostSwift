@@ -153,58 +153,24 @@ struct MattermostHTTPClient: Sendable {
     }
 
     // Native async transport. `URLSession.data(for:)` propagates Task cancellation
-    // (cancels the underlying data task), unlike the old completion-handler bridge.
-    //
-    // ponytail: the macOS curl fallback is NOT optional decoration — some Mattermost
-    // deployments sit behind a WAF/proxy that resets URLSession's TLS connection with
-    // NSURLErrorNetworkConnectionLost (-1005) on every request while curl succeeds. The
-    // fallback shells out to curl only on that specific error, and runs off the Swift
-    // cooperative thread pool so the blocking `Process.waitUntilExit()` can't starve it.
+    // (it cancels the underlying data task), and a transient network blip is retried once.
     private func loadData(for request: URLRequest) async throws -> (Data, URLResponse) {
         do {
             return try await urlSession.data(for: request)
-        } catch {
-#if os(macOS)
-            if (error as? URLError)?.code == .networkConnectionLost {
-                return try await runOffCooperativePool { try self.loadDataWithCurl(for: request) }
-            }
-#endif
-            throw error
+        } catch let error as URLError where Self.isTransient(error) {
+            return try await urlSession.data(for: request)
         }
     }
 
-#if os(macOS)
-    // Runs blocking subprocess work on a Dispatch global queue instead of the Swift
-    // concurrency cooperative pool, so a slow curl call can't exhaust pool threads.
-    private func runOffCooperativePool(
-        _ work: @escaping @Sendable () throws -> (Data, URLResponse)
-    ) async throws -> (Data, URLResponse) {
-        let boxed: UncheckedSendableBox<(Data, URLResponse)> = try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    continuation.resume(returning: UncheckedSendableBox(value: try work()))
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
+    private static func isTransient(_ error: URLError) -> Bool {
+        switch error.code {
+        case .networkConnectionLost, .timedOut, .cannotConnectToHost, .dnsLookupFailed:
+            true
+        default:
+            false
         }
-        return boxed.value
     }
 
-    func performWithCurlResponse<Response: Decodable & Sendable>(
-        request: URLRequest
-    ) async throws -> MattermostHTTPResponse<Response> {
-        let (data, response) = try await runOffCooperativePool { try self.loadDataWithCurl(for: request) }
-        return try decodeResponse(data: data, response: response)
-    }
-
-    func performLoginWithCurlResponse<Response: Decodable & Sendable>(
-        request: URLRequest
-    ) async throws -> MattermostHTTPResponse<Response> {
-        let (data, response) = try await runOffCooperativePool { try self.loadLoginDataWithCurl(for: request) }
-        return try decodeResponse(data: data, response: response)
-    }
-#endif
 
     func makeRequest(
         endpoint: String,
@@ -273,213 +239,6 @@ struct MattermostHTTPClient: Sendable {
         return body
     }
 
-#if os(macOS)
-    private func loadDataWithCurl(for request: URLRequest) throws -> (Data, URLResponse) {
-        guard let url = request.url else {
-            throw MattermostError.invalidEndpoint("")
-        }
-
-        let marker = "\n__MATTERMOST_SWIFT_HTTP_STATUS__:"
-        let temporaryHeaderURL = FileManager.default.temporaryDirectory
-            .appending(path: "mattermostswift-\(UUID().uuidString).headers")
-        let temporaryBodyURL = try writeTemporaryBodyIfNeeded(for: request)
-        defer {
-            try? FileManager.default.removeItem(at: temporaryHeaderURL)
-            if let temporaryBodyURL {
-                try? FileManager.default.removeItem(at: temporaryBodyURL)
-            }
-        }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
-        var arguments = [
-            "--silent",
-            "--show-error",
-            "--request",
-            request.httpMethod ?? "GET",
-            "--output",
-            "-",
-            "--dump-header",
-            temporaryHeaderURL.path,
-            "--write-out",
-            "\(marker)%{http_code}",
-            "--config",
-            "-",
-            url.absoluteString,
-        ]
-        if let temporaryBodyURL {
-            arguments.insert(contentsOf: ["--data-binary", "@\(temporaryBodyURL.path)"], at: arguments.count - 1)
-        }
-        process.arguments = arguments
-
-        let standardInput = Pipe()
-        let standardOutput = Pipe()
-        let standardError = Pipe()
-        process.standardInput = standardInput
-        process.standardOutput = standardOutput
-        process.standardError = standardError
-
-        let curlConfiguration = curlConfiguration(for: request)
-        try process.run()
-        standardInput.fileHandleForWriting.write(Data(curlConfiguration.utf8))
-        try standardInput.fileHandleForWriting.close()
-        process.waitUntilExit()
-
-        let output = standardOutput.fileHandleForReading.readDataToEndOfFile()
-        let errorOutput = standardError.fileHandleForReading.readDataToEndOfFile()
-
-        guard process.terminationStatus == 0 else {
-            let message = String(data: errorOutput, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            throw MattermostError.transportFailure(message ?? "curl exited with status \(process.terminationStatus)")
-        }
-
-        guard let markerRange = output.lastRange(of: Data(marker.utf8)),
-              let statusCode = Int(String(decoding: output[markerRange.upperBound...], as: UTF8.self)) else {
-            throw MattermostError.transportFailure("curl response did not include an HTTP status")
-        }
-
-        let body = output[..<markerRange.lowerBound]
-        let headerFields = try parseCurlHeaders(at: temporaryHeaderURL)
-        guard let response = HTTPURLResponse(
-            url: url,
-            statusCode: statusCode,
-            httpVersion: nil,
-            headerFields: headerFields
-        ) else {
-            throw MattermostError.invalidHTTPResponse
-        }
-
-        return (Data(body), response)
-    }
-
-    private func loadLoginDataWithCurl(for request: URLRequest) throws -> (Data, URLResponse) {
-        guard request.value(forHTTPHeaderField: "Authorization") == nil else {
-            throw MattermostError.transportFailure("login curl fallback refuses authenticated requests")
-        }
-        guard let url = request.url else {
-            throw MattermostError.invalidEndpoint("")
-        }
-
-        let marker = "\n__MATTERMOST_SWIFT_HTTP_STATUS__:"
-        let temporaryHeaderURL = FileManager.default.temporaryDirectory
-            .appending(path: "mattermostswift-\(UUID().uuidString).headers")
-        defer {
-            try? FileManager.default.removeItem(at: temporaryHeaderURL)
-        }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
-        var arguments = [
-            "--silent",
-            "--show-error",
-            "--request",
-            request.httpMethod ?? "POST",
-            "--output",
-            "-",
-            "--dump-header",
-            temporaryHeaderURL.path,
-            "--write-out",
-            "\(marker)%{http_code}",
-        ]
-        for (name, value) in request.allHTTPHeaderFields ?? [:] {
-            arguments.append(contentsOf: ["--header", "\(name): \(value)"])
-        }
-        if request.httpBody?.isEmpty == false {
-            arguments.append(contentsOf: ["--data-binary", "@-"])
-        }
-        arguments.append(url.absoluteString)
-        process.arguments = arguments
-
-        let standardInput = Pipe()
-        let standardOutput = Pipe()
-        let standardError = Pipe()
-        process.standardInput = standardInput
-        process.standardOutput = standardOutput
-        process.standardError = standardError
-
-        try process.run()
-        if let body = request.httpBody, !body.isEmpty {
-            standardInput.fileHandleForWriting.write(body)
-        }
-        try standardInput.fileHandleForWriting.close()
-        process.waitUntilExit()
-
-        let output = standardOutput.fileHandleForReading.readDataToEndOfFile()
-        let errorOutput = standardError.fileHandleForReading.readDataToEndOfFile()
-
-        guard process.terminationStatus == 0 else {
-            let message = String(data: errorOutput, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            throw MattermostError.transportFailure(message ?? "curl exited with status \(process.terminationStatus)")
-        }
-
-        guard let markerRange = output.lastRange(of: Data(marker.utf8)),
-              let statusCode = Int(String(decoding: output[markerRange.upperBound...], as: UTF8.self)) else {
-            throw MattermostError.transportFailure("curl response did not include an HTTP status")
-        }
-
-        let body = output[..<markerRange.lowerBound]
-        let headerFields = try parseCurlHeaders(at: temporaryHeaderURL)
-        guard let response = HTTPURLResponse(
-            url: url,
-            statusCode: statusCode,
-            httpVersion: nil,
-            headerFields: headerFields
-        ) else {
-            throw MattermostError.invalidHTTPResponse
-        }
-
-        return (Data(body), response)
-    }
-
-    private func curlConfiguration(for request: URLRequest) -> String {
-        var lines: [String] = []
-        for (name, value) in request.allHTTPHeaderFields ?? [:] {
-            lines.append("header = \"\(name): \(value.replacing("\"", with: "\\\""))\"")
-        }
-
-        return lines.joined(separator: "\n") + "\n"
-    }
-
-    private func writeTemporaryBodyIfNeeded(for request: URLRequest) throws -> URL? {
-        guard let body = request.httpBody, !body.isEmpty else {
-            return nil
-        }
-
-        let url = FileManager.default.temporaryDirectory
-            .appending(path: "mattermostswift-\(UUID().uuidString).body")
-        try body.write(to: url, options: .atomic)
-        // Restrict to owner-only: the login body can contain a plaintext password.
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
-        return url
-    }
-
-    private func parseCurlHeaders(at url: URL) throws -> [String: String] {
-        let text = try String(contentsOf: url, encoding: .utf8)
-        let normalizedText = text.replacingOccurrences(of: "\r\n", with: "\n")
-        guard let finalHeaderBlock = normalizedText
-            .components(separatedBy: "\n\n")
-            .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
-            .last(where: { $0.hasPrefix("HTTP/") }) else {
-            return [:]
-        }
-
-        var headers: [String: String] = [:]
-        for line in finalHeaderBlock.split(separator: "\n").dropFirst() {
-            let parts = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
-            guard parts.count == 2 else {
-                continue
-            }
-            let name = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-            let value = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
-            if let existing = headers[name] {
-                headers[name] = "\(existing), \(value)"
-            } else {
-                headers[name] = value
-            }
-        }
-        return headers
-    }
-#endif
 
     private func decodeMattermostAPIError(from data: Data) -> MattermostAPIError? {
         guard !data.isEmpty else {
@@ -487,12 +246,6 @@ struct MattermostHTTPClient: Sendable {
         }
         return try? decoder.decode(MattermostAPIError.self, from: data)
     }
-}
-
-/// Transports a non-Sendable value across a continuation resume from a Dispatch queue.
-/// Used only for `(Data, HTTPURLResponse)`, both effectively immutable once produced.
-private struct UncheckedSendableBox<Value>: @unchecked Sendable {
-    let value: Value
 }
 
 struct MattermostHTTPResponse<Value: Sendable>: Sendable {
