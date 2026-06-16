@@ -7,10 +7,23 @@ public struct MattermostConfiguration: Sendable {
     public let webSocketURL: URL
     public let authentication: MattermostAuthentication
 
-    public init(serverURL: URL, authentication: MattermostAuthentication) throws {
+    /// - Parameter allowInsecureHTTP: Permits `http://` (and `ws://`) for non-loopback hosts.
+    ///   Loopback hosts (`localhost`, `127.0.0.1`, `::1`) are always allowed for local development.
+    ///   Remote `http://` is rejected by default because it transmits the bearer token in cleartext.
+    public init(
+        serverURL: URL,
+        authentication: MattermostAuthentication,
+        allowInsecureHTTP: Bool = false
+    ) throws {
         let normalizedServerURL = serverURL.normalizedMattermostServerURL
         guard normalizedServerURL.scheme == "https" || normalizedServerURL.scheme == "http" else {
             throw MattermostError.invalidServerURL(serverURL.absoluteString)
+        }
+
+        if normalizedServerURL.scheme == "http",
+           !allowInsecureHTTP,
+           !normalizedServerURL.isLoopbackHost {
+            throw MattermostError.insecureServerURL(serverURL.absoluteString)
         }
 
         self.serverURL = normalizedServerURL
@@ -27,6 +40,13 @@ public enum MattermostAuthentication: Sendable, Equatable {
 }
 
 private extension URL {
+    var isLoopbackHost: Bool {
+        guard let host = host()?.lowercased() else {
+            return false
+        }
+        return host == "localhost" || host == "127.0.0.1" || host == "::1" || host.hasSuffix(".localhost")
+    }
+
     var normalizedMattermostServerURL: URL {
         var components = URLComponents(url: self, resolvingAgainstBaseURL: false)
         components?.path = path.removingMattermostAPIPath.trimmingSlashes

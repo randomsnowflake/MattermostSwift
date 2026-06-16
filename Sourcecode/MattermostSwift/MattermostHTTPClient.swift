@@ -127,22 +127,6 @@ struct MattermostHTTPClient: Sendable {
         return try decodeResponse(data: data, response: response)
     }
 
-#if os(macOS)
-    func performWithCurlResponse<Response: Decodable & Sendable>(
-        request: URLRequest
-    ) throws -> MattermostHTTPResponse<Response> {
-        let (data, response) = try loadDataWithCurl(for: request)
-        return try decodeResponse(data: data, response: response)
-    }
-
-    func performLoginWithCurlResponse<Response: Decodable & Sendable>(
-        request: URLRequest
-    ) throws -> MattermostHTTPResponse<Response> {
-        let (data, response) = try loadLoginDataWithCurl(for: request)
-        return try decodeResponse(data: data, response: response)
-    }
-#endif
-
     private func decodeResponse<Response: Decodable & Sendable>(
         data: Data,
         response: URLResponse
@@ -168,37 +152,125 @@ struct MattermostHTTPClient: Sendable {
         )
     }
 
+    // Native async transport. `URLSession.data(for:)` propagates Task cancellation
+    // (cancels the underlying data task), unlike the old completion-handler bridge.
+    //
+    // ponytail: the macOS curl fallback is NOT optional decoration — some Mattermost
+    // deployments sit behind a WAF/proxy that resets URLSession's TLS connection with
+    // NSURLErrorNetworkConnectionLost (-1005) on every request while curl succeeds. The
+    // fallback shells out to curl only on that specific error, and runs off the Swift
+    // cooperative thread pool so the blocking `Process.waitUntilExit()` can't starve it.
     private func loadData(for request: URLRequest) async throws -> (Data, URLResponse) {
         do {
-            return try await loadDataWithURLSession(for: request)
+            return try await urlSession.data(for: request)
         } catch {
 #if os(macOS)
-            if (error as NSError).domain == NSURLErrorDomain,
-               (error as NSError).code == NSURLErrorNetworkConnectionLost {
-                return try loadDataWithCurl(for: request)
+            if (error as? URLError)?.code == .networkConnectionLost {
+                return try await runOffCooperativePool { try self.loadDataWithCurl(for: request) }
             }
 #endif
             throw error
         }
     }
 
-    private func loadDataWithURLSession(for request: URLRequest) async throws -> (Data, URLResponse) {
-        try await withCheckedThrowingContinuation { continuation in
-            let task = urlSession.dataTask(with: request) { data, response, error in
-                if let error {
+#if os(macOS)
+    // Runs blocking subprocess work on a Dispatch global queue instead of the Swift
+    // concurrency cooperative pool, so a slow curl call can't exhaust pool threads.
+    private func runOffCooperativePool(
+        _ work: @escaping @Sendable () throws -> (Data, URLResponse)
+    ) async throws -> (Data, URLResponse) {
+        let boxed: UncheckedSendableBox<(Data, URLResponse)> = try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    continuation.resume(returning: UncheckedSendableBox(value: try work()))
+                } catch {
                     continuation.resume(throwing: error)
-                    return
                 }
-
-                guard let data, let response else {
-                    continuation.resume(throwing: MattermostError.invalidHTTPResponse)
-                    return
-                }
-
-                continuation.resume(returning: (data, response))
             }
-            task.resume()
         }
+        return boxed.value
+    }
+
+    func performWithCurlResponse<Response: Decodable & Sendable>(
+        request: URLRequest
+    ) async throws -> MattermostHTTPResponse<Response> {
+        let (data, response) = try await runOffCooperativePool { try self.loadDataWithCurl(for: request) }
+        return try decodeResponse(data: data, response: response)
+    }
+
+    func performLoginWithCurlResponse<Response: Decodable & Sendable>(
+        request: URLRequest
+    ) async throws -> MattermostHTTPResponse<Response> {
+        let (data, response) = try await runOffCooperativePool { try self.loadLoginDataWithCurl(for: request) }
+        return try decodeResponse(data: data, response: response)
+    }
+#endif
+
+    func makeRequest(
+        endpoint: String,
+        method: String,
+        queryItems: [URLQueryItem] = []
+    ) throws -> URLRequest {
+        guard var components = URLComponents(
+            url: configuration.apiBaseURL.appending(path: endpoint.trimmingLeadingSlash),
+            resolvingAgainstBaseURL: false
+        ) else {
+            throw MattermostError.invalidEndpoint(endpoint)
+        }
+
+        components.percentEncodedPath = components.percentEncodedPath.replacing("//", with: "/")
+        components.queryItems = queryItems.isEmpty ? nil : queryItems
+
+        guard let url = components.url else {
+            throw MattermostError.invalidEndpoint(endpoint)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        MattermostUserAgent.applyBrowserUserAgent(to: &request)
+
+        switch configuration.authentication {
+        case .none:
+            break
+        case .bearerToken(let token):
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        return request
+    }
+
+    func makeJSONRequest<Request: Encodable & Sendable>(
+        endpoint: String,
+        method: String,
+        body: Request,
+        queryItems: [URLQueryItem] = []
+    ) throws -> URLRequest {
+        var request = try makeRequest(endpoint: endpoint, method: method, queryItems: queryItems)
+        request.httpBody = try encoder.encode(body)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        return request
+    }
+
+    func makeMultipartBody(parts: [MattermostMultipartPart], boundary: String) -> Data {
+        var body = Data()
+
+        for part in parts {
+            body.appendString("--\(boundary)\r\n")
+            body.appendString(part.contentDisposition)
+            body.appendString("\r\n")
+
+            if let contentType = part.contentType {
+                body.appendString("Content-Type: \(contentType)\r\n")
+            }
+
+            body.appendString("\r\n")
+            body.append(part.data)
+            body.appendString("\r\n")
+        }
+
+        body.appendString("--\(boundary)--\r\n")
+        return body
     }
 
 #if os(macOS)
@@ -376,6 +448,8 @@ struct MattermostHTTPClient: Sendable {
         let url = FileManager.default.temporaryDirectory
             .appending(path: "mattermostswift-\(UUID().uuidString).body")
         try body.write(to: url, options: .atomic)
+        // Restrict to owner-only: the login body can contain a plaintext password.
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
         return url
     }
 
@@ -407,79 +481,18 @@ struct MattermostHTTPClient: Sendable {
     }
 #endif
 
-    func makeRequest(
-        endpoint: String,
-        method: String,
-        queryItems: [URLQueryItem] = []
-    ) throws -> URLRequest {
-        guard var components = URLComponents(
-            url: configuration.apiBaseURL.appending(path: endpoint.trimmingLeadingSlash),
-            resolvingAgainstBaseURL: false
-        ) else {
-            throw MattermostError.invalidEndpoint(endpoint)
-        }
-
-        components.percentEncodedPath = components.percentEncodedPath.replacing("//", with: "/")
-        components.queryItems = queryItems.isEmpty ? nil : queryItems
-
-        guard let url = components.url else {
-            throw MattermostError.invalidEndpoint(endpoint)
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        MattermostUserAgent.applyBrowserUserAgent(to: &request)
-
-        switch configuration.authentication {
-        case .none:
-            break
-        case .bearerToken(let token):
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        return request
-    }
-
-    func makeJSONRequest<Request: Encodable & Sendable>(
-        endpoint: String,
-        method: String,
-        body: Request,
-        queryItems: [URLQueryItem] = []
-    ) throws -> URLRequest {
-        var request = try makeRequest(endpoint: endpoint, method: method, queryItems: queryItems)
-        request.httpBody = try encoder.encode(body)
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        return request
-    }
-
-    func makeMultipartBody(parts: [MattermostMultipartPart], boundary: String) -> Data {
-        var body = Data()
-
-        for part in parts {
-            body.appendString("--\(boundary)\r\n")
-            body.appendString(part.contentDisposition)
-            body.appendString("\r\n")
-
-            if let contentType = part.contentType {
-                body.appendString("Content-Type: \(contentType)\r\n")
-            }
-
-            body.appendString("\r\n")
-            body.append(part.data)
-            body.appendString("\r\n")
-        }
-
-        body.appendString("--\(boundary)--\r\n")
-        return body
-    }
-
     private func decodeMattermostAPIError(from data: Data) -> MattermostAPIError? {
         guard !data.isEmpty else {
             return nil
         }
         return try? decoder.decode(MattermostAPIError.self, from: data)
     }
+}
+
+/// Transports a non-Sendable value across a continuation resume from a Dispatch queue.
+/// Used only for `(Data, HTTPURLResponse)`, both effectively immutable once produced.
+private struct UncheckedSendableBox<Value>: @unchecked Sendable {
+    let value: Value
 }
 
 struct MattermostHTTPResponse<Value: Sendable>: Sendable {

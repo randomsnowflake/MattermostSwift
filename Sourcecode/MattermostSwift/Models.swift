@@ -97,7 +97,7 @@ public struct MattermostSession: Equatable, Sendable {
         self.tokenSource = tokenSource
     }
 
-    public func client(serverURL: URL, urlSession: URLSession = .shared) throws -> MattermostClient {
+    public func client(serverURL: URL, urlSession: URLSession = .mattermost) throws -> MattermostClient {
         try MattermostClient(serverURL: serverURL, token: token, urlSession: urlSession)
     }
 }

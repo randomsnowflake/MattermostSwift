@@ -96,7 +96,7 @@ func liveSyncEventsExposeConnectionStateForHostUI() async throws {
 
 @MainActor
 @Test
-func liveSyncEmitsBackfillFailureBeforeTerminating() async throws {
+func liveSyncEmitsBackfillFailureWithoutTerminating() async throws {
     struct BackfillFailure: LocalizedError, Equatable {
         let errorDescription: String? = "backfill failed for test"
     }
@@ -121,20 +121,17 @@ func liveSyncEmitsBackfillFailureBeforeTerminating() async throws {
         }
     )
 
+    // A backfill failure surfaces as a `.backfillFailed` event but the stream keeps running so a
+    // later reconnect can retry; here the injected lifecycle finishes, so the stream ends cleanly.
     var states: [MattermostLiveSyncConnectionState] = []
     var failure: MattermostLiveSyncFailure?
-    do {
-        for try await event in stream {
-            if let state = event.connectionState {
-                states.append(state)
-            }
-            if case .backfillFailed(let emittedFailure) = event {
-                failure = emittedFailure
-            }
+    for try await event in stream {
+        if let state = event.connectionState {
+            states.append(state)
         }
-        Issue.record("Expected live sync to terminate with the backfill error")
-    } catch let error as BackfillFailure {
-        #expect(error == BackfillFailure())
+        if case .backfillFailed(let emittedFailure) = event {
+            failure = emittedFailure
+        }
     }
 
     #expect(failure == MattermostLiveSyncFailure(

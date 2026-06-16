@@ -4,6 +4,7 @@ import Foundation
 public enum MattermostError: Error, Equatable, Sendable {
     case missingEnvironmentVariable(String)
     case invalidServerURL(String)
+    case insecureServerURL(String)
     case invalidEndpoint(String)
     case invalidHTTPResponse
     case httpStatus(code: Int, message: String?)
@@ -20,6 +21,8 @@ extension MattermostError: LocalizedError {
             "Missing environment variable: \(name)"
         case .invalidServerURL(let url):
             "Invalid Mattermost server URL: \(url)"
+        case .insecureServerURL(let url):
+            "Refusing to send credentials over an insecure (http) Mattermost URL: \(url). Use https, or pass allowInsecureHTTP: true for a trusted local server."
         case .invalidEndpoint(let endpoint):
             "Invalid Mattermost API endpoint: \(endpoint)"
         case .invalidHTTPResponse:

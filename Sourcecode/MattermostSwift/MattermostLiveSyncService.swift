@@ -255,7 +255,7 @@ public struct MattermostLiveSyncService: Sendable {
         refreshSidebarCategories: MattermostLiveSyncSidebarRefresh? = nil,
         refreshThreadState: MattermostLiveSyncThreadStateRefresh? = nil
     ) -> AsyncThrowingStream<MattermostLiveSyncEvent, Error> {
-        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(200)) { continuation in
+        AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
             let streamTask = Task { @MainActor in
                 do {
                     var activeTeamID = teamID
@@ -266,27 +266,27 @@ public struct MattermostLiveSyncService: Sendable {
                         switch lifecycleEvent {
                         case .connecting(let attempt):
                             continuation.yield(.connecting(attempt: attempt))
-                            let backfillResult: MattermostLiveBackfillResult
+                            // A backfill failure is reported but no longer terminates the stream:
+                            // the lifecycle loop keeps running so the socket can connect and a later
+                            // reconnect can retry the backfill. Only cancellation tears the stream down.
                             do {
-                                backfillResult = try await backfill(
+                                let backfillResult = try await backfill(
                                     store,
                                     activeTeamID,
                                     teamName,
                                     options
                                 )
+                                activeTeamID = backfillResult.sync.teamID ?? activeTeamID
+                                activeUserID = backfillResult.sync.user.id
+                                continuation.yield(.backfilled(backfillResult))
+                            } catch is CancellationError {
+                                throw CancellationError()
                             } catch {
-                                if error is CancellationError {
-                                    throw error
-                                }
                                 continuation.yield(.backfillFailed(MattermostLiveSyncFailure(
                                     attempt: attempt,
                                     message: Self.failureMessage(for: error)
                                 )))
-                                throw error
                             }
-                            activeTeamID = backfillResult.sync.teamID ?? activeTeamID
-                            activeUserID = backfillResult.sync.user.id
-                            continuation.yield(.backfilled(backfillResult))
 
                         case .event(let event):
                             let typedEvent = try store.apply(liveEvent: event)

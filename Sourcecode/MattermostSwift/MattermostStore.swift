@@ -1,6 +1,15 @@
 import Foundation
 import SwiftData
 
+/// Plain JSON coders reused for cached post props/metadata round-trips (no key strategy:
+/// keys are arbitrary server JSON and must survive verbatim). Shared to avoid per-call allocation.
+private let mattermostCachedPostEncoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return encoder
+}()
+private let mattermostCachedPostDecoder = JSONDecoder()
+
 /// SwiftData-backed cache for Mattermost objects used by app targets and the CLI.
 @MainActor
 public final class MattermostStore {
@@ -1166,9 +1175,7 @@ public final class MattermostCachedPost {
             return nil
         }
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        let data = try encoder.encode(value)
+        let data = try mattermostCachedPostEncoder.encode(value)
         return String(decoding: data, as: UTF8.self)
     }
 
@@ -1216,7 +1223,7 @@ public final class MattermostCachedPost {
             return nil
         }
 
-        return try JSONDecoder().decode([String: MattermostJSONValue].self, from: Data(string.utf8))
+        return try mattermostCachedPostDecoder.decode([String: MattermostJSONValue].self, from: Data(string.utf8))
     }
 
     func markDeleted(at deletedAt: Int64) {

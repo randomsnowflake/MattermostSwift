@@ -7,17 +7,23 @@ public struct MattermostClient: Sendable {
     private let urlSession: URLSession
 
     /// Creates a client from an explicit configuration.
-    public init(configuration: MattermostConfiguration, urlSession: URLSession = .shared) {
+    public init(configuration: MattermostConfiguration, urlSession: URLSession = .mattermost) {
         self.configuration = configuration
         self.urlSession = urlSession
         httpClient = MattermostHTTPClient(configuration: configuration, urlSession: urlSession)
     }
 
     /// Creates a bearer-token authenticated client.
-    public init(serverURL: URL, token: String, urlSession: URLSession = .shared) throws {
+    public init(
+        serverURL: URL,
+        token: String,
+        urlSession: URLSession = .mattermost,
+        allowInsecureHTTP: Bool = false
+    ) throws {
         let configuration = try MattermostConfiguration(
             serverURL: serverURL,
-            authentication: .bearerToken(token)
+            authentication: .bearerToken(token),
+            allowInsecureHTTP: allowInsecureHTTP
         )
         self.init(configuration: configuration, urlSession: urlSession)
     }
@@ -1124,7 +1130,7 @@ public extension MattermostClient {
         mfaToken: String? = nil,
         deviceID: String? = nil,
         ldapOnly: Bool? = nil,
-        urlSession: URLSession = .shared
+        urlSession: URLSession = .mattermost
     ) async throws -> MattermostSession {
         let configuration = try MattermostConfiguration(
             serverURL: serverURL,
@@ -1155,7 +1161,8 @@ public extension MattermostClient {
         }
 
 #if os(macOS)
-        let curlResponse: MattermostHTTPResponse<MattermostUser> = try httpClient.performLoginWithCurlResponse(request: request)
+        // Some deployments reset URLSession's TLS connection (-1005); retry login via curl.
+        let curlResponse: MattermostHTTPResponse<MattermostUser> = try await httpClient.performLoginWithCurlResponse(request: request)
         if let sessionToken = curlResponse.httpResponse.mattermostSessionToken(cookieStorage: nil) {
             return MattermostSession(
                 user: curlResponse.value,
@@ -1176,7 +1183,7 @@ public extension MattermostClient {
     /// - `MATTERMOST_PASSWORD`
     static func loginFromEnvironment(
         _ environment: [String: String] = ProcessInfo.processInfo.environment,
-        urlSession: URLSession = .shared
+        urlSession: URLSession = .mattermost
     ) async throws -> MattermostSession {
         guard let rawURL = environment["MATTERMOST_URL"], !rawURL.isEmpty else {
             throw MattermostError.missingEnvironmentVariable("MATTERMOST_URL")
@@ -1395,4 +1402,18 @@ private extension String {
     var nonEmpty: String? {
         isEmpty ? nil : self
     }
+}
+
+public extension URLSession {
+    /// URLSession preconfigured with finite request/resource timeouts for Mattermost.
+    ///
+    /// `URLSession.shared` uses a 7-day resource timeout, which lets a stalled server hang a
+    /// request indefinitely. This session caps a single request at 30s and a full transfer
+    /// (e.g. a file download) at 5 minutes.
+    static let mattermost: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 300
+        return URLSession(configuration: configuration)
+    }()
 }

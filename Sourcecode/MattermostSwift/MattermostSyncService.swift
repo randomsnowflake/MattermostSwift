@@ -185,8 +185,24 @@ public struct MattermostSyncService: Sendable {
         }
 
         if options.refreshUnreadForAllJoinedChannels {
-            for channel in resolvedTeam.channels {
-                let unread = try await client.channelUnread(userID: user.id, channelID: channel.id)
+            // Fan the per-channel unread fetches out concurrently (network-bound), then apply
+            // them serially on the main actor. Previously this was N sequential round-trips.
+            let userID = user.id
+            let client = client
+            let unreads = try await withThrowingTaskGroup(of: MattermostChannelUnread.self) { group in
+                for channel in resolvedTeam.channels {
+                    let channelID = channel.id
+                    group.addTask {
+                        try await client.channelUnread(userID: userID, channelID: channelID)
+                    }
+                }
+                var collected: [MattermostChannelUnread] = []
+                for try await unread in group {
+                    collected.append(unread)
+                }
+                return collected
+            }
+            for unread in unreads {
                 try store.upsert(unread: unread, userID: user.id)
                 syncedUnreadsCount += 1
             }

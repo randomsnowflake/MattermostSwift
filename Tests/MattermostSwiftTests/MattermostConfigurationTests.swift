@@ -37,6 +37,38 @@ func configurationBuildsInsecureWebSocketURLForHTTPServer() throws {
 }
 
 @Test
+func configurationRejectsRemoteInsecureHTTP() throws {
+    #expect(throws: MattermostError.insecureServerURL("http://mattermost.example.com")) {
+        _ = try MattermostConfiguration(
+            serverURL: #require(URL(string: "http://mattermost.example.com")),
+            authentication: .bearerToken("token")
+        )
+    }
+}
+
+@Test
+func configurationAllowsRemoteInsecureHTTPWhenOptedIn() throws {
+    let configuration = try MattermostConfiguration(
+        serverURL: #require(URL(string: "http://mattermost.example.com")),
+        authentication: .bearerToken("token"),
+        allowInsecureHTTP: true
+    )
+
+    #expect(configuration.serverURL.absoluteString == "http://mattermost.example.com")
+    #expect(configuration.webSocketURL.absoluteString == "ws://mattermost.example.com/api/v4/websocket")
+}
+
+@Test
+func configurationRejectsNonHTTPScheme() throws {
+    #expect(throws: MattermostError.invalidServerURL("ftp://mattermost.example.com")) {
+        _ = try MattermostConfiguration(
+            serverURL: #require(URL(string: "ftp://mattermost.example.com")),
+            authentication: .none
+        )
+    }
+}
+
+@Test
 func environmentClientRequiresURL() throws {
     #expect(throws: MattermostError.missingEnvironmentVariable("MATTERMOST_URL")) {
         _ = try MattermostClient.liveFromEnvironment([:])

@@ -7,7 +7,7 @@ public struct MattermostLiveEventStream: Sendable {
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
 
-    public init(configuration: MattermostConfiguration, urlSession: URLSession = .shared) {
+    public init(configuration: MattermostConfiguration, urlSession: URLSession = .mattermost) {
         self.configuration = configuration
         self.urlSession = urlSession
 
@@ -22,7 +22,7 @@ public struct MattermostLiveEventStream: Sendable {
 
     /// Connects, authenticates, and yields server events until cancelled or the socket fails.
     public func events() -> AsyncThrowingStream<MattermostLiveEvent, Error> {
-        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(200)) { continuation in
+        AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
             let streamTask = Task {
                 do {
                     let webSocketTask = urlSession.webSocketTask(with: makeWebSocketRequest())
@@ -47,6 +47,8 @@ public struct MattermostLiveEventStream: Sendable {
                     continuation.finish()
                 } catch {
 #if os(macOS)
+                    // Same WAF/proxy that resets URLSession HTTP also resets the WebSocket;
+                    // fall back to a python `websockets` bridge on connection-lost.
                     if shouldUsePythonFallback(for: error) {
                         do {
                             try await runPythonFallback(continuation: continuation)
@@ -82,17 +84,18 @@ public struct MattermostLiveEventStream: Sendable {
     public func reconnectingEvents(
         policy: MattermostLiveEventReconnectPolicy = .default
     ) -> AsyncThrowingStream<MattermostLiveEvent, Error> {
-        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(200)) { continuation in
+        AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
             let streamTask = Task {
                 var attempt = 0
 
                 while !Task.isCancelled {
+                    let connectedAt = ContinuousClock.now
                     do {
                         for try await event in events() {
-                            attempt = 0
                             continuation.yield(event)
                         }
 
+                        if Self.connectionWasStable(since: connectedAt) { attempt = 0 }
                         guard policy.reconnectAfterCleanClose, policy.canRetry(attempt: attempt) else {
                             continuation.finish()
                             return
@@ -101,6 +104,7 @@ public struct MattermostLiveEventStream: Sendable {
                         continuation.finish()
                         return
                     } catch {
+                        if Self.connectionWasStable(since: connectedAt) { attempt = 0 }
                         guard policy.canRetry(attempt: attempt) else {
                             continuation.finish(throwing: error)
                             return
@@ -129,19 +133,20 @@ public struct MattermostLiveEventStream: Sendable {
     public func lifecycleEvents(
         policy: MattermostLiveEventReconnectPolicy = .default
     ) -> AsyncThrowingStream<MattermostLiveEventStreamLifecycleEvent, Error> {
-        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(200)) { continuation in
+        AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
             let streamTask = Task {
                 var attempt = 0
 
                 while !Task.isCancelled {
                     continuation.yield(.connecting(attempt: attempt))
 
+                    let connectedAt = ContinuousClock.now
                     do {
                         for try await event in events() {
-                            attempt = 0
                             continuation.yield(.event(event))
                         }
 
+                        if Self.connectionWasStable(since: connectedAt) { attempt = 0 }
                         guard policy.reconnectAfterCleanClose, policy.canRetry(attempt: attempt) else {
                             continuation.finish()
                             return
@@ -150,6 +155,7 @@ public struct MattermostLiveEventStream: Sendable {
                         continuation.finish()
                         return
                     } catch {
+                        if Self.connectionWasStable(since: connectedAt) { attempt = 0 }
                         guard policy.canRetry(attempt: attempt) else {
                             continuation.finish(throwing: error)
                             return
@@ -177,45 +183,76 @@ public struct MattermostLiveEventStream: Sendable {
     }
 
     private func authenticate(_ webSocketTask: URLSessionWebSocketTask) async throws -> [MattermostLiveEvent] {
-        let authSequence = 1
-        let token: String
-        switch configuration.authentication {
-        case .none:
-            throw MattermostError.transportFailure("Mattermost WebSocket authentication requires a token.")
-        case .bearerToken(let bearerToken):
-            token = bearerToken
-        }
+        // Bound the handshake: a server that upgrades the socket but never sends `hello`
+        // or an auth reply would otherwise hang this loop forever.
+        try await Self.withTimeout(.seconds(15)) {
+            let authSequence = 1
+            let token: String
+            switch self.configuration.authentication {
+            case .none:
+                throw MattermostError.transportFailure("Mattermost WebSocket authentication requires a token.")
+            case .bearerToken(let bearerToken):
+                token = bearerToken
+            }
 
-        let auth = MattermostWebSocketAuthentication(
-            seq: authSequence,
-            action: "authentication_challenge",
-            data: MattermostWebSocketAuthenticationData(token: token)
-        )
-        let payload = try encoder.encode(auth)
-        try await send(.data(payload), to: webSocketTask)
+            let auth = MattermostWebSocketAuthentication(
+                seq: authSequence,
+                action: "authentication_challenge",
+                data: MattermostWebSocketAuthenticationData(token: token)
+            )
+            let payload = try self.encoder.encode(auth)
+            try await self.send(.data(payload), to: webSocketTask)
 
-        var pendingEvents: [MattermostLiveEvent] = []
-        while !Task.isCancelled {
-            let envelope = try await receiveEnvelope(from: webSocketTask)
+            var pendingEvents: [MattermostLiveEvent] = []
+            while !Task.isCancelled {
+                let envelope = try await self.receiveEnvelope(from: webSocketTask)
 
-            if let event = envelope.liveEvent {
-                pendingEvents.append(event)
-                if event.event == "hello" {
-                    return pendingEvents
+                if let event = envelope.liveEvent {
+                    pendingEvents.append(event)
+                    if event.event == "hello" {
+                        return pendingEvents
+                    }
+                }
+
+                if envelope.seqReply == authSequence {
+                    if envelope.status == "OK" {
+                        return pendingEvents
+                    }
+
+                    let message = envelope.error?.message ?? envelope.status ?? "authentication failed"
+                    throw MattermostError.transportFailure("Mattermost WebSocket authentication failed: \(message)")
                 }
             }
 
-            if envelope.seqReply == authSequence {
-                if envelope.status == "OK" {
-                    return pendingEvents
-                }
-
-                let message = envelope.error?.message ?? envelope.status ?? "authentication failed"
-                throw MattermostError.transportFailure("Mattermost WebSocket authentication failed: \(message)")
-            }
+            throw CancellationError()
         }
+    }
 
-        throw CancellationError()
+    private static let connectionStabilityWindow: Duration = .seconds(30)
+
+    /// Treats a connection that stayed up at least `connectionStabilityWindow` as a fresh
+    /// success, so backoff only escalates for a genuinely flapping server.
+    private static func connectionWasStable(since start: ContinuousClock.Instant) -> Bool {
+        ContinuousClock.now - start >= connectionStabilityWindow
+    }
+
+    /// Runs `operation`, failing with a transport error if it does not finish within `duration`.
+    private static func withTimeout<T: Sendable>(
+        _ duration: Duration,
+        operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                try await Task.sleep(for: duration)
+                throw MattermostError.transportFailure("Mattermost WebSocket authentication timed out.")
+            }
+            defer { group.cancelAll() }
+            guard let result = try await group.next() else {
+                throw CancellationError()
+            }
+            return result
+        }
     }
 
 #if os(macOS)
@@ -274,8 +311,7 @@ public struct MattermostLiveEventStream: Sendable {
             process.waitUntilExit()
             guard process.terminationStatus == 0 || Task.isCancelled else {
                 let errorOutput = standardError.fileHandleForReading.readDataToEndOfFile()
-                let message = String(data: errorOutput, encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let message = Self.sanitizedBridgeError(errorOutput)
                 if let message, !message.isEmpty {
                     throw MattermostError.transportFailure(message)
                 }
@@ -286,6 +322,23 @@ public struct MattermostLiveEventStream: Sendable {
         } onCancel: {
             processBox.terminateIfRunning()
         }
+    }
+
+    /// Strips any line that could echo the bearer token before surfacing bridge stderr.
+    private static func sanitizedBridgeError(_ data: Data) -> String? {
+        guard let text = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            return nil
+        }
+        return text
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { line in
+                !line.localizedCaseInsensitiveContains("authorization")
+                    && !line.localizedCaseInsensitiveContains("token")
+                    && !line.localizedCaseInsensitiveContains("bearer")
+            }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static let pythonWebSocketBridgeScript = #"""
@@ -334,22 +387,16 @@ asyncio.run(main())
     }
 
     private func send(_ message: URLSessionWebSocketTask.Message, to webSocketTask: URLSessionWebSocketTask) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            webSocketTask.send(message) { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
-                }
-            }
-        }
+        try await webSocketTask.send(message)
     }
 
     private func receive(from webSocketTask: URLSessionWebSocketTask) async throws -> URLSessionWebSocketTask.Message {
-        try await withCheckedThrowingContinuation { continuation in
-            webSocketTask.receive { result in
-                continuation.resume(with: result)
-            }
+        // Cancel the socket on Task cancellation so a suspended receive on a quiet channel
+        // tears down promptly instead of waiting for the next server message.
+        try await withTaskCancellationHandler {
+            try await webSocketTask.receive()
+        } onCancel: {
+            webSocketTask.cancel(with: .goingAway, reason: nil)
         }
     }
 }
@@ -427,9 +474,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
             return nil
         }
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(MattermostPost.self, from: data)
+        return try mattermostSnakeCaseDecoder.decode(MattermostPost.self, from: data)
     }
 
     /// Decodes embedded channel payloads used by channel-related WebSocket events when present.
@@ -438,9 +483,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
             return nil
         }
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(MattermostChannel.self, from: data)
+        return try mattermostSnakeCaseDecoder.decode(MattermostChannel.self, from: data)
     }
 
     /// Decodes embedded channel membership payloads when present.
@@ -450,9 +493,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
             return nil
         }
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(MattermostChannelMember.self, from: payload)
+        return try mattermostSnakeCaseDecoder.decode(MattermostChannelMember.self, from: payload)
     }
 
     /// Decodes embedded user payloads used by user-related WebSocket events when present.
@@ -461,9 +502,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
             return nil
         }
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(MattermostUser.self, from: data)
+        return try mattermostSnakeCaseDecoder.decode(MattermostUser.self, from: data)
     }
 
     /// Decodes a reaction payload from reaction WebSocket events when present.
@@ -472,9 +511,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
             return nil
         }
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(MattermostReaction.self, from: data)
+        return try mattermostSnakeCaseDecoder.decode(MattermostReaction.self, from: data)
     }
 
     /// Returns a channel id from event data or broadcast metadata.
@@ -929,13 +966,26 @@ private struct MattermostWebSocketError: Decodable, Sendable {
     let message: String?
 }
 
+/// Shared snake_case decoder reused by `MattermostLiveEvent` payload decoding to avoid
+/// allocating a configured `JSONDecoder` per event on the live hot path.
+let mattermostSnakeCaseDecoder: JSONDecoder = {
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    return decoder
+}()
+
 #if os(macOS)
 private final class MattermostProcessBox: @unchecked Sendable {
     let process = Process()
+    private let lock = NSLock()
 
+    // Lock-guarded: the stream task's `defer` and the cancellation handler can both call this
+    // concurrently, racing the isRunning-read against terminate on the same Process.
     func terminateIfRunning() {
-        if process.isRunning {
-            process.terminate()
+        lock.withLock {
+            if process.isRunning {
+                process.terminate()
+            }
         }
     }
 }
