@@ -153,22 +153,37 @@ struct MattermostHTTPClient: Sendable {
     }
 
     // Native async transport. `URLSession.data(for:)` propagates Task cancellation
-    // (it cancels the underlying data task), and a transient network blip is retried once.
+    // (it cancels the underlying data task). A transient connection blip (a reused
+    // keep-alive socket reset by the edge: -1005 / ENOTCONN) is retried with backoff.
     private func loadData(for request: URLRequest) async throws -> (Data, URLResponse) {
-        do {
-            return try await urlSession.data(for: request)
-        } catch let error as URLError where Self.isTransient(error) {
-            return try await urlSession.data(for: request)
+        var attempt = 0
+        while true {
+            do {
+                return try await urlSession.data(for: request)
+            } catch {
+                attempt += 1
+                guard attempt <= Self.maxTransientRetries, Self.isTransient(error) else {
+                    throw error
+                }
+                try await Task.sleep(for: .milliseconds(200 * attempt))
+            }
         }
     }
 
-    private static func isTransient(_ error: URLError) -> Bool {
-        switch error.code {
-        case .networkConnectionLost, .timedOut, .cannotConnectToHost, .dnsLookupFailed:
-            true
-        default:
-            false
+    private static let maxTransientRetries = 2
+
+    private static func isTransient(_ error: Error) -> Bool {
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .networkConnectionLost, .timedOut, .cannotConnectToHost,
+                 .dnsLookupFailed, .notConnectedToInternet:
+                return true
+            default:
+                break
+            }
         }
+        let nsError = error as NSError
+        return nsError.domain == NSPOSIXErrorDomain && nsError.code == 57 // ENOTCONN
     }
 
 

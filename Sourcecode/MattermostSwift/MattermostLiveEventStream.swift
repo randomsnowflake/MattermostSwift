@@ -185,8 +185,10 @@ public struct MattermostLiveEventStream: Sendable {
                 action: "authentication_challenge",
                 data: MattermostWebSocketAuthenticationData(token: token)
             )
+            // Must be a TEXT frame: Mattermost silently drops the socket right after `hello`
+            // if the authentication_challenge arrives as a binary frame.
             let payload = try self.encoder.encode(auth)
-            try await self.send(.data(payload), to: webSocketTask)
+            try await self.send(.string(String(decoding: payload, as: UTF8.self)), to: webSocketTask)
 
             var pendingEvents: [MattermostLiveEvent] = []
             while !Task.isCancelled {
