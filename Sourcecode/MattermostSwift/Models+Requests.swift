@@ -8,6 +8,32 @@ struct MattermostUserStatusUpdateRequest: Encodable, Equatable, Sendable {
     let dndEndTime: Int64?
 }
 
+/// Fields accepted by Mattermost's user profile patch endpoint.
+public struct MattermostUserPatch: Encodable, Equatable, Sendable {
+    public let username: String?
+    public let email: String?
+    public let firstName: String?
+    public let lastName: String?
+    public let nickname: String?
+    public let position: String?
+
+    public init(
+        username: String? = nil,
+        email: String? = nil,
+        firstName: String? = nil,
+        lastName: String? = nil,
+        nickname: String? = nil,
+        position: String? = nil
+    ) {
+        self.username = username
+        self.email = email
+        self.firstName = firstName
+        self.lastName = lastName
+        self.nickname = nickname
+        self.position = position
+    }
+}
+
 struct MattermostMobileDeviceRequest: Encodable, Equatable, Sendable {
     let deviceId: String
 }

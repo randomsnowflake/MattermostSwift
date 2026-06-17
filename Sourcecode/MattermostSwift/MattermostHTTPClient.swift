@@ -87,11 +87,12 @@ struct MattermostHTTPClient: Sendable {
 
     func multipart<Response: Decodable & Sendable>(
         _ endpoint: String,
+        method: String = "POST",
         parts: [MattermostMultipartPart],
         queryItems: [URLQueryItem] = []
     ) async throws -> Response {
         let boundary = "MattermostSwift-\(UUID().uuidString)"
-        var request = try makeRequest(endpoint: endpoint, method: "POST", queryItems: queryItems)
+        var request = try makeRequest(endpoint: endpoint, method: method, queryItems: queryItems)
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.httpBody = makeMultipartBody(parts: parts, boundary: boundary)
         return try await perform(request: request)
