@@ -115,6 +115,12 @@ public struct MattermostUserStatus: Codable, Equatable, Sendable {
     public let dndEndTime: Int64?
 }
 
+struct MattermostUserStatusUpdateRequest: Encodable, Equatable, Sendable {
+    let userId: String
+    let status: String
+    let dndEndTime: Int64?
+}
+
 /// User autocomplete buckets returned by Mattermost for composer/member pickers.
 public struct MattermostUserAutocomplete: Decodable, Equatable, Sendable {
     public let users: [MattermostUser]

@@ -65,55 +65,6 @@ public struct MattermostLiveEventStream: Sendable {
         return request
     }
 
-    /// Yields live events and reconnects with exponential backoff when the socket ends unexpectedly.
-    public func reconnectingEvents(
-        policy: MattermostLiveEventReconnectPolicy = .default
-    ) -> AsyncThrowingStream<MattermostLiveEvent, Error> {
-        AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
-            let streamTask = Task {
-                var attempt = 0
-
-                while !Task.isCancelled {
-                    let connectedAt = ContinuousClock.now
-                    do {
-                        for try await event in events() {
-                            continuation.yield(event)
-                        }
-
-                        if Self.connectionWasStable(since: connectedAt) { attempt = 0 }
-                        guard policy.reconnectAfterCleanClose, policy.canRetry(attempt: attempt) else {
-                            continuation.finish()
-                            return
-                        }
-                    } catch is CancellationError {
-                        continuation.finish()
-                        return
-                    } catch {
-                        if Self.connectionWasStable(since: connectedAt) { attempt = 0 }
-                        guard policy.canRetry(attempt: attempt) else {
-                            continuation.finish(throwing: error)
-                            return
-                        }
-                    }
-
-                    do {
-                        try await Task.sleep(for: policy.delay(for: attempt))
-                    } catch {
-                        continuation.finish()
-                        return
-                    }
-                    attempt += 1
-                }
-
-                continuation.finish()
-            }
-
-            continuation.onTermination = { @Sendable _ in
-                streamTask.cancel()
-            }
-        }
-    }
-
     /// Yields connection lifecycle notifications and live events, reconnecting with exponential backoff.
     public func lifecycleEvents(
         policy: MattermostLiveEventReconnectPolicy = .default
@@ -344,6 +295,16 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
         data[key]?.jsonData
     }
 
+    /// First non-nil string across the given (snake/camel) data keys, then the broadcast fallback.
+    func anyString(_ keys: String..., broadcast path: KeyPath<MattermostLiveBroadcast, String?>? = nil) -> String? {
+        for key in keys {
+            if let value = stringData(key) {
+                return value
+            }
+        }
+        return path.flatMap { broadcast?[keyPath: $0] }
+    }
+
     /// Decodes the embedded post payload used by post-related WebSocket events.
     public func decodedPost() throws -> MattermostPost? {
         guard let data = jsonData("post") else {
@@ -392,7 +353,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
 
     /// Returns a channel id from event data or broadcast metadata.
     public func decodedChannelID() throws -> String? {
-        if let channelID = stringData("channel_id") ?? stringData("channelId") ?? broadcast?.channelId {
+        if let channelID = anyString("channel_id", "channelId", broadcast: \.channelId) {
             return channelID
         }
         return try decodedChannel()?.id
@@ -405,9 +366,9 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
         }
 
         return MattermostTypingEvent(
-            userID: stringData("user_id") ?? stringData("userId") ?? broadcast?.userId,
-            channelID: stringData("channel_id") ?? stringData("channelId") ?? broadcast?.channelId,
-            parentID: stringData("parent_id") ?? stringData("parentId") ?? stringData("root_id") ?? stringData("rootId")
+            userID: anyString("user_id", "userId", broadcast: \.userId),
+            channelID: anyString("channel_id", "channelId", broadcast: \.channelId),
+            parentID: anyString("parent_id", "parentId", "root_id", "rootId")
         )
     }
 
@@ -418,7 +379,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
         }
 
         return MattermostStatusChangeEvent(
-            userID: stringData("user_id") ?? stringData("userId") ?? broadcast?.userId,
+            userID: anyString("user_id", "userId", broadcast: \.userId),
             status: stringData("status"),
             manual: boolData("manual")
         )
@@ -431,9 +392,9 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
         }
 
         return MattermostChannelViewedEvent(
-            userID: stringData("user_id") ?? stringData("userId") ?? broadcast?.userId,
-            channelID: stringData("channel_id") ?? stringData("channelId") ?? broadcast?.channelId,
-            previousChannelID: stringData("prev_channel_id") ?? stringData("prevChannelId")
+            userID: anyString("user_id", "userId", broadcast: \.userId),
+            channelID: anyString("channel_id", "channelId", broadcast: \.channelId),
+            previousChannelID: anyString("prev_channel_id", "prevChannelId")
         )
     }
 
@@ -441,10 +402,10 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
     public func decodedCacheInvalidation() -> MattermostCacheInvalidationEvent {
         MattermostCacheInvalidationEvent(
             event: event,
-            userID: stringData("user_id") ?? stringData("userId") ?? broadcast?.userId,
-            channelID: stringData("channel_id") ?? stringData("channelId") ?? broadcast?.channelId,
-            teamID: stringData("team_id") ?? stringData("teamId") ?? broadcast?.teamId,
-            postID: stringData("post_id") ?? stringData("postId")
+            userID: anyString("user_id", "userId", broadcast: \.userId),
+            channelID: anyString("channel_id", "channelId", broadcast: \.channelId),
+            teamID: anyString("team_id", "teamId", broadcast: \.teamId),
+            postID: anyString("post_id", "postId")
         )
     }
 
@@ -454,12 +415,12 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
         let postRootID = post?.rootId.isEmpty == false ? post?.rootId : nil
         return MattermostThreadEvent(
             event: event,
-            userID: stringData("user_id") ?? stringData("userId") ?? broadcast?.userId ?? post?.userId,
-            channelID: stringData("channel_id") ?? stringData("channelId") ?? broadcast?.channelId ?? post?.channelId,
-            teamID: stringData("team_id") ?? stringData("teamId") ?? broadcast?.teamId,
-            postID: stringData("post_id") ?? stringData("postId") ?? post?.id,
-            rootID: stringData("root_id") ?? stringData("rootId") ?? postRootID,
-            threadID: stringData("thread_id") ?? stringData("threadId") ?? postRootID ?? post?.id
+            userID: anyString("user_id", "userId", broadcast: \.userId) ?? post?.userId,
+            channelID: anyString("channel_id", "channelId", broadcast: \.channelId) ?? post?.channelId,
+            teamID: anyString("team_id", "teamId", broadcast: \.teamId),
+            postID: anyString("post_id", "postId") ?? post?.id,
+            rootID: anyString("root_id", "rootId") ?? postRootID,
+            threadID: anyString("thread_id", "threadId") ?? postRootID ?? post?.id
         )
     }
 

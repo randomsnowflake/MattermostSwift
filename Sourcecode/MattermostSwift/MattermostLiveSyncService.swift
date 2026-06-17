@@ -486,9 +486,9 @@ private extension MattermostTypedLiveEvent {
             return nil
         }
 
-        guard let userID = nonEmpty(threadEvent.userID ?? fallbackUserID),
-              let teamID = nonEmpty(threadEvent.teamID ?? fallbackTeamID),
-              let threadID = nonEmpty(threadEvent.threadID ?? threadEvent.rootID ?? threadEvent.postID) else {
+        guard let userID = (threadEvent.userID ?? fallbackUserID).nonEmpty,
+              let teamID = (threadEvent.teamID ?? fallbackTeamID).nonEmpty,
+              let threadID = (threadEvent.threadID ?? threadEvent.rootID ?? threadEvent.postID).nonEmpty else {
             return nil
         }
 
@@ -497,12 +497,5 @@ private extension MattermostTypedLiveEvent {
             teamID: teamID,
             threadID: threadID
         )
-    }
-
-    private func nonEmpty(_ value: String?) -> String? {
-        guard let value, !value.isEmpty else {
-            return nil
-        }
-        return value
     }
 }

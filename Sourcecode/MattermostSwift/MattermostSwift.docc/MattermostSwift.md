@@ -4,9 +4,9 @@ Build Mattermost clients in Swift with REST commands, WebSocket live events, and
 
 ## Overview
 
-`MattermostSwift` is a single-account SDK for a Mattermost server. It keeps credentials outside the package, exposes high-level services for app code, and leaves UI concerns to host apps.
+`MattermostSwift` is a single-account SDK for a Mattermost server. It keeps credentials outside the package, exposes high-level operations for app code, and leaves UI concerns to host apps.
 
-Use `MattermostClient` as the root entry point, then choose focused service facades for user, team, channel, post, timeline, sync, and live-event work.
+Use `MattermostClient` as the root entry point: it exposes user, team, channel, post, timeline, and live-event operations as methods directly, with `MattermostSyncService` and `MattermostLiveSyncService` layered on top for cache hydration and live state.
 
 ## Authenticate
 
@@ -25,17 +25,17 @@ let client = try MattermostClient(
 let me = try await client.currentUser()
 ```
 
-Probe server health and client-visible capabilities through the server service:
+Probe server health and client-visible capabilities directly on the client:
 
 ```swift
-let server = try await client.serverService().info()
+let server = try await client.serverInfo()
 print(server.ping.status)
 print(server.clientConfig.buildNumber ?? "unknown build")
 
-let teams = try await client.teamService().joinedTeams()
+let teams = try await client.teams()
 print(teams.first?.displayName ?? "no joined teams")
 if let team = teams.first {
-    let members = try await client.teamService().members(teamID: team.id, perPage: 20)
+    let members = try await client.teamMembers(teamID: team.id, perPage: 20)
     print(members.count)
 }
 ```
@@ -85,7 +85,7 @@ func hydrate(client: MattermostClient, storeURL: URL) async throws {
 
 ## Work With Timelines
 
-Use `MattermostTimelineService` for both channel timelines and thread timelines:
+Use the client's timeline methods for both channel timelines and thread timelines:
 
 ```swift
 @MainActor
@@ -95,21 +95,19 @@ func loadTimeline(
     channelID: String,
     rootPostID: String
 ) async throws {
-    let timelines = client.timelineService()
-
-    let channelPage = try await timelines.load(
+    let channelPage = try await client.timeline(
         .channel(id: channelID),
         request: MattermostTimelineRequest(perPage: 40)
     )
 
-    let threadPage = try await timelines.load(
+    let threadPage = try await client.timeline(
         .thread(rootPostID: rootPostID),
         request: MattermostTimelineRequest(perPage: 40)
     )
 
-    _ = try await timelines.sync(.channel(id: channelID), to: store)
-    let cachedChannelPosts = try timelines.cachedPosts(.channel(id: channelID), in: store)
-    let visibleCachedPosts = try timelines.cachedPosts(.channel(id: channelID), in: store, includeDeleted: false)
+    _ = try await client.syncTimeline(.channel(id: channelID), to: store)
+    let cachedChannelPosts = try store.cachedTimeline(.channel(id: channelID))
+    let visibleCachedPosts = try store.cachedTimeline(.channel(id: channelID), includeDeleted: false)
 
     print(channelPage.posts.count)
     print(threadPage.posts.count)

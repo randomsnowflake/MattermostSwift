@@ -1067,6 +1067,31 @@ func httpClientBuildsBatchStatusRequestWithJSONBody() throws {
 }
 
 @Test
+func httpClientBuildsUpdateStatusRequestWithJSONBody() throws {
+    let configuration = try MattermostConfiguration(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        authentication: .bearerToken("token")
+    )
+    let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
+
+    let request: URLRequest = try httpClient.makeJSONRequest(
+        endpoint: "/users/user-a/status",
+        method: "PUT",
+        body: MattermostUserStatusUpdateRequest(
+            userId: "user-a",
+            status: "dnd",
+            dndEndTime: 1_780_000_000
+        )
+    )
+    let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: Any]
+
+    #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/user-a/status")
+    #expect(body?["user_id"] as? String == "user-a")
+    #expect(body?["status"] as? String == "dnd")
+    #expect(body?["dnd_end_time"] as? Int == 1_780_000_000)
+}
+
+@Test
 func httpClientBuildsMultipartBody() throws {
     let httpClient = MattermostHTTPClient(
         configuration: try MattermostConfiguration(

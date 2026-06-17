@@ -149,19 +149,19 @@ guard let serverURL = URL(string: "https://mattermost.example.com") else {
 }
 
 let client = try MattermostClient(serverURL: serverURL, token: "personal-access-token")
-let users = try await client.userService().search(term: "alice")
+let users = try await client.searchUsers(term: "alice")
 print(users.map(\.username))
-let resolvedUsers = try await client.userService().users(ids: users.map(\.id))
+let resolvedUsers = try await client.users(ids: users.map(\.id))
 print(resolvedUsers.count)
-let namedUsers = try await client.userService().users(usernames: ["alice"])
+let namedUsers = try await client.users(usernames: ["alice"])
 print(namedUsers.count)
-let suggestions = try await client.userService().autocomplete(name: "ali")
+let suggestions = try await client.autocompleteUsers(name: "ali")
 print(suggestions.allUsers.map(\.username))
-let knownUserIDs = try await client.userService().knownUserIDs()
+let knownUserIDs = try await client.knownUserIDs()
 print(knownUserIDs.count)
-let notifyProps = try await client.notificationService().channelNotifyProps(channelID: "channel-id")
+let notifyProps = try await client.channelMember(channelID: "channel-id").channelNotifyProps
 print(notifyProps.desktop ?? "default")
-let dm = try await client.channelService().createDirectChannel(
+let dm = try await client.createDirectChannel(
     userID: "current-user-id",
     otherUserID: "other-user-id"
 )
@@ -175,26 +175,18 @@ let session = try await MattermostClient.login(
 let passwordClient = try session.client(serverURL: serverURL)
 print(session.tokenSource)
 
-let users = client.userService()
-let teams = client.teamService()
-let channelService = client.channelService()
-let posts = client.postService()
-let preferences = client.preferenceService()
-let threads = client.threadService()
-let timelines = client.timelineService()
-
-let user = try await users.currentUser()
-let status = try await users.status(userID: user.id)
-let avatar = try await users.profileImage(userID: user.id)
-let joinedTeams = try await teams.joinedTeams()
-let teamMembers = try await teams.members(teamID: "team-id", perPage: 20)
-let channels = try await channelService.joinedChannelsAcrossTeams()
-let publicChannels = try await channelService.publicChannels(teamID: "team-id", perPage: 20)
-let townSquare = try await channelService.channel(teamID: "team-id", name: "town-square")
-let stats = try await channelService.stats(channelID: townSquare.id)
-let timezones = try await channelService.timezones(channelID: townSquare.id)
-let memberCounts = try await channelService.memberCounts(channelIDs: [townSquare.id])
-let userPreferences = try await preferences.list()
+let user = try await client.currentUser()
+let status = try await client.status(userID: user.id)
+let avatar = try await client.userProfileImage(userID: user.id)
+let joinedTeams = try await client.teams()
+let teamMembers = try await client.teamMembers(teamID: "team-id", perPage: 20)
+let channels = try await client.joinedChannelsAcrossTeams()
+let publicChannels = try await client.publicChannels(teamID: "team-id", perPage: 20)
+let townSquare = try await client.channel(teamID: "team-id", name: "town-square")
+let stats = try await client.channelStats(channelID: townSquare.id)
+let timezones = try await client.channelTimezones(channelID: townSquare.id)
+let memberCounts = try await client.channelMemberCounts(channelIDs: [townSquare.id])
+let userPreferences = try await client.preferences()
 let store = try await MattermostStore(inMemory: true)
 
 try await store.upsert(user: user)
@@ -207,10 +199,10 @@ print(teamMembers.count)
 if let channel = channels.first {
     let unread = try await client.channelUnread(channelID: channel.id)
     let member = try await client.channelMember(channelID: channel.id)
-    let pageOfMembers = try await channelService.channelMembers(channelID: channel.id, perPage: 20)
-    let resolvedMembers = try await channelService.channelMembers(channelID: channel.id, userIDs: [user.id])
+    let pageOfMembers = try await client.channelMembers(channelID: channel.id, perPage: 20)
+    let resolvedMembers = try await client.channelMembers(channelID: channel.id, userIDs: [user.id])
 
-    let post = try await posts.sendPost(
+    let post = try await client.sendPost(
         channelID: channel.id,
         message: "hello from MattermostSwift",
         props: [
@@ -220,11 +212,11 @@ if let channel = channels.first {
 
     try await store.upsert(member: member)
     try await store.upsert(unread: unread, userID: user.id)
-    let postSync = try await posts.syncChannelPosts(channelID: channel.id, to: store)
-    let timeline = try await timelines.load(.channel(id: channel.id))
-    let pinned = try await posts.pinnedPosts(channelID: channel.id)
-    let updates = try await posts.postsSince(channelID: channel.id, since: postSync.cursorLastSyncAt)
-    _ = try await posts.postsAroundLastUnread(
+    let postSync = try await client.syncChannelPosts(channelID: channel.id, to: store)
+    let timeline = try await client.timeline(.channel(id: channel.id))
+    let pinned = try await client.pinnedPosts(channelID: channel.id)
+    let updates = try await client.postsSince(channelID: channel.id, since: postSync.cursorLastSyncAt)
+    _ = try await client.postsAroundLastUnread(
         channelID: channel.id,
         collapsedThreads: true,
         collapsedThreadsExtended: true
@@ -233,7 +225,7 @@ if let channel = channels.first {
 }
 
 if let teamID = channels.compactMap(\.teamId).first {
-    let threadList = try await threads.list(teamID: teamID, request: MattermostThreadListRequest(perPage: 20, extended: true))
+    let threadList = try await client.userThreads(teamID: teamID, request: MattermostThreadListRequest(perPage: 20, extended: true))
     try await store.upsert(threads: threadList, userID: user.id, teamID: teamID)
     try await store.save()
 }

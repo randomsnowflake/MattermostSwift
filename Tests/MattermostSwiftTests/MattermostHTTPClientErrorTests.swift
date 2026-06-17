@@ -68,7 +68,7 @@ struct MattermostHTTPClientErrorTests {
             return try Self.response(statusCode: 200, body: body, contentType: "image/png", request: request)
         }
 
-        let data = try await client.userService().profileImage()
+        let data = try await client.userProfileImage()
 
         #expect(data == Data([0x89, 0x50, 0x4E, 0x47, 0x00]))
     }
@@ -83,7 +83,7 @@ struct MattermostHTTPClientErrorTests {
             return try Self.response(statusCode: 200, body: body, contentType: "image/jpeg", request: request)
         }
 
-        let data = try await client.userService().defaultProfileImage(userID: "user-id")
+        let data = try await client.defaultUserProfileImage(userID: "user-id")
 
         #expect(data == Data([0xFF, 0xD8, 0xFF, 0x00]))
     }
@@ -107,7 +107,7 @@ struct MattermostHTTPClientErrorTests {
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
 
-        let members = try await client.channelService().channelMembers(channelID: "channel-id", page: -2, perPage: 0)
+        let members = try await client.channelMembers(channelID: "channel-id", page: -2, perPage: 0)
 
         #expect(members.isEmpty)
     }
@@ -119,7 +119,7 @@ struct MattermostHTTPClientErrorTests {
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
 
-        let channels = try await client.channelService().publicChannels(teamID: "team-id", page: -2, perPage: 0)
+        let channels = try await client.publicChannels(teamID: "team-id", page: -2, perPage: 0)
 
         #expect(channels.isEmpty)
     }
@@ -131,7 +131,7 @@ struct MattermostHTTPClientErrorTests {
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
 
-        let members = try await client.teamService().members(
+        let members = try await client.teamMembers(
             teamID: "team-id",
             page: -2,
             perPage: 0,
@@ -200,7 +200,7 @@ struct MattermostHTTPClientErrorTests {
             return try Self.response(statusCode: 200, body: body, request: request)
         }
 
-        let result = try await client.postService().syncChannelPosts(
+        let result = try await client.syncChannelPosts(
             channelID: "channel-id",
             to: store
         )

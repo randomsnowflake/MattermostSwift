@@ -30,32 +30,32 @@ struct MattermostSwiftCLI {
             printUser(user)
         case .profileImage(let userID):
             let resolvedUserID = try await resolvedUserID(userID, client: client)
-            let data = try await client.userService().profileImage(userID: resolvedUserID)
+            let data = try await client.userProfileImage(userID: resolvedUserID)
             printImageDownload(label: "profile-image", userID: resolvedUserID, data: data)
         case .defaultProfileImage(let userID):
             let resolvedUserID = try await resolvedUserID(userID, client: client)
-            let data = try await client.userService().defaultProfileImage(userID: resolvedUserID)
+            let data = try await client.defaultUserProfileImage(userID: resolvedUserID)
             printImageDownload(label: "default-profile-image", userID: resolvedUserID, data: data)
         case .getUsers(let userIDs):
-            let users = try await client.userService().users(ids: userIDs)
+            let users = try await client.users(ids: userIDs)
             printUsers(users)
         case .getUsersByUsername(let usernames):
-            let users = try await client.userService().users(usernames: usernames)
+            let users = try await client.users(usernames: usernames)
             printUsers(users)
         case .listChannelUsers(let channelID):
             let users = try await client.users(channelID: resolvedChannelID(channelID), perPage: 20)
             printUsers(users)
         case .searchUsers(let terms):
-            let users = try await client.userService().search(term: terms, limit: 20)
+            let users = try await client.searchUsers(term: terms, limit: 20)
             printUsers(users)
         case .autocompleteUsers(let name):
-            let autocomplete = try await client.userService().autocomplete(name: name, limit: 20)
+            let autocomplete = try await client.autocompleteUsers(name: name, limit: 20)
             printUserAutocomplete(autocomplete)
         case .knownUsers(let includeProfiles):
-            let userIDs = try await client.userService().knownUserIDs()
+            let userIDs = try await client.knownUserIDs()
             print("known-users: \(userIDs.count)")
             if includeProfiles {
-                let users = try await client.userService().users(ids: userIDs)
+                let users = try await client.users(ids: userIDs)
                 printUsers(users)
             } else {
                 for userID in userIDs.sorted() {
@@ -76,7 +76,7 @@ struct MattermostSwiftCLI {
             let team = try await client.team(id: try await resolvedTeamID(teamID, client: client))
             printTeam(team)
         case .listTeamMembers(let teamID):
-            let members = try await client.teamService().members(
+            let members = try await client.teamMembers(
                 teamID: try await resolvedTeamID(teamID, client: client),
                 page: 0,
                 perPage: 20,
@@ -87,36 +87,36 @@ struct MattermostSwiftCLI {
             let channels = try await loadChannels(client: client)
             printChannels(channels)
         case .listPublicChannels(let teamID):
-            let channels = try await client.channelService().publicChannels(
+            let channels = try await client.publicChannels(
                 teamID: try await resolvedTeamID(teamID, client: client),
                 page: 0,
                 perPage: 20
             )
             printChannels(channels)
         case .channelInfo(let channelID):
-            let channel = try await client.channelService().channel(id: resolvedChannelID(channelID))
+            let channel = try await client.channel(id: resolvedChannelID(channelID))
             printChannel(channel)
         case .channelByName(let teamID, let name):
-            let channel = try await client.channelService().channel(
+            let channel = try await client.channel(
                 teamID: try await resolvedTeamID(teamID, client: client),
                 name: name
             )
             printChannel(channel)
         case .channelByTeamName(let teamName, let channelName):
-            let channel = try await client.channelService().channel(
+            let channel = try await client.channel(
                 teamName: teamName,
                 channelName: channelName
             )
             printChannel(channel)
         case .channelStats(let channelID):
-            let stats = try await client.channelService().stats(channelID: resolvedChannelID(channelID))
+            let stats = try await client.channelStats(channelID: resolvedChannelID(channelID))
             printChannelStats(stats)
         case .channelTimezones(let channelID):
-            let timezones = try await client.channelService().timezones(channelID: resolvedChannelID(channelID))
+            let timezones = try await client.channelTimezones(channelID: resolvedChannelID(channelID))
             printTimezones(timezones)
         case .channelMemberCounts(let channelIDs):
             let resolvedChannelIDs = try channelIDs.isEmpty ? [resolvedChannelID(nil)] : channelIDs
-            let counts = try await client.channelService().memberCounts(channelIDs: resolvedChannelIDs)
+            let counts = try await client.channelMemberCounts(channelIDs: resolvedChannelIDs)
             printChannelMemberCounts(counts)
         case .searchChannels(let terms):
             if let teamID = try? await loadTeamID(client: client) {
@@ -127,37 +127,37 @@ struct MattermostSwiftCLI {
                 printChannels(results.channels)
             }
         case .searchGroupChannels(let terms):
-            let channels = try await client.channelService().searchGroupChannels(term: terms)
+            let channels = try await client.searchGroupChannels(term: terms)
             printChannels(channels)
         case .directChannelTest(let userID):
             try await runDirectChannelTest(client: client, userID: userID)
         case .createGroupChannel(let userIDs):
-            let channel = try await client.channelService().createGroupChannel(userIDs: userIDs)
+            let channel = try await client.createGroupChannel(userIDs: userIDs)
             printChannel(channel)
         case .channelMember(let channelID):
             let member = try await client.channelMember(channelID: resolvedChannelID(channelID))
             printChannelMember(member)
         case .listChannelMembers(let channelID):
-            let members = try await client.channelService().channelMembers(
+            let members = try await client.channelMembers(
                 channelID: resolvedChannelID(channelID),
                 page: 0,
                 perPage: 20
             )
             printChannelMembers(members)
         case .channelMembersByID(let channelID, let userIDs):
-            let members = try await client.channelService().channelMembers(
+            let members = try await client.channelMembers(
                 channelID: resolvedChannelID(channelID),
                 userIDs: userIDs
             )
             printChannelMembers(members)
         case .addChannelMember(let channelID, let userID):
-            let member = try await client.channelService().addChannelMember(
+            let member = try await client.addChannelMember(
                 channelID: resolvedChannelID(channelID),
                 userID: userID
             )
             printChannelMember(member)
         case .removeChannelMember(let channelID, let userID):
-            let status = try await client.channelService().removeChannelMember(
+            let status = try await client.removeChannelMember(
                 channelID: resolvedChannelID(channelID),
                 userID: userID
             )
@@ -216,7 +216,7 @@ struct MattermostSwiftCLI {
             let postList = try await client.posts(channelID: resolvedChannelID(channelID), perPage: 20)
             printPosts(postList.orderedPosts)
         case .pinnedPosts(let channelID):
-            let postList = try await client.postService().pinnedPosts(channelID: resolvedChannelID(channelID))
+            let postList = try await client.pinnedPosts(channelID: resolvedChannelID(channelID))
             printPosts(postList.orderedPosts)
         case .listPostUpdates(let channelID, let since):
             let postList = try await client.postsSince(channelID: resolvedChannelID(channelID), since: since)
@@ -656,7 +656,7 @@ struct MattermostSwiftCLI {
 
     private static func runNotifyPropsTest(client: MattermostClient) async throws {
         let channelID = try resolvedChannelID(nil)
-        let props = try await client.notificationService().channelNotifyProps(channelID: channelID)
+        let props = try await client.channelMember(channelID: channelID).channelNotifyProps
 
         print("channel: \(channelID)")
         printNotifyProps(props)
@@ -676,7 +676,7 @@ struct MattermostSwiftCLI {
             otherUserID = peer.id
         }
 
-        let channel = try await client.channelService().createDirectChannel(
+        let channel = try await client.createDirectChannel(
             userID: currentUser.id,
             otherUserID: otherUserID
         )
@@ -817,8 +817,7 @@ struct MattermostSwiftCLI {
     }
 
     private static func runPreferenceRoundTripTest(client: MattermostClient) async throws {
-        let user = try await client.userService().currentUser()
-        let preferences = client.preferenceService()
+        let user = try await client.currentUser()
         let suffix = Int(Date.now.timeIntervalSince1970)
         let category = "mmswift_test"
         let name = "preference_roundtrip_\(suffix)"
@@ -831,15 +830,15 @@ struct MattermostSwiftCLI {
         var saved = false
 
         do {
-            let saveStatus = try await preferences.save([preference], userID: user.id)
+            let saveStatus = try await client.savePreferences([preference], userID: user.id)
             saved = true
-            let loaded = try await preferences.preference(userID: user.id, category: category, name: name)
-            let categoryPreferences = try await preferences.list(userID: user.id, category: category)
-            let deleteStatus = try await preferences.delete([preference], userID: user.id)
+            let loaded = try await client.preference(userID: user.id, category: category, name: name)
+            let categoryPreferences = try await client.preferences(userID: user.id, category: category)
+            let deleteStatus = try await client.deletePreferences([preference], userID: user.id)
             saved = false
             let afterDelete: [MattermostPreference]
             do {
-                afterDelete = try await preferences.list(userID: user.id, category: category)
+                afterDelete = try await client.preferences(userID: user.id, category: category)
             } catch MattermostError.httpStatus(let code, _) where code == 404 {
                 afterDelete = []
             }
@@ -853,7 +852,7 @@ struct MattermostSwiftCLI {
             print("deleted: \(!stillPresent)")
         } catch {
             if saved {
-                _ = try? await preferences.delete([preference], userID: user.id)
+                _ = try? await client.deletePreferences([preference], userID: user.id)
             }
             throw error
         }
@@ -1710,7 +1709,7 @@ struct MattermostSwiftCLI {
         let suffix = String(Int(Date.now.timeIntervalSince1970 * 1000))
         let name = "mmswift-test-\(suffix)"
         let displayName = "MattermostSwift Test \(suffix)"
-        let channel = try await client.channelService().createChannel(
+        let channel = try await client.createChannel(
             teamID: teamID,
             name: name,
             displayName: displayName,
@@ -1743,7 +1742,7 @@ struct MattermostSwiftCLI {
             throw CLIError.usage("New test channel names must start with mmswift-test and contain only lowercase letters, numbers, and hyphens.")
         }
 
-        let renamed = try await client.channelService().patchChannel(
+        let renamed = try await client.patchChannel(
             id: channelID,
             name: newName,
             displayName: "MattermostSwift Test Renamed \(suffix)"
@@ -1765,7 +1764,7 @@ struct MattermostSwiftCLI {
             throw CLIError.usage("Refusing to archive a channel that does not look like a MattermostSwift test channel.")
         }
 
-        let status = try await client.channelService().deleteChannel(id: channelID)
+        let status = try await client.deleteChannel(id: channelID)
         print("channel: \(channelID)")
         print("archive-status: \(status.status)")
     }

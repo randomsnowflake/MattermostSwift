@@ -679,26 +679,6 @@ public final class MattermostCachedUser {
     public var position: String?
     public var locale: String?
 
-    public init(
-        id: String,
-        username: String,
-        email: String? = nil,
-        firstName: String? = nil,
-        lastName: String? = nil,
-        nickname: String? = nil,
-        position: String? = nil,
-        locale: String? = nil
-    ) {
-        self.id = id
-        self.username = username
-        self.email = email
-        self.firstName = firstName
-        self.lastName = lastName
-        self.nickname = nickname
-        self.position = position
-        self.locale = locale
-    }
-
     init(_ user: MattermostUser) {
         self.id = user.id
         self.username = user.username
@@ -772,20 +752,6 @@ public final class MattermostCachedTeam {
     public var descriptionText: String?
     public var type: String?
 
-    public init(
-        id: String,
-        name: String,
-        displayName: String,
-        descriptionText: String? = nil,
-        type: String? = nil
-    ) {
-        self.id = id
-        self.name = name
-        self.displayName = displayName
-        self.descriptionText = descriptionText
-        self.type = type
-    }
-
     init(_ team: MattermostTeam) {
         id = team.id
         name = team.name
@@ -814,30 +780,6 @@ public final class MattermostCachedChannel {
     public var header: String?
     public var purpose: String?
     public var deleteAt: Int64?
-
-    public init(
-        id: String,
-        createAt: Int64? = nil,
-        updateAt: Int64? = nil,
-        teamId: String? = nil,
-        name: String,
-        displayName: String,
-        type: String,
-        header: String? = nil,
-        purpose: String? = nil,
-        deleteAt: Int64? = nil
-    ) {
-        self.id = id
-        self.createAt = createAt
-        self.updateAt = updateAt
-        self.teamId = teamId
-        self.name = name
-        self.displayName = displayName
-        self.type = type
-        self.header = header
-        self.purpose = purpose
-        self.deleteAt = deleteAt
-    }
 
     init(_ channel: MattermostChannel) {
         id = channel.id
@@ -901,27 +843,6 @@ public final class MattermostCachedChannelMember {
         MattermostChannelNotifyProps(notifyProps)
     }
 
-    public init(
-        channelId: String,
-        userId: String,
-        roles: String? = nil,
-        lastViewedAt: Int64? = nil,
-        msgCount: Int? = nil,
-        mentionCount: Int? = nil,
-        notifyProps: [String: String] = [:],
-        lastUpdateAt: Int64? = nil
-    ) {
-        id = Self.cacheID(channelID: channelId, userID: userId)
-        self.channelId = channelId
-        self.userId = userId
-        self.roles = roles
-        self.lastViewedAt = lastViewedAt
-        self.msgCount = msgCount
-        self.mentionCount = mentionCount
-        self.notifyProps = notifyProps
-        self.lastUpdateAt = lastUpdateAt
-    }
-
     init(_ member: MattermostChannelMember) {
         id = Self.cacheID(channelID: member.channelId, userID: member.userId)
         channelId = member.channelId
@@ -958,21 +879,6 @@ public final class MattermostCachedChannelUnread {
     public var userId: String = ""
     public var msgCount: Int = 0
     public var mentionCount: Int = 0
-
-    public init(
-        teamId: String? = nil,
-        channelId: String,
-        userId: String,
-        msgCount: Int,
-        mentionCount: Int
-    ) {
-        id = Self.cacheID(channelID: channelId, userID: userId)
-        self.teamId = teamId
-        self.channelId = channelId
-        self.userId = userId
-        self.msgCount = msgCount
-        self.mentionCount = mentionCount
-    }
 
     init(_ unread: MattermostChannelUnread, userID: String) {
         id = Self.cacheID(channelID: unread.channelId, userID: userID)
@@ -1013,33 +919,6 @@ public final class MattermostCachedThread {
 
     public var isUnread: Bool {
         unreadReplies > 0 || unreadMentions > 0
-    }
-
-    public init(
-        rootId: String,
-        userId: String,
-        teamId: String,
-        replyCount: Int64,
-        lastReplyAt: Int64,
-        lastViewedAt: Int64,
-        unreadReplies: Int64,
-        unreadMentions: Int64,
-        isUrgent: Bool,
-        deleteAt: Int64,
-        participantIds: [String] = []
-    ) {
-        id = Self.cacheID(rootID: rootId, userID: userId, teamID: teamId)
-        self.rootId = rootId
-        self.userId = userId
-        self.teamId = teamId
-        self.replyCount = replyCount
-        self.lastReplyAt = lastReplyAt
-        self.lastViewedAt = lastViewedAt
-        self.unreadReplies = unreadReplies
-        self.unreadMentions = unreadMentions
-        self.isUrgent = isUrgent
-        self.deleteAt = deleteAt
-        self.participantIds = participantIds
     }
 
     init(_ thread: MattermostThreadResponse, userID: String, teamID: String) {
@@ -1111,44 +990,6 @@ public final class MattermostCachedPost {
     public var hasReactions: Bool?
     public var propsJSON: String?
     public var metadataJSON: String?
-
-    public init(
-        id: String,
-        createAt: Int64,
-        updateAt: Int64,
-        editAt: Int64,
-        deleteAt: Int64,
-        userId: String,
-        channelId: String,
-        rootId: String,
-        originalId: String? = nil,
-        message: String,
-        type: String,
-        hashtags: String? = nil,
-        pendingPostId: String? = nil,
-        fileIds: [String] = [],
-        hasReactions: Bool? = nil,
-        propsJSON: String? = nil,
-        metadataJSON: String? = nil
-    ) {
-        self.id = id
-        self.createAt = createAt
-        self.updateAt = updateAt
-        self.editAt = editAt
-        self.deleteAt = deleteAt
-        self.userId = userId
-        self.channelId = channelId
-        self.rootId = rootId
-        self.originalId = originalId
-        self.message = message
-        self.type = type
-        self.hashtags = hashtags
-        self.pendingPostId = pendingPostId
-        self.fileIds = fileIds
-        self.hasReactions = hasReactions
-        self.propsJSON = propsJSON
-        self.metadataJSON = metadataJSON
-    }
 
     init(_ post: MattermostPost, propsJSON: String?, metadataJSON: String?) {
         id = post.id
@@ -1247,19 +1088,6 @@ public final class MattermostCachedReaction {
     public var emojiName: String = ""
     public var createAt: Int64?
 
-    public init(
-        userId: String,
-        postId: String,
-        emojiName: String,
-        createAt: Int64? = nil
-    ) {
-        id = Self.cacheID(userID: userId, postID: postId, emojiName: emojiName)
-        self.userId = userId
-        self.postId = postId
-        self.emojiName = emojiName
-        self.createAt = createAt
-    }
-
     init(_ reaction: MattermostReaction) {
         id = Self.cacheID(
             userID: reaction.userId,
@@ -1299,36 +1127,6 @@ public final class MattermostCachedFile {
     public var width: Int?
     public var height: Int?
     public var hasPreviewImage: Bool?
-
-    public init(
-        id: String,
-        userId: String? = nil,
-        postId: String? = nil,
-        createAt: Int64? = nil,
-        updateAt: Int64? = nil,
-        deleteAt: Int64? = nil,
-        name: String,
-        extensionName: String? = nil,
-        size: Int64? = nil,
-        mimeType: String? = nil,
-        width: Int? = nil,
-        height: Int? = nil,
-        hasPreviewImage: Bool? = nil
-    ) {
-        self.id = id
-        self.userId = userId
-        self.postId = postId
-        self.createAt = createAt
-        self.updateAt = updateAt
-        self.deleteAt = deleteAt
-        self.name = name
-        self.extensionName = extensionName
-        self.size = size
-        self.mimeType = mimeType
-        self.width = width
-        self.height = height
-        self.hasPreviewImage = hasPreviewImage
-    }
 
     init(_ file: MattermostFileInfo) {
         id = file.id
@@ -1374,30 +1172,6 @@ public final class MattermostCachedSidebarCategory {
     public var sorting: String?
     public var muted: Bool?
     public var collapsed: Bool?
-
-    public init(
-        id: String,
-        userId: String? = nil,
-        teamId: String? = nil,
-        displayName: String,
-        type: String,
-        sortOrder: Int? = nil,
-        channelIds: [String] = [],
-        sorting: String? = nil,
-        muted: Bool? = nil,
-        collapsed: Bool? = nil
-    ) {
-        self.id = id
-        self.userId = userId
-        self.teamId = teamId
-        self.displayName = displayName
-        self.type = type
-        self.sortOrder = sortOrder
-        self.channelIds = channelIds
-        self.sorting = sorting
-        self.muted = muted
-        self.collapsed = collapsed
-    }
 
     init(_ category: MattermostSidebarCategory) {
         id = category.id

@@ -132,6 +132,18 @@ public struct MattermostClient: Sendable {
         try await httpClient.post("/users/status/ids", body: userIDs)
     }
 
+    /// Manually sets a user's presence status.
+    public func setStatus(userID: String, status: String, dndEndTime: Int64? = nil) async throws -> MattermostUserStatus {
+        try await httpClient.put(
+            "/users/\(userID)/status",
+            body: MattermostUserStatusUpdateRequest(
+                userId: userID,
+                status: status,
+                dndEndTime: dndEndTime
+            )
+        )
+    }
+
     /// Loads basic server health and capability metadata.
     public func serverInfo() async throws -> MattermostServerInfo {
         async let ping = serverPing()
@@ -1377,7 +1389,7 @@ private extension HTTPURLResponse {
     }
 }
 
-private extension Optional where Wrapped == String {
+extension Optional where Wrapped == String {
     var nonEmpty: String? {
         guard let value = self, !value.isEmpty else {
             return nil
@@ -1386,7 +1398,7 @@ private extension Optional where Wrapped == String {
     }
 }
 
-private extension String {
+extension String {
     var nonEmpty: String? {
         isEmpty ? nil : self
     }
