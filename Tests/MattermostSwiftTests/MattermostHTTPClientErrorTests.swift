@@ -89,6 +89,97 @@ struct MattermostHTTPClientErrorTests {
     }
 
     @Test
+    func clientAttachesMobileDeviceToSession() async throws {
+        let client = try Self.makeClient { request in
+            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/sessions/device")
+            #expect(request.httpMethod == "PUT")
+            let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
+            #expect(body?["device_id"] as? String == "apple:apns-token")
+            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+        }
+
+        let status = try await client.attachMobileDevice(deviceID: "apple:apns-token")
+
+        #expect(status.isOK)
+    }
+
+    @Test
+    func clientDetachesMobileDeviceFromSession() async throws {
+        let client = try Self.makeClient { request in
+            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/sessions/device")
+            #expect(request.httpMethod == "DELETE")
+            let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
+            #expect(body?["device_id"] as? String == "apple:apns-token")
+            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+        }
+
+        let status = try await client.detachMobileDevice(deviceID: "apple:apns-token")
+
+        #expect(status.isOK)
+    }
+
+    @Test
+    func clientPinsAndUnpinsPostWithoutBody() async throws {
+        let requested = MattermostRequestLog()
+        let client = try Self.makeClient { request in
+            requested.append("\(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
+            #expect(request.httpBody == nil)
+            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+        }
+
+        _ = try await client.pinPost(id: "post-id")
+        _ = try await client.unpinPost(id: "post-id")
+
+        #expect(requested.values == [
+            "POST https://mattermost.example.com/api/v4/posts/post-id/pin",
+            "POST https://mattermost.example.com/api/v4/posts/post-id/unpin",
+        ])
+    }
+
+    @Test
+    func clientSetsThreadFollowingWithExpectedMethod() async throws {
+        let requested = MattermostRequestLog()
+        let client = try Self.makeClient { request in
+            requested.append("\(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
+            #expect(request.httpBody == nil)
+            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+        }
+
+        _ = try await client.setThreadFollowing(teamID: "team-id", threadID: "thread-id", following: true)
+        _ = try await client.setThreadFollowing(teamID: "team-id", threadID: "thread-id", following: false)
+
+        #expect(requested.values == [
+            "PUT https://mattermost.example.com/api/v4/users/me/teams/team-id/threads/thread-id/following",
+            "DELETE https://mattermost.example.com/api/v4/users/me/teams/team-id/threads/thread-id/following",
+        ])
+    }
+
+    @Test
+    func clientSetsAndClearsCustomStatus() async throws {
+        let requested = MattermostRequestLog()
+        let client = try Self.makeClient { request in
+            requested.append("\(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
+            if request.httpMethod == "PUT" {
+                let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
+                #expect(body?["emoji"] as? String == "coffee")
+                #expect(body?["text"] as? String == "Deep work")
+                #expect(body?["duration"] as? String == "one_hour")
+            } else {
+                #expect(request.httpBody == nil)
+            }
+            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+        }
+
+        _ = try await client.setCustomStatus(MattermostCustomStatus(emoji: "coffee", text: "Deep work", duration: "one_hour"))
+        _ = try await client.clearCustomStatus()
+
+        #expect(requested.values == [
+            "PUT https://mattermost.example.com/api/v4/users/me/status/custom",
+            "DELETE https://mattermost.example.com/api/v4/users/me/status/custom",
+        ])
+    }
+
+    @Test
     func clientClampsChannelUsersPagination() async throws {
         let client = try Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users?in_channel=channel-id&page=0&per_page=1")
@@ -372,6 +463,47 @@ struct MattermostHTTPClientErrorTests {
             headerFields: ["Content-Type": contentType]
         ))
         return (response, body)
+    }
+
+    private static func bodyData(from request: URLRequest) throws -> Data {
+        if let body = request.httpBody {
+            return body
+        }
+        let stream = try #require(request.httpBodyStream)
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while stream.hasBytesAvailable {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            if count < 0 {
+                throw stream.streamError ?? MattermostTestError.unreadableBodyStream
+            }
+            if count == 0 {
+                break
+            }
+            data.append(buffer, count: count)
+        }
+        return data
+    }
+}
+
+private enum MattermostTestError: Error {
+    case unreadableBodyStream
+}
+
+private final class MattermostRequestLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [String] = []
+
+    var values: [String] {
+        lock.withLock { storage }
+    }
+
+    func append(_ value: String) {
+        lock.withLock {
+            storage.append(value)
+        }
     }
 }
 

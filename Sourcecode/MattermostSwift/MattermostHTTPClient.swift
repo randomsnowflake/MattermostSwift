@@ -33,6 +33,14 @@ struct MattermostHTTPClient: Sendable {
         try await send(endpoint, method: "POST", body: body, queryItems: queryItems)
     }
 
+    func post<Response: Decodable & Sendable>(
+        _ endpoint: String,
+        queryItems: [URLQueryItem] = []
+    ) async throws -> Response {
+        let request = try makeRequest(endpoint: endpoint, method: "POST", queryItems: queryItems)
+        return try await perform(request: request)
+    }
+
     func put<Request: Encodable & Sendable, Response: Decodable & Sendable>(
         _ endpoint: String,
         body: Request,
@@ -41,12 +49,28 @@ struct MattermostHTTPClient: Sendable {
         try await send(endpoint, method: "PUT", body: body, queryItems: queryItems)
     }
 
+    func put<Response: Decodable & Sendable>(
+        _ endpoint: String,
+        queryItems: [URLQueryItem] = []
+    ) async throws -> Response {
+        let request = try makeRequest(endpoint: endpoint, method: "PUT", queryItems: queryItems)
+        return try await perform(request: request)
+    }
+
     func delete<Response: Decodable & Sendable>(
         _ endpoint: String,
         queryItems: [URLQueryItem] = []
     ) async throws -> Response {
         let request = try makeRequest(endpoint: endpoint, method: "DELETE", queryItems: queryItems)
         return try await perform(request: request)
+    }
+
+    func delete<Request: Encodable & Sendable, Response: Decodable & Sendable>(
+        _ endpoint: String,
+        body: Request,
+        queryItems: [URLQueryItem] = []
+    ) async throws -> Response {
+        try await send(endpoint, method: "DELETE", body: body, queryItems: queryItems)
     }
 
     func data(
