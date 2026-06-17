@@ -4,20 +4,10 @@ import Foundation
 public struct MattermostLiveEventStream: Sendable {
     private let configuration: MattermostConfiguration
     private let urlSession: URLSession
-    private let decoder: JSONDecoder
-    private let encoder: JSONEncoder
 
     public init(configuration: MattermostConfiguration, urlSession: URLSession = .mattermost) {
         self.configuration = configuration
         self.urlSession = urlSession
-
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        self.decoder = decoder
-
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        self.encoder = encoder
     }
 
     /// Connects, authenticates, and yields server events until cancelled or the socket fails.
@@ -138,7 +128,7 @@ public struct MattermostLiveEventStream: Sendable {
             )
             // Must be a TEXT frame: Mattermost silently drops the socket right after `hello`
             // if the authentication_challenge arrives as a binary frame.
-            let payload = try self.encoder.encode(auth)
+            let payload = try mattermostSnakeCaseEncoder.encode(auth)
             try await self.send(.string(String(decoding: payload, as: UTF8.self)), to: webSocketTask)
 
             var pendingEvents: [MattermostLiveEvent] = []
@@ -210,7 +200,7 @@ public struct MattermostLiveEventStream: Sendable {
             throw MattermostError.transportFailure("Mattermost WebSocket returned an unsupported message type.")
         }
 
-        return try decoder.decode(MattermostWebSocketEnvelope.self, from: data)
+        return try mattermostSnakeCaseDecoder.decode(MattermostWebSocketEnvelope.self, from: data)
     }
 
     private func send(_ message: URLSessionWebSocketTask.Message, to webSocketTask: URLSessionWebSocketTask) async throws {
@@ -803,11 +793,15 @@ private struct MattermostWebSocketError: Decodable, Sendable {
     let message: String?
 }
 
-/// Shared snake_case decoder reused by `MattermostLiveEvent` payload decoding to avoid
-/// allocating a configured `JSONDecoder` per event on the live hot path.
+/// Shared snake_case coders reused by API and WebSocket payload handling.
 let mattermostSnakeCaseDecoder: JSONDecoder = {
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     return decoder
 }()
 
+let mattermostSnakeCaseEncoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    return encoder
+}()

@@ -173,29 +173,7 @@ public struct MattermostLiveSyncService: Sendable {
             teamID: teamID,
             teamName: teamName,
             options: options,
-            lifecycleEvents: { client.liveEventStream().lifecycleEvents(policy: reconnectPolicy) },
-            backfill: { store, teamID, teamName, options in
-                try await backfill(
-                    store: store,
-                    teamID: teamID,
-                    teamName: teamName,
-                    options: options
-                )
-            },
-            refreshUnread: { userID, channelID in
-                try await client.channelUnread(userID: userID, channelID: channelID)
-            },
-            refreshSidebarCategories: { teamID in
-                try await client.sidebarCategories(teamID: teamID)
-            },
-            refreshThreadState: { userID, teamID, threadID in
-                try await client.userThread(
-                    userID: userID,
-                    teamID: teamID,
-                    threadID: threadID,
-                    extended: true
-                )
-            }
+            lifecycleEvents: { client.liveEventStream().lifecycleEvents(policy: reconnectPolicy) }
         )
     }
 

@@ -49,7 +49,7 @@ private extension URL {
 
     var normalizedMattermostServerURL: URL {
         var components = URLComponents(url: self, resolvingAgainstBaseURL: false)
-        components?.path = path.removingMattermostAPIPath.trimmingSlashes
+        components?.path = path.removingMattermostAPIPath.mattermostTrimmingTrailingSlashes
         components?.query = nil
         components?.fragment = nil
         return components?.url ?? self
@@ -89,13 +89,5 @@ private extension String {
         }
 
         return self
-    }
-
-    var trimmingSlashes: String {
-        var result = self
-        while result.hasSuffix("/") {
-            result.removeLast()
-        }
-        return result
     }
 }

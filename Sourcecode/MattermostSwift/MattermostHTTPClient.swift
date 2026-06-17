@@ -3,20 +3,10 @@ import Foundation
 struct MattermostHTTPClient: Sendable {
     private let configuration: MattermostConfiguration
     private let urlSession: URLSession
-    private let decoder: JSONDecoder
-    private let encoder: JSONEncoder
 
     init(configuration: MattermostConfiguration, urlSession: URLSession) {
         self.configuration = configuration
         self.urlSession = urlSession
-
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        self.decoder = decoder
-
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        self.encoder = encoder
     }
 
     func get<Response: Decodable & Sendable>(
@@ -26,22 +16,13 @@ struct MattermostHTTPClient: Sendable {
         let request = try makeRequest(endpoint: endpoint, method: "GET", queryItems: queryItems)
         let (data, response) = try await loadData(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw MattermostError.invalidHTTPResponse
-        }
-
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            throw MattermostError.httpStatus(
-                code: httpResponse.statusCode,
-                message: decodeMattermostAPIError(from: data)?.message
-            )
-        }
+        _ = try validate(data, response)
 
         guard !data.isEmpty else {
             throw MattermostError.emptyResponse
         }
 
-        return try decoder.decode(Response.self, from: data)
+        return try mattermostSnakeCaseDecoder.decode(Response.self, from: data)
     }
 
     func post<Request: Encodable & Sendable, Response: Decodable & Sendable>(
@@ -75,16 +56,7 @@ struct MattermostHTTPClient: Sendable {
         let request = try makeRequest(endpoint: endpoint, method: "GET", queryItems: queryItems)
         let (data, response) = try await loadData(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw MattermostError.invalidHTTPResponse
-        }
-
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            throw MattermostError.httpStatus(
-                code: httpResponse.statusCode,
-                message: decodeMattermostAPIError(from: data)?.message
-            )
-        }
+        _ = try validate(data, response)
 
         return data
     }
@@ -131,6 +103,19 @@ struct MattermostHTTPClient: Sendable {
         data: Data,
         response: URLResponse
     ) throws -> MattermostHTTPResponse<Response> {
+        let httpResponse = try validate(data, response)
+
+        guard !data.isEmpty else {
+            throw MattermostError.emptyResponse
+        }
+
+        return MattermostHTTPResponse(
+            value: try mattermostSnakeCaseDecoder.decode(Response.self, from: data),
+            httpResponse: httpResponse
+        )
+    }
+
+    private func validate(_ data: Data, _ response: URLResponse) throws -> HTTPURLResponse {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw MattermostError.invalidHTTPResponse
         }
@@ -142,14 +127,7 @@ struct MattermostHTTPClient: Sendable {
             )
         }
 
-        guard !data.isEmpty else {
-            throw MattermostError.emptyResponse
-        }
-
-        return MattermostHTTPResponse(
-            value: try decoder.decode(Response.self, from: data),
-            httpResponse: httpResponse
-        )
+        return httpResponse
     }
 
     // Native async transport. `URLSession.data(for:)` propagates Task cancellation
@@ -193,7 +171,7 @@ struct MattermostHTTPClient: Sendable {
         queryItems: [URLQueryItem] = []
     ) throws -> URLRequest {
         guard var components = URLComponents(
-            url: configuration.apiBaseURL.appending(path: endpoint.trimmingLeadingSlash),
+            url: configuration.apiBaseURL.appending(path: endpoint.mattermostTrimmingLeadingSlashes),
             resolvingAgainstBaseURL: false
         ) else {
             throw MattermostError.invalidEndpoint(endpoint)
@@ -228,7 +206,7 @@ struct MattermostHTTPClient: Sendable {
         queryItems: [URLQueryItem] = []
     ) throws -> URLRequest {
         var request = try makeRequest(endpoint: endpoint, method: method, queryItems: queryItems)
-        request.httpBody = try encoder.encode(body)
+        request.httpBody = try mattermostSnakeCaseEncoder.encode(body)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         return request
     }
@@ -259,7 +237,7 @@ struct MattermostHTTPClient: Sendable {
         guard !data.isEmpty else {
             return nil
         }
-        return try? decoder.decode(MattermostAPIError.self, from: data)
+        return try? mattermostSnakeCaseDecoder.decode(MattermostAPIError.self, from: data)
     }
 }
 
@@ -307,13 +285,6 @@ private extension String {
         return escaped
     }
 
-    var trimmingLeadingSlash: String {
-        var result = self
-        while result.hasPrefix("/") {
-            result.removeFirst()
-        }
-        return result
-    }
 }
 
 private extension Data {
