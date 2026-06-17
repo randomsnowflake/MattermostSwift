@@ -1070,6 +1070,33 @@ func httpClientBuildsMultipartBody() throws {
 }
 
 @Test
+func httpClientEscapesMultipartDispositionValues() throws {
+    let httpClient = MattermostHTTPClient(
+        configuration: try MattermostConfiguration(
+            serverURL: #require(URL(string: "https://mattermost.example.com")),
+            authentication: .bearerToken("token")
+        ),
+        urlSession: .shared
+    )
+
+    let body = httpClient.makeMultipartBody(
+        parts: [
+            MattermostMultipartPart(
+                name: "files\"x\r\nX-Injected: yes",
+                filename: "report\"draft\n.txt",
+                contentType: "text/plain",
+                data: Data("hello".utf8)
+            ),
+        ],
+        boundary: "Boundary"
+    )
+    let text = String(decoding: body, as: UTF8.self)
+
+    #expect(text.contains(#"Content-Disposition: form-data; name="files\"x  X-Injected: yes"; filename="report\"draft .txt""#))
+    #expect(!text.contains("\r\nX-Injected: yes"))
+}
+
+@Test
 func decodesServerPing() throws {
     let json = """
     {
