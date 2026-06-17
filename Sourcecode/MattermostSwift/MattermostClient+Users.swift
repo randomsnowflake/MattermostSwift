@@ -13,9 +13,35 @@ extension MattermostClient {
         try await httpClient.get("/users/\(id)")
     }
 
+    /// Updates editable profile fields for a user. Pass `"me"` for the authenticated user.
+    public func updateUser(id: String, patch: MattermostUserPatch) async throws -> MattermostUser {
+        try await httpClient.put("/users/\(id)/patch", body: patch)
+    }
+
     /// Downloads a user's current profile image. Pass `"me"` for the authenticated user.
     public func userProfileImage(userID: String = "me") async throws -> Data {
         try await httpClient.data("/users/\(userID)/image")
+    }
+
+    /// Updates a user's profile image with raw image bytes.
+    @discardableResult
+    public func updateUserProfileImage(
+        userID: String,
+        data: Data,
+        contentType: String = "application/octet-stream"
+    ) async throws -> MattermostStatusOK {
+        try await httpClient.multipart(
+            "/users/\(userID)/image",
+            method: "PUT",
+            parts: [
+                MattermostMultipartPart(
+                    name: "image",
+                    filename: "profile-image",
+                    contentType: contentType,
+                    data: data
+                ),
+            ]
+        )
     }
 
     /// Downloads the generated default profile image for a user id.

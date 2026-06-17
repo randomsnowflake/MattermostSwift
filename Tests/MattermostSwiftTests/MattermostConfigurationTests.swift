@@ -139,6 +139,39 @@ func httpClientBuildsUserProfileImageRequests() throws {
 }
 
 @Test
+func httpClientBuildsUserPatchRequestWithJSONBody() throws {
+    let configuration = try MattermostConfiguration(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        authentication: .bearerToken("token")
+    )
+    let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
+    let patch = MattermostUserPatch(
+        username: "alice",
+        email: "alice@example.com",
+        firstName: "Alice",
+        lastName: "Ng",
+        nickname: "",
+        position: "Engineer"
+    )
+
+    let request: URLRequest = try httpClient.makeJSONRequest(
+        endpoint: "/users/user-id/patch",
+        method: "PUT",
+        body: patch
+    )
+    let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: Any]
+
+    #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/user-id/patch")
+    #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+    #expect(body?["username"] as? String == "alice")
+    #expect(body?["email"] as? String == "alice@example.com")
+    #expect(body?["first_name"] as? String == "Alice")
+    #expect(body?["last_name"] as? String == "Ng")
+    #expect(body?["nickname"] as? String == "")
+    #expect(body?["position"] as? String == "Engineer")
+}
+
+@Test
 func httpClientBuildsUnauthenticatedLoginRequestWithJSONBody() throws {
     let configuration = try MattermostConfiguration(
         serverURL: #require(URL(string: "https://mattermost.example.com")),
@@ -1124,6 +1157,36 @@ func httpClientBuildsMultipartBody() throws {
     #expect(text.contains(#"Content-Disposition: form-data; name="files"; filename="hello.txt""#))
     #expect(text.contains("Content-Type: text/plain"))
     #expect(text.hasSuffix("--Boundary--\r\n"))
+}
+
+@Test
+func httpClientBuildsMultipartPutBody() throws {
+    let httpClient = MattermostHTTPClient(
+        configuration: try MattermostConfiguration(
+            serverURL: #require(URL(string: "https://mattermost.example.com")),
+            authentication: .bearerToken("token")
+        ),
+        urlSession: .shared
+    )
+
+    let request = try httpClient.makeRequest(endpoint: "/users/user-id/image", method: "PUT")
+    let body = httpClient.makeMultipartBody(
+        parts: [
+            MattermostMultipartPart(
+                name: "image",
+                filename: "avatar.png",
+                contentType: "image/png",
+                data: Data("png".utf8)
+            ),
+        ],
+        boundary: "Boundary"
+    )
+    let text = String(decoding: body, as: UTF8.self)
+
+    #expect(request.httpMethod == "PUT")
+    #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/user-id/image")
+    #expect(text.contains(#"Content-Disposition: form-data; name="image"; filename="avatar.png""#))
+    #expect(text.contains("Content-Type: image/png"))
 }
 
 @Test
