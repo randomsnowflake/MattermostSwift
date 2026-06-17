@@ -30,7 +30,7 @@ let package = Package(
         ),
         .testTarget(
             name: "MattermostSwiftTests",
-            dependencies: ["MattermostSwift"],
+            dependencies: ["MattermostSwift", "MattermostSwiftCLI"],
             path: "Tests/MattermostSwiftTests"
         ),
     ],
