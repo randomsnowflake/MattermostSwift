@@ -275,9 +275,9 @@ struct MattermostMultipartPart: Sendable {
     let data: Data
 
     var contentDisposition: String {
-        var value = "Content-Disposition: form-data; name=\"\(name)\""
+        var value = "Content-Disposition: form-data; name=\"\(name.multipartQuotedStringEscaped)\""
         if let filename {
-            value += "; filename=\"\(filename)\""
+            value += "; filename=\"\(filename.multipartQuotedStringEscaped)\""
         }
         return value
     }
@@ -288,6 +288,25 @@ private struct MattermostAPIError: Decodable, Sendable {
 }
 
 private extension String {
+    var multipartQuotedStringEscaped: String {
+        var escaped = ""
+        escaped.reserveCapacity(count)
+
+        for scalar in unicodeScalars {
+            switch scalar {
+            case "\\", "\"":
+                escaped.append("\\")
+                escaped.unicodeScalars.append(scalar)
+            case "\r", "\n":
+                escaped.append(" ")
+            default:
+                escaped.unicodeScalars.append(scalar)
+            }
+        }
+
+        return escaped
+    }
+
     var trimmingLeadingSlash: String {
         var result = self
         while result.hasPrefix("/") {
