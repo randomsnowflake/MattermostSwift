@@ -2620,6 +2620,8 @@ struct MattermostSwiftCLI {
               swift run MattermostSwiftCLI login-test
               swift run MattermostSwiftCLI check
 
+            Commands ending in -test are live-server diagnostics that use the configured Mattermost environment.
+
             Environment:
               MATTERMOST_URL       Required. Server base URL.
               MATTERMOST_TOKEN     Required. Personal access token.
