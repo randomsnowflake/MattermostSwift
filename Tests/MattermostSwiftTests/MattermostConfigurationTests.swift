@@ -1739,7 +1739,7 @@ func decodesWebSocketLiveEventAndEmbeddedPost() throws {
 }
 
 @Test
-func decodesWebSocketLiveEventWithUnexpectedBroadcastFieldTypes() throws {
+func decodingWebSocketLiveEventThrowsOnUnexpectedBroadcastFieldTypes() throws {
     let json = """
     {
       "event": "custom_plugin_event",
@@ -1755,13 +1755,9 @@ func decodesWebSocketLiveEventWithUnexpectedBroadcastFieldTypes() throws {
     }
     """.data(using: .utf8)!
 
-    let event = try mattermostDecoder.decode(MattermostLiveEvent.self, from: json)
-
-    #expect(event.event == "custom_plugin_event")
-    #expect(event.broadcast?.channelId == nil)
-    #expect(event.broadcast?.teamId == "team-a")
-    #expect(event.broadcast?.omitUsers == nil)
-    #expect(event.data["value"] == .number(1))
+    #expect(throws: DecodingError.self) {
+        _ = try mattermostDecoder.decode(MattermostLiveEvent.self, from: json)
+    }
 }
 
 @Test
