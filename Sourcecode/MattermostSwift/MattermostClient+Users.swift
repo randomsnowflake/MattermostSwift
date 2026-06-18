@@ -8,6 +8,24 @@ extension MattermostClient {
         try await httpClient.get("/users/me")
     }
 
+    /// Checks whether a login id requires a TOTP MFA code.
+    public static func checkMFARequired(
+        serverURL: URL,
+        loginID: String,
+        urlSession: URLSession = .mattermost
+    ) async throws -> Bool {
+        let configuration = try MattermostConfiguration(
+            serverURL: serverURL,
+            authentication: .none
+        )
+        let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: urlSession)
+        let response: MattermostMFARequired = try await httpClient.post(
+            "/users/mfa",
+            body: MattermostMFARequiredRequest(loginId: loginID)
+        )
+        return response.mfaRequired
+    }
+
     /// Loads a user by id. Pass `"me"` for the authenticated user.
     public func user(id: String) async throws -> MattermostUser {
         try await httpClient.get("/users/\(id)")
@@ -16,6 +34,37 @@ extension MattermostClient {
     /// Updates editable profile fields for a user. Pass `"me"` for the authenticated user.
     public func updateUser(id: String, patch: MattermostUserPatch) async throws -> MattermostUser {
         try await httpClient.put("/users/\(id)/patch", body: patch)
+    }
+
+    /// Updates a user's password. `currentPassword` is required when changing your own password.
+    @discardableResult
+    public func changePassword(
+        userID: String,
+        currentPassword: String? = nil,
+        newPassword: String
+    ) async throws -> MattermostStatusOK {
+        try await httpClient.put(
+            "/users/\(userID)/password",
+            body: MattermostPasswordUpdateRequest(currentPassword: currentPassword, newPassword: newPassword)
+        )
+    }
+
+    /// Generates the TOTP MFA secret and QR code payload for a user.
+    public func generateMFA(userID: String) async throws -> MattermostMFASecret {
+        try await httpClient.post("/users/\(userID)/mfa/generate")
+    }
+
+    /// Activates or deactivates TOTP MFA for a user.
+    @discardableResult
+    public func activateMFA(
+        userID: String,
+        code: String? = nil,
+        activate: Bool
+    ) async throws -> MattermostStatusOK {
+        try await httpClient.put(
+            "/users/\(userID)/mfa",
+            body: MattermostMFAUpdateRequest(activate: activate, code: code)
+        )
     }
 
     /// Downloads a user's current profile image. Pass `"me"` for the authenticated user.
@@ -155,6 +204,26 @@ extension MattermostClient {
     @discardableResult
     public func clearCustomStatus() async throws -> MattermostStatusOK {
         try await httpClient.delete("/users/me/status/custom")
+    }
+
+    /// Lists active sessions for a user. Sensitive fields may be sanitized by the server.
+    public func sessions(userID: String) async throws -> [MattermostUserSession] {
+        try await httpClient.get("/users/\(userID)/sessions")
+    }
+
+    /// Revokes one active session for a user.
+    @discardableResult
+    public func revokeSession(userID: String, sessionID: String) async throws -> MattermostStatusOK {
+        try await httpClient.post(
+            "/users/\(userID)/sessions/revoke",
+            body: MattermostSessionRevokeRequest(sessionId: sessionID)
+        )
+    }
+
+    /// Revokes all active sessions for a user.
+    @discardableResult
+    public func revokeAllSessions(userID: String) async throws -> MattermostStatusOK {
+        try await httpClient.post("/users/\(userID)/sessions/revoke/all")
     }
 
     /// Attaches a mobile device token to the current session for push notifications.

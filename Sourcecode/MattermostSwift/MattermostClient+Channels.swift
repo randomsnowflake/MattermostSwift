@@ -9,12 +9,18 @@ extension MattermostClient {
     }
 
     /// Lists public channels on a team that the authenticated user may discover.
-    public func publicChannels(teamID: String, page: Int = 0, perPage: Int = 60) async throws -> [MattermostChannel] {
+    public func publicChannels(
+        teamID: String,
+        page: Int = 0,
+        perPage: Int = 60,
+        includeDeleted: Bool = false
+    ) async throws -> [MattermostChannel] {
         try await httpClient.get(
             "/teams/\(teamID)/channels",
             queryItems: [
                 URLQueryItem(name: "page", value: String(Self.clampedPage(page))),
                 URLQueryItem(name: "per_page", value: String(Self.clampedPerPage(perPage))),
+                URLQueryItem(name: "include_deleted", value: String(includeDeleted)),
             ]
         )
     }
@@ -91,6 +97,17 @@ extension MattermostClient {
         )
     }
 
+    /// Lists archived channels on a team.
+    public func deletedChannels(teamID: String, page: Int = 0, perPage: Int = 60) async throws -> [MattermostChannel] {
+        try await httpClient.get(
+            "/teams/\(teamID)/channels/deleted",
+            queryItems: [
+                URLQueryItem(name: "page", value: String(Self.clampedPage(page))),
+                URLQueryItem(name: "per_page", value: String(Self.clampedPerPage(perPage))),
+            ]
+        )
+    }
+
     /// Opens or creates a direct message channel between two users.
     public func createDirectChannel(userID: String, otherUserID: String) async throws -> MattermostChannel {
         try await httpClient.post("/channels/direct", body: [userID, otherUserID])
@@ -143,6 +160,37 @@ extension MattermostClient {
                 displayName: displayName,
                 purpose: purpose,
                 header: header
+            )
+        )
+    }
+
+    /// Restores an archived channel.
+    public func restoreChannel(id: String) async throws -> MattermostChannel {
+        try await httpClient.post("/channels/\(id)/restore")
+    }
+
+    /// Updates a channel privacy type (`"O"` public, `"P"` private).
+    public func setChannelPrivacy(id: String, type: String) async throws -> MattermostChannel {
+        try await httpClient.put(
+            "/channels/\(id)/privacy",
+            body: MattermostChannelPrivacyRequest(privacy: type)
+        )
+    }
+
+    /// Converts a group message into a private channel in a team.
+    public func convertGroupToChannel(
+        id: String,
+        teamID: String,
+        name: String? = nil,
+        displayName: String? = nil
+    ) async throws -> MattermostChannel {
+        try await httpClient.post(
+            "/channels/\(id)/convert_to_channel",
+            body: MattermostGroupMessageConversionRequest(
+                channelId: id,
+                teamId: teamID,
+                name: name,
+                displayName: displayName
             )
         )
     }
