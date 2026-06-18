@@ -5,6 +5,11 @@ extension MattermostSwiftCLI {
     static func main() async {
         do {
             try await run()
+        } catch let error as CLIError {
+            // Usage/argument errors exit with a distinct code so CI and scripts can tell
+            // "you called it wrong" (2) apart from a runtime/server failure (1).
+            FileHandle.standardError.write(Data("error: \(error.localizedDescription)\n".utf8))
+            Foundation.exit(2)
         } catch {
             FileHandle.standardError.write(Data("error: \(error.localizedDescription)\n".utf8))
             Foundation.exit(1)
@@ -25,8 +30,13 @@ extension MattermostSwiftCLI {
             let user = try await client.currentUser()
             printUser(user)
         case .getUser(let userID):
-            let user = try await client.user(id: userID)
-            printUser(user)
+            // `get-user` with no argument defaults to "me"; route that through the
+            // dedicated current-user endpoint rather than `GET /users/me`.
+            if userID == "me" {
+                printUser(try await client.currentUser())
+            } else {
+                printUser(try await client.user(id: userID))
+            }
         case .profileImage(let userID):
             let resolvedUserID = try await resolvedUserID(userID, client: client)
             let data = try await client.userProfileImage(userID: resolvedUserID)
