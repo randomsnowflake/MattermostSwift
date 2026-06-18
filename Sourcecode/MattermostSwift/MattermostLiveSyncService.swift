@@ -266,6 +266,9 @@ public struct MattermostLiveSyncService: Sendable {
                                 )))
                             }
 
+                        case .connected:
+                            break
+
                         case .event(let event):
                             let typedEvent = try store.apply(liveEvent: event)
                             try store.save()
@@ -440,6 +443,7 @@ public struct MattermostLiveEventStreamFailure: Equatable, Sendable {
 
 public enum MattermostLiveEventStreamLifecycleEvent: Sendable {
     case connecting(attempt: Int)
+    case connected(attempt: Int)
     case event(MattermostLiveEvent)
     case reconnecting(attempt: Int, delay: Duration, failure: MattermostLiveEventStreamFailure? = nil)
 }
