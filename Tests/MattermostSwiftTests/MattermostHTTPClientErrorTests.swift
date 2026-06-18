@@ -119,6 +119,141 @@ struct MattermostHTTPClientErrorTests {
     }
 
     @Test
+    func clientChecksMFARequirementBeforeLogin() async throws {
+        let session = Self.urlSession { request in
+            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/mfa")
+            #expect(request.httpMethod == "POST")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+            let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
+            #expect(body?["login_id"] as? String == "person@example.com")
+            return try Self.response(statusCode: 200, body: Data(#"{"mfa_required":true}"#.utf8), request: request)
+        }
+
+        let isRequired = try await MattermostClient.checkMFARequired(
+            serverURL: try #require(URL(string: "https://mattermost.example.com")),
+            loginID: "person@example.com",
+            urlSession: session
+        )
+
+        #expect(isRequired)
+    }
+
+    @Test
+    func clientManagesMFAAndPasswordSecurityEndpoints() async throws {
+        let requested = MattermostRequestLog()
+        let client = try Self.makeClient { request in
+            requested.append("\(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
+            if request.url?.path.contains("/password") == true {
+                let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
+                #expect(body?["current_password"] as? String == "old")
+                #expect(body?["new_password"] as? String == "new")
+            }
+            if request.url?.path.contains("/mfa") == true, request.httpMethod == "PUT" {
+                let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
+                #expect(body?["activate"] as? Bool == true)
+                #expect(body?["code"] as? String == "123456")
+            }
+            if request.url?.path.contains("/mfa/generate") == true {
+                return try Self.response(
+                    statusCode: 200,
+                    body: Data(#"{"secret":"SECRET","qr_code":"base64-qr"}"#.utf8),
+                    request: request
+                )
+            }
+            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+        }
+
+        let secret = try await client.generateMFA(userID: "user-id")
+        let mfaStatus = try await client.activateMFA(userID: "user-id", code: "123456", activate: true)
+        let passwordStatus = try await client.changePassword(userID: "user-id", currentPassword: "old", newPassword: "new")
+
+        #expect(secret.secret == "SECRET")
+        #expect(secret.qrCode == "base64-qr")
+        #expect(mfaStatus.isOK)
+        #expect(passwordStatus.isOK)
+        #expect(requested.values == [
+            "POST https://mattermost.example.com/api/v4/users/user-id/mfa/generate",
+            "PUT https://mattermost.example.com/api/v4/users/user-id/mfa",
+            "PUT https://mattermost.example.com/api/v4/users/user-id/password",
+        ])
+    }
+
+    @Test
+    func clientManagesUserSessions() async throws {
+        let requested = MattermostRequestLog()
+        let client = try Self.makeClient { request in
+            requested.append("\(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
+            if request.url?.path.hasSuffix("/sessions") == true {
+                return try Self.response(
+                    statusCode: 200,
+                    body: Data(#"[{"id":"session-id","user_id":"user-id","device_id":"ios","create_at":1000,"last_activity_at":2000,"props":{"platform":"ios"},"token":"session-token"}]"#.utf8),
+                    request: request
+                )
+            }
+            if request.url?.path.hasSuffix("/sessions/revoke") == true {
+                let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
+                #expect(body?["session_id"] as? String == "session-id")
+            } else {
+                #expect(request.httpBody == nil)
+            }
+            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+        }
+
+        let sessions = try await client.sessions(userID: "user-id")
+        let single = try await client.revokeSession(userID: "user-id", sessionID: "session-id")
+        let all = try await client.revokeAllSessions(userID: "user-id")
+
+        #expect(sessions.map(\.id) == ["session-id"])
+        #expect(sessions.first?.props?["platform"] == .string("ios"))
+        #expect(single.isOK)
+        #expect(all.isOK)
+        #expect(requested.values == [
+            "GET https://mattermost.example.com/api/v4/users/user-id/sessions",
+            "POST https://mattermost.example.com/api/v4/users/user-id/sessions/revoke",
+            "POST https://mattermost.example.com/api/v4/users/user-id/sessions/revoke/all",
+        ])
+    }
+
+    @Test
+    func clientManagesChannelLifecycleEndpoints() async throws {
+        let requested = MattermostRequestLog()
+        let channelJSON = Data(#"{"id":"channel-id","team_id":"team-id","name":"town","display_name":"Town","type":"P","delete_at":0}"#.utf8)
+        let client = try Self.makeClient { request in
+            requested.append("\(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
+            if request.url?.path.hasSuffix("/privacy") == true {
+                let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
+                #expect(body?["privacy"] as? String == "P")
+            }
+            if request.url?.path.hasSuffix("/convert_to_channel") == true {
+                let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
+                #expect(body?["channel_id"] as? String == "gm-id")
+                #expect(body?["team_id"] as? String == "team-id")
+                #expect(body?["name"] as? String == "project-room")
+                #expect(body?["display_name"] as? String == "Project Room")
+            }
+            return try Self.response(statusCode: 200, body: channelJSON, request: request)
+        }
+
+        let restored = try await client.restoreChannel(id: "channel-id")
+        let privateChannel = try await client.setChannelPrivacy(id: "channel-id", type: "P")
+        let converted = try await client.convertGroupToChannel(
+            id: "gm-id",
+            teamID: "team-id",
+            name: "project-room",
+            displayName: "Project Room"
+        )
+
+        #expect(restored.id == "channel-id")
+        #expect(privateChannel.type == "P")
+        #expect(converted.id == "channel-id")
+        #expect(requested.values == [
+            "POST https://mattermost.example.com/api/v4/channels/channel-id/restore",
+            "PUT https://mattermost.example.com/api/v4/channels/channel-id/privacy",
+            "POST https://mattermost.example.com/api/v4/channels/gm-id/convert_to_channel",
+        ])
+    }
+
+    @Test
     func clientPinsAndUnpinsPostWithoutBody() async throws {
         let requested = MattermostRequestLog()
         let client = try Self.makeClient { request in
@@ -206,7 +341,7 @@ struct MattermostHTTPClientErrorTests {
     @Test
     func clientClampsPublicChannelPagination() async throws {
         let client = try Self.makeClient { request in
-            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/teams/team-id/channels?page=0&per_page=1")
+            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/teams/team-id/channels?page=0&per_page=1&include_deleted=false")
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
 
