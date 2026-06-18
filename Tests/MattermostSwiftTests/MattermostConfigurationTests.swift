@@ -1384,7 +1384,7 @@ func decodesChannelMemberAndUnreadState() throws {
       "channel_id": "channel-id",
       "member_count": 42,
       "guest_count": 3,
-      "pinned_post_count": 2,
+      "pinnedpost_count": 2,
       "total_msg_count": 99
     }
     """.data(using: .utf8)!

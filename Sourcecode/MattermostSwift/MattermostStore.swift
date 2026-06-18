@@ -535,14 +535,15 @@ public final class MattermostStore {
     public func prunePosts(channelID: String, keepCount: Int = 200) throws {
         let keepCount = max(0, keepCount)
         let posts = try cachedPosts(channelID: channelID)
-        for post in posts.dropFirst(keepCount) {
+        let prunedPosts = Array(posts.dropFirst(keepCount))
+        try deleteCachedPostContent(postIDs: prunedPosts.map(\.id))
+        for post in prunedPosts {
             context.delete(post)
         }
     }
 
     public func deleteChannelContent(channelID: String) throws {
         let posts = try cachedPosts(channelID: channelID)
-        let postIDs = posts.map(\.id)
 
         for post in posts {
             context.delete(post)
@@ -552,9 +553,14 @@ public final class MattermostStore {
         )) {
             context.delete(unread)
         }
+        try deleteCachedPostContent(postIDs: posts.map(\.id))
+    }
+
+    private func deleteCachedPostContent(postIDs: [String]) throws {
         guard !postIDs.isEmpty else {
             return
         }
+        let postIDs = Set(postIDs)
         for reaction in try context.fetch(FetchDescriptor<MattermostCachedReaction>()) where postIDs.contains(reaction.postId) {
             context.delete(reaction)
         }

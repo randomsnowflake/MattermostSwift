@@ -836,12 +836,50 @@ func storePrunesPostsKeepingNewestForChannel() throws {
     try store.upsert(post: storeTestPost(id: "post-2", channelID: "channel-1", message: "middle", createAt: 20))
     try store.upsert(post: storeTestPost(id: "post-3", channelID: "channel-1", message: "new", createAt: 30))
     try store.upsert(post: storeTestPost(id: "other", channelID: "channel-2", message: "other", createAt: 5))
+    try store.upsert(reaction: MattermostReaction(userId: "user-1", postId: "post-1", emojiName: "old", createAt: 11))
+    try store.upsert(reaction: MattermostReaction(userId: "user-1", postId: "post-2", emojiName: "kept", createAt: 21))
+    try store.upsert(file: MattermostFileInfo(
+        id: "file-1",
+        userId: "user-1",
+        postId: "post-1",
+        createAt: 12,
+        updateAt: 12,
+        deleteAt: 0,
+        name: "old.txt",
+        extensionName: "txt",
+        size: 5,
+        mimeType: "text/plain",
+        width: nil,
+        height: nil,
+        hasPreviewImage: false
+    ))
+    try store.upsert(file: MattermostFileInfo(
+        id: "file-2",
+        userId: "user-1",
+        postId: "post-2",
+        createAt: 22,
+        updateAt: 22,
+        deleteAt: 0,
+        name: "kept.txt",
+        extensionName: "txt",
+        size: 5,
+        mimeType: "text/plain",
+        width: nil,
+        height: nil,
+        hasPreviewImage: false
+    ))
 
     try store.prunePosts(channelID: "channel-1", keepCount: 2)
     try store.save()
 
+    let prunedReactionID = MattermostCachedReaction.cacheID(userID: "user-1", postID: "post-1", emojiName: "old")
+    let keptReactionID = MattermostCachedReaction.cacheID(userID: "user-1", postID: "post-2", emojiName: "kept")
     #expect(try store.cachedPosts(channelID: "channel-1").map(\.id) == ["post-3", "post-2"])
     #expect(try store.cachedPosts(channelID: "channel-2").map(\.id) == ["other"])
+    #expect(try store.cachedReaction(id: prunedReactionID) == nil)
+    #expect(try store.cachedReaction(id: keptReactionID) != nil)
+    #expect(try store.cachedFiles(postID: "post-1").isEmpty)
+    #expect(try store.cachedFiles(postID: "post-2").map(\.id) == ["file-2"])
 }
 
 @MainActor
