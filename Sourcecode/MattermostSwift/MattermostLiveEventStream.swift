@@ -15,23 +15,10 @@ public struct MattermostLiveEventStream: Sendable {
         AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
             let streamTask = Task {
                 do {
-                    let webSocketTask = urlSession.webSocketTask(with: makeWebSocketRequest())
-                    webSocketTask.resume()
-                    defer {
-                        webSocketTask.cancel(with: .goingAway, reason: nil)
-                    }
-
-                    let pendingEvents = try await authenticate(webSocketTask)
-                    for event in pendingEvents {
-                        continuation.yield(event)
-                    }
-
-                    while !Task.isCancelled {
-                        if let event = try await receiveEvent(from: webSocketTask) {
-                            continuation.yield(event)
-                        }
-                    }
-
+                    try await runAuthenticatedConnection(
+                        onConnected: {},
+                        onEvent: { continuation.yield($0) }
+                    )
                     continuation.finish()
                 } catch is CancellationError {
                     continuation.finish()
@@ -67,10 +54,16 @@ public struct MattermostLiveEventStream: Sendable {
                     continuation.yield(.connecting(attempt: attempt))
 
                     let connectedAt = ContinuousClock.now
+                    let currentAttempt = attempt
                     do {
-                        for try await event in events() {
-                            continuation.yield(.event(event))
-                        }
+                        try await runAuthenticatedConnection(
+                            onConnected: {
+                                continuation.yield(.connected(attempt: currentAttempt))
+                            },
+                            onEvent: { event in
+                                continuation.yield(.event(event))
+                            }
+                        )
 
                         if Self.connectionWasStable(since: connectedAt) { attempt = 0 }
                         guard policy.reconnectAfterCleanClose, policy.canRetry(attempt: attempt) else {
@@ -115,6 +108,29 @@ public struct MattermostLiveEventStream: Sendable {
 
             continuation.onTermination = { @Sendable _ in
                 streamTask.cancel()
+            }
+        }
+    }
+
+    private func runAuthenticatedConnection(
+        onConnected: @escaping @Sendable () async -> Void,
+        onEvent: @escaping @Sendable (MattermostLiveEvent) -> Void
+    ) async throws {
+        let webSocketTask = urlSession.webSocketTask(with: makeWebSocketRequest())
+        webSocketTask.resume()
+        defer {
+            webSocketTask.cancel(with: .goingAway, reason: nil)
+        }
+
+        let pendingEvents = try await authenticate(webSocketTask)
+        await onConnected()
+        for event in pendingEvents {
+            onEvent(event)
+        }
+
+        while !Task.isCancelled {
+            if let event = try await receiveEvent(from: webSocketTask) {
+                onEvent(event)
             }
         }
     }
