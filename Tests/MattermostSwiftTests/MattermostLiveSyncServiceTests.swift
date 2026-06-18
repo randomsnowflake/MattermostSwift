@@ -2,6 +2,27 @@ import Foundation
 import Testing
 @testable import MattermostSwift
 
+@Test
+func liveEventStreamFailureCapturesNSErrorAndUnderlyingNSErrorDetails() {
+    let underlying = NSError(domain: NSPOSIXErrorDomain, code: 57)
+    let error = NSError(
+        domain: NSURLErrorDomain,
+        code: NSURLErrorNetworkConnectionLost,
+        userInfo: [
+            NSUnderlyingErrorKey: underlying,
+            NSLocalizedDescriptionKey: "The network connection was lost.",
+        ]
+    )
+
+    let failure = MattermostLiveEventStreamFailure(error: error)
+
+    #expect(failure.domain == NSURLErrorDomain)
+    #expect(failure.code == NSURLErrorNetworkConnectionLost)
+    #expect(failure.underlyingDomain == NSPOSIXErrorDomain)
+    #expect(failure.underlyingCode == 57)
+    #expect(failure.message == "The network connection was lost.")
+}
+
 @MainActor
 @Test
 func liveSyncRunsBackfillForEveryConnectingLifecycleEvent() async throws {
