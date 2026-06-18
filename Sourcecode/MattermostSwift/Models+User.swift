@@ -45,6 +45,31 @@ public struct MattermostSession: Equatable, Sendable {
 @available(*, deprecated, renamed: "MattermostSession")
 public typealias MattermostLoginSession = MattermostSession
 
+/// MFA requirement check returned before password login.
+public struct MattermostMFARequired: Decodable, Equatable, Sendable {
+    public let mfaRequired: Bool
+}
+
+/// MFA setup secret returned by Mattermost.
+public struct MattermostMFASecret: Decodable, Equatable, Sendable {
+    public let secret: String?
+    public let qrCode: String?
+}
+
+/// Sanitized active session metadata for a user.
+public struct MattermostUserSession: Decodable, Equatable, Sendable, Identifiable {
+    public let id: String
+    public let createAt: Int64?
+    public let deviceId: String?
+    public let expiresAt: Int64?
+    public let isOauth: Bool?
+    public let lastActivityAt: Int64?
+    public let props: [String: MattermostJSONValue]?
+    public let roles: String?
+    public let token: String?
+    public let userId: String?
+}
+
 /// Presence status for a Mattermost user.
 public struct MattermostUserStatus: Codable, Equatable, Sendable {
     public let userId: String
