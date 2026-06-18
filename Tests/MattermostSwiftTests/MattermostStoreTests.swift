@@ -656,6 +656,50 @@ func storeAppliesLivePostAndReactionEvents() throws {
 
 @MainActor
 @Test
+func storeAppliesLivePostEditedEventWithoutLosingStalenessGuard() throws {
+    let store = try MattermostStore(inMemory: true)
+    let posted = MattermostLiveEvent(
+        event: "posted",
+        data: ["post": .string(storeTestPostJSON(id: "post-1", message: "original", updateAt: 10, editAt: 0))],
+        broadcast: nil,
+        seq: 1
+    )
+    let edited = MattermostLiveEvent(
+        event: "post_edited",
+        data: ["post": .string(storeTestPostJSON(id: "post-1", message: "edited", updateAt: 30, editAt: 30))],
+        broadcast: nil,
+        seq: 2
+    )
+    let olderEdited = MattermostLiveEvent(
+        event: "post_edited",
+        data: ["post": .string(storeTestPostJSON(id: "post-1", message: "older edit", updateAt: 20, editAt: 20))],
+        broadcast: nil,
+        seq: 3
+    )
+
+    try store.apply(liveEvent: posted)
+    try store.apply(liveEvent: edited)
+    try store.apply(liveEvent: olderEdited)
+    try store.save()
+
+    let cached = try #require(try store.cachedPost(id: "post-1"))
+    #expect(cached.message == "edited")
+    #expect(cached.editAt == 30)
+}
+
+@MainActor
+@Test
+func storeAppliesPreferenceInvalidationEventsAsTypedNoOps() throws {
+    let store = try MattermostStore(inMemory: true)
+    let changed = MattermostLiveEvent(event: "preferences_changed", data: [:], broadcast: nil, seq: 1)
+    let deleted = MattermostLiveEvent(event: "preferences_deleted", data: [:], broadcast: nil, seq: 2)
+
+    #expect(try store.apply(liveEvent: changed) == .preferencesChanged(changed))
+    #expect(try store.apply(liveEvent: deleted) == .preferencesDeleted(deleted))
+}
+
+@MainActor
+@Test
 func storeAppliesLiveChannelMemberAndUserEvents() throws {
     let store = try MattermostStore(inMemory: true)
     let channelJSON = """
@@ -764,7 +808,98 @@ func reconnectPolicyCalculatesBackoffAndStopsAtLimit() {
     #expect(!policy.canRetry(attempt: 2))
     #expect(policy.delay(for: 0) == .milliseconds(500))
     #expect(policy.delay(for: 1) == .seconds(1))
+    #expect(policy.delay(for: 2) == .seconds(2))
+    #expect(policy.delay(for: 3) == .seconds(2))
     #expect(policy.delay(for: 4) == .seconds(2))
+}
+
+@MainActor
+@Test
+func cachedThreadStatesFiltersByStoredColumnsAndUnreadState() throws {
+    let store = try MattermostStore(inMemory: true)
+
+    try store.upsert(thread: storeTestThread(id: "root-1", unreadReplies: 1), userID: "user-1", teamID: "team-1")
+    try store.upsert(thread: storeTestThread(id: "root-2", unreadReplies: 0), userID: "user-1", teamID: "team-1")
+    try store.upsert(thread: storeTestThread(id: "root-3", unreadReplies: 2), userID: "user-2", teamID: "team-1")
+    try store.upsert(thread: storeTestThread(id: "root-4", unreadReplies: 3), userID: "user-1", teamID: "team-2")
+    try store.save()
+
+    #expect(try store.cachedThreadStates(userID: "user-1", teamID: "team-1").map(\.rootId) == ["root-2", "root-1"])
+    #expect(try store.cachedThreadStates(userID: "user-1", teamID: "team-1", unreadOnly: true).map(\.rootId) == ["root-1"])
+}
+
+@MainActor
+@Test
+func storePrunesPostsKeepingNewestForChannel() throws {
+    let store = try MattermostStore(inMemory: true)
+    try store.upsert(post: storeTestPost(id: "post-1", channelID: "channel-1", message: "old", createAt: 10))
+    try store.upsert(post: storeTestPost(id: "post-2", channelID: "channel-1", message: "middle", createAt: 20))
+    try store.upsert(post: storeTestPost(id: "post-3", channelID: "channel-1", message: "new", createAt: 30))
+    try store.upsert(post: storeTestPost(id: "other", channelID: "channel-2", message: "other", createAt: 5))
+
+    try store.prunePosts(channelID: "channel-1", keepCount: 2)
+    try store.save()
+
+    #expect(try store.cachedPosts(channelID: "channel-1").map(\.id) == ["post-3", "post-2"])
+    #expect(try store.cachedPosts(channelID: "channel-2").map(\.id) == ["other"])
+}
+
+@MainActor
+@Test
+func channelDeletedLiveEventPurgesCachedChannelContent() throws {
+    let store = try MattermostStore(inMemory: true)
+    let channel = MattermostChannel(
+        id: "channel-1",
+        createAt: 1,
+        updateAt: 1,
+        teamId: "team-1",
+        name: "town-square",
+        displayName: "Town Square",
+        type: "O",
+        header: nil,
+        purpose: nil,
+        deleteAt: nil
+    )
+    let post = storeTestPost(id: "post-1", channelID: "channel-1", message: "hello", createAt: 10)
+    let reaction = MattermostReaction(userId: "user-1", postId: "post-1", emojiName: "wave", createAt: 11)
+    let file = MattermostFileInfo(
+        id: "file-1",
+        userId: "user-1",
+        postId: "post-1",
+        createAt: 12,
+        updateAt: 12,
+        deleteAt: 0,
+        name: "hello.txt",
+        extensionName: "txt",
+        size: 5,
+        mimeType: "text/plain",
+        width: nil,
+        height: nil,
+        hasPreviewImage: false
+    )
+    let unread = MattermostChannelUnread(teamId: "team-1", channelId: "channel-1", msgCount: 4, mentionCount: 1)
+    let deletion = MattermostLiveEvent(
+        event: "channel_deleted",
+        data: ["channel_id": .string("channel-1")],
+        broadcast: nil,
+        seq: 1
+    )
+
+    try store.upsert(channel: channel)
+    try store.upsert(post: post)
+    try store.upsert(reaction: reaction)
+    try store.upsert(file: file)
+    try store.upsert(unread: unread, userID: "user-1")
+    try store.apply(liveEvent: deletion)
+    try store.save()
+
+    let cachedChannel = try #require(try store.cachedChannel(id: "channel-1"))
+    let reactionID = MattermostCachedReaction.cacheID(userID: "user-1", postID: "post-1", emojiName: "wave")
+    #expect((cachedChannel.deleteAt ?? 0) > 0)
+    #expect(try store.cachedPosts(channelID: "channel-1").isEmpty)
+    #expect(try store.cachedReaction(id: reactionID) == nil)
+    #expect(try store.cachedFiles(postID: "post-1").isEmpty)
+    #expect(try store.cachedChannelUnread(channelID: "channel-1", userID: "user-1") == nil)
 }
 
 @Test
@@ -815,4 +950,56 @@ func liveSyncOptionsClampBackfillChannelLimit() {
     #expect(options.refreshUnreadOnChannelViewed)
     #expect(options.refreshSidebarCategoriesOnPreferenceChange)
     #expect(options.syncOptions.maxPostPages == 1)
+}
+
+private func storeTestPostJSON(id: String, message: String, updateAt: Int64, editAt: Int64) -> String {
+    """
+    {
+      "id": "\(id)",
+      "create_at": 10,
+      "update_at": \(updateAt),
+      "edit_at": \(editAt),
+      "delete_at": 0,
+      "user_id": "user-1",
+      "channel_id": "channel-1",
+      "root_id": "",
+      "message": "\(message)",
+      "type": ""
+    }
+    """
+}
+
+private func storeTestPost(id: String, channelID: String, message: String, createAt: Int64) -> MattermostPost {
+    MattermostPost(
+        id: id,
+        createAt: createAt,
+        updateAt: createAt,
+        editAt: 0,
+        deleteAt: 0,
+        userId: "user-1",
+        channelId: channelID,
+        rootId: "",
+        originalId: nil,
+        message: message,
+        type: "",
+        hashtags: nil,
+        pendingPostId: nil,
+        fileIds: nil,
+        hasReactions: nil
+    )
+}
+
+private func storeTestThread(id: String, unreadReplies: Int64) -> MattermostThreadResponse {
+    MattermostThreadResponse(
+        id: id,
+        replyCount: unreadReplies,
+        lastReplyAt: id == "root-1" ? 10 : id == "root-2" ? 20 : id == "root-3" ? 30 : 40,
+        lastViewedAt: 0,
+        participants: [],
+        post: storeTestPost(id: id, channelID: "channel-1", message: id, createAt: 1),
+        unreadReplies: unreadReplies,
+        unreadMentions: 0,
+        isUrgent: false,
+        deleteAt: 0
+    )
 }
