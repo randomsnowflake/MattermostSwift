@@ -165,6 +165,9 @@ struct MattermostHTTPClient: Sendable {
                 return try await urlSession.data(for: request)
             } catch {
                 attempt += 1
+                if Self.isCancellation(error) {
+                    throw error
+                }
                 guard attempt <= Self.maxTransientRetries, Self.isTransient(error) else {
                     throw MattermostError.transportFailure(error.localizedDescription)
                 }
@@ -174,6 +177,13 @@ struct MattermostHTTPClient: Sendable {
     }
 
     private static let maxTransientRetries = 2
+
+    private static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        return (error as? URLError)?.code == .cancelled
+    }
 
     private static func isTransient(_ error: Error) -> Bool {
         if let urlError = error as? URLError {

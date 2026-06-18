@@ -12,7 +12,7 @@ public struct MattermostLiveEventStream: Sendable {
 
     /// Connects, authenticates, and yields server events until cancelled or the socket fails.
     public func events() -> AsyncThrowingStream<MattermostLiveEvent, Error> {
-        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(256)) { continuation in
+        AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
             let streamTask = Task {
                 do {
                     let webSocketTask = urlSession.webSocketTask(with: makeWebSocketRequest())
@@ -59,7 +59,7 @@ public struct MattermostLiveEventStream: Sendable {
     public func lifecycleEvents(
         policy: MattermostLiveEventReconnectPolicy = .default
     ) -> AsyncThrowingStream<MattermostLiveEventStreamLifecycleEvent, Error> {
-        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(256)) { continuation in
+        AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
             let streamTask = Task {
                 var attempt = 0
 

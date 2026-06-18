@@ -54,6 +54,22 @@ struct MattermostHTTPClientErrorTests {
     }
 
     @Test
+    func clientPreservesCancellationErrors() async throws {
+        let client = try await Self.makeClient { _ in
+            throw URLError(.cancelled)
+        }
+
+        do {
+            _ = try await client.currentUser()
+            Issue.record("Expected cancellation to be preserved.")
+        } catch let error as URLError {
+            #expect(error.code == .cancelled)
+        } catch {
+            Issue.record("Expected URLError.cancelled, got \(error).")
+        }
+    }
+
+    @Test
     func dataRequestMapsHTTPStatusMessage() async throws {
         let configuration = try MattermostConfiguration(
             serverURL: try #require(URL(string: "https://mattermost.example.com")),
