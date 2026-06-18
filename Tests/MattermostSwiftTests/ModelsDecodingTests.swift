@@ -97,19 +97,36 @@ func decodesMattermostSidebarCategory() throws {
 func decodesMattermostChannelStatsWithServerKeys() throws {
     let payload = """
     {
-        "channelId": "chan123",
-        "memberCount": 42,
-        "guestCount": 3,
-        "pinnedpostCount": 5,
-        "totalMsgCount": 1000
+        "channel_id": "chan123",
+        "member_count": 42,
+        "guest_count": 3,
+        "pinnedpost_count": 5,
+        "total_msg_count": 1000
     }
     """
-    let stats = try JSONDecoder().decode(MattermostChannelStats.self, from: Data(payload.utf8))
+    let stats = try mattermostSnakeCaseDecoder.decode(MattermostChannelStats.self, from: Data(payload.utf8))
     #expect(stats.channelId == "chan123")
     #expect(stats.memberCount == 42)
     #expect(stats.guestCount == 3)
     #expect(stats.pinnedPostCount == 5)
     #expect(stats.totalMessageCount == 1000)
+}
+
+@Test
+func mattermostUserSessionDescriptionRedactsToken() throws {
+    let payload = """
+    {
+      "id": "session-1",
+      "user_id": "user-1",
+      "expires_at": 12345,
+      "token": "super-secret-token"
+    }
+    """
+    let session = try mattermostSnakeCaseDecoder.decode(MattermostUserSession.self, from: Data(payload.utf8))
+
+    #expect(session.token == "super-secret-token")
+    #expect(String(describing: session).contains("super-secret-token") == false)
+    #expect(String(reflecting: session).contains("super-secret-token") == false)
 }
 
 @Test

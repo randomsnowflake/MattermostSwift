@@ -25,6 +25,14 @@ public struct MattermostConfiguration: Sendable {
            !normalizedServerURL.isLoopbackHost {
             throw MattermostError.insecureServerURL(serverURL.absoluteString)
         }
+        if normalizedServerURL.scheme == "http",
+           allowInsecureHTTP,
+           !normalizedServerURL.isLoopbackHost {
+            fputs(
+                "MattermostSwift: allowInsecureHTTP=true with non-loopback host \(normalizedServerURL.host() ?? "?") sends bearer tokens in cleartext.\n",
+                stderr
+            )
+        }
 
         self.serverURL = normalizedServerURL
         apiBaseURL = normalizedServerURL.appending(path: "api/v4", directoryHint: .isDirectory)

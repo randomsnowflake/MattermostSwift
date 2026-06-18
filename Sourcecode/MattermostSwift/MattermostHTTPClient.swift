@@ -165,8 +165,11 @@ struct MattermostHTTPClient: Sendable {
                 return try await urlSession.data(for: request)
             } catch {
                 attempt += 1
-                guard attempt <= Self.maxTransientRetries, Self.isTransient(error) else {
+                if Self.isCancellation(error) {
                     throw error
+                }
+                guard attempt <= Self.maxTransientRetries, Self.isTransient(error) else {
+                    throw MattermostError.transportFailure(error.localizedDescription)
                 }
                 try await Task.sleep(for: .milliseconds(200 * attempt))
             }
@@ -174,6 +177,13 @@ struct MattermostHTTPClient: Sendable {
     }
 
     private static let maxTransientRetries = 2
+
+    private static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        return (error as? URLError)?.code == .cancelled
+    }
 
     private static func isTransient(_ error: Error) -> Bool {
         if let urlError = error as? URLError {
@@ -238,6 +248,10 @@ struct MattermostHTTPClient: Sendable {
 
     func makeMultipartBody(parts: [MattermostMultipartPart], boundary: String) -> Data {
         var body = Data()
+        let estimatedCapacity = parts.reduce(0) { total, part in
+            total + part.contentDisposition.utf8.count + (part.contentType?.utf8.count ?? 0) + part.data.count + 64
+        } + boundary.utf8.count + 8
+        body.reserveCapacity(estimatedCapacity)
 
         for part in parts {
             body.appendString("--\(boundary)\r\n")
@@ -314,6 +328,6 @@ private extension String {
 
 private extension Data {
     mutating func appendString(_ string: String) {
-        append(Data(string.utf8))
+        append(contentsOf: string.utf8)
     }
 }
