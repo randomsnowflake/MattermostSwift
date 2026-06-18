@@ -185,14 +185,11 @@ public struct MattermostSyncService: Sendable {
         }
 
         if options.refreshUnreadForAllJoinedChannels {
-            // ponytail: sequential on purpose. Fanning these out concurrently bursts the
-            // Cloudflare edge into resetting connections (ENOTCONN). If this list grows large
-            // enough to matter, bound it with a small TaskGroup (e.g. 4-wide), don't unleash N.
-            for channel in resolvedTeam.channels {
-                let unread = try await client.channelUnread(userID: user.id, channelID: channel.id)
-                try store.upsert(unread: unread, userID: user.id)
-                syncedUnreadsCount += 1
-            }
+            syncedUnreadsCount = try await refreshJoinedChannelUnreads(
+                channels: resolvedTeam.channels,
+                userID: user.id,
+                store: store
+            )
         } else if let postChannelID {
             let unread = try await client.channelUnread(userID: user.id, channelID: postChannelID)
             try store.upsert(unread: unread, userID: user.id)
@@ -221,11 +218,11 @@ public struct MattermostSyncService: Sendable {
             syncedMembersCount: syncedMembersCount,
             syncedUnreadsCount: syncedUnreadsCount,
             syncedCategoriesCount: syncedCategoriesCount,
-            cachedTeamsCount: try store.cachedTeams().count,
-            cachedUsersCount: try store.cachedUsers().count,
-            cachedChannelsCount: try store.cachedChannels().count,
-            cachedMembersCount: try store.cachedChannelMembers().count,
-            cachedUnreadsCount: try store.cachedChannelUnreads().count,
+            cachedTeamsCount: try store.cachedTeamsCount(),
+            cachedUsersCount: try store.cachedUsersCount(),
+            cachedChannelsCount: try store.cachedChannelsCount(),
+            cachedMembersCount: try store.cachedChannelMembersCount(),
+            cachedUnreadsCount: try store.cachedChannelUnreadsCount(),
             teamCursorLastSyncAt: teamCursorLastSyncAt
         )
     }
@@ -256,11 +253,44 @@ public struct MattermostSyncService: Sendable {
         }
 
         let channels = try await client.joinedChannelsAcrossTeams()
-        let inferredTeamID = channels.compactMap(\.teamId).first { !$0.isEmpty }
+        let inferredTeamID = channels.lazy.compactMap(\.teamId).first { !$0.isEmpty }
         let inferredTeam = inferredTeamID.flatMap { teamID in
             joinedTeams.first { $0.id == teamID }
         }
         return (inferredTeam, inferredTeamID, channels)
+    }
+
+    @MainActor
+    private func refreshJoinedChannelUnreads(
+        channels: [MattermostChannel],
+        userID: String,
+        store: MattermostStore,
+        width: Int = 4
+    ) async throws -> Int {
+        try await withThrowingTaskGroup(of: MattermostChannelUnread.self) { group in
+            var iterator = channels.makeIterator()
+            var inflight = 0
+            var syncedCount = 0
+
+            func fill() {
+                while inflight < width, let channel = iterator.next() {
+                    inflight += 1
+                    group.addTask {
+                        try await client.channelUnread(userID: userID, channelID: channel.id)
+                    }
+                }
+            }
+
+            fill()
+            while let unread = try await group.next() {
+                try store.upsert(unread: unread, userID: userID)
+                syncedCount += 1
+                inflight -= 1
+                fill()
+            }
+
+            return syncedCount
+        }
     }
 }
 

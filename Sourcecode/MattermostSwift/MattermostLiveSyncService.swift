@@ -233,7 +233,7 @@ public struct MattermostLiveSyncService: Sendable {
         refreshSidebarCategories: MattermostLiveSyncSidebarRefresh? = nil,
         refreshThreadState: MattermostLiveSyncThreadStateRefresh? = nil
     ) -> AsyncThrowingStream<MattermostLiveSyncEvent, Error> {
-        AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
+        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(512)) { continuation in
             let streamTask = Task { @MainActor in
                 do {
                     var activeTeamID = teamID
