@@ -38,6 +38,35 @@ struct MattermostMobileDeviceRequest: Encodable, Equatable, Sendable {
     let deviceId: String
 }
 
+struct MattermostMFARequiredRequest: Encodable, Equatable, Sendable {
+    let loginId: String
+}
+
+struct MattermostMFAUpdateRequest: Encodable, Equatable, Sendable {
+    let activate: Bool
+    let code: String?
+}
+
+struct MattermostPasswordUpdateRequest: Encodable, Equatable, Sendable {
+    let currentPassword: String?
+    let newPassword: String
+}
+
+struct MattermostSessionRevokeRequest: Encodable, Equatable, Sendable {
+    let sessionId: String
+}
+
+struct MattermostChannelPrivacyRequest: Encodable, Equatable, Sendable {
+    let privacy: String
+}
+
+struct MattermostGroupMessageConversionRequest: Encodable, Equatable, Sendable {
+    let channelId: String
+    let teamId: String
+    let name: String?
+    let displayName: String?
+}
+
 struct MattermostCreatePostRequest: Encodable, Sendable {
     let channelId: String
     let message: String
