@@ -112,6 +112,7 @@ public final class MattermostCachedTeam {
 
 @Model
 public final class MattermostCachedChannel {
+    #Index<MattermostCachedChannel>([\.teamId])
     @Attribute(.unique) public var id: String = ""
     public var createAt: Int64?
     public var updateAt: Int64?
@@ -171,6 +172,7 @@ public final class MattermostCachedChannel {
 
 @Model
 public final class MattermostCachedChannelMember {
+    #Index<MattermostCachedChannelMember>([\.userId])
     @Attribute(.unique) public var id: String = ""
     public var channelId: String = ""
     public var userId: String = ""
@@ -215,6 +217,7 @@ public final class MattermostCachedChannelMember {
 
 @Model
 public final class MattermostCachedChannelUnread {
+    #Index<MattermostCachedChannelUnread>([\.userId])
     @Attribute(.unique) public var id: String = ""
     public var teamId: String?
     public var channelId: String = ""
@@ -246,6 +249,7 @@ public final class MattermostCachedChannelUnread {
 
 @Model
 public final class MattermostCachedThread {
+    #Index<MattermostCachedThread>([\.userId, \.teamId])
     @Attribute(.unique) public var id: String = ""
     public var rootId: String = ""
     public var userId: String = ""
@@ -315,6 +319,7 @@ public final class MattermostCachedThread {
 
 @Model
 public final class MattermostCachedPost {
+    #Index<MattermostCachedPost>([\.channelId], [\.channelId, \.createAt], [\.rootId])
     @Attribute(.unique) public var id: String = ""
     public var createAt: Int64 = 0
     public var updateAt: Int64 = 0
@@ -426,6 +431,7 @@ public final class MattermostCachedPost {
 
 @Model
 public final class MattermostCachedReaction {
+    #Index<MattermostCachedReaction>([\.postId])
     @Attribute(.unique) public var id: String = ""
     public var userId: String = ""
     public var postId: String = ""
@@ -458,6 +464,7 @@ public final class MattermostCachedReaction {
 
 @Model
 public final class MattermostCachedFile {
+    #Index<MattermostCachedFile>([\.postId])
     @Attribute(.unique) public var id: String = ""
     public var userId: String?
     public var postId: String?
@@ -506,6 +513,7 @@ public final class MattermostCachedFile {
 
 @Model
 public final class MattermostCachedSidebarCategory {
+    #Index<MattermostCachedSidebarCategory>([\.teamId])
     @Attribute(.unique) public var id: String = ""
     public var userId: String?
     public var teamId: String?

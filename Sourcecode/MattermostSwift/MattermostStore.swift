@@ -8,6 +8,8 @@ import SwiftData
 /// background maintenance or channel lifecycle events to keep long-lived stores bounded.
 @MainActor
 public final class MattermostStore {
+    private static let batchedFetchIDLimit = 500
+
     public static var schema: Schema {
         Schema([
             MattermostCachedUser.self,
@@ -63,6 +65,24 @@ public final class MattermostStore {
         try context.save()
     }
 
+    private func fetchInBatches<Model: PersistentModel>(
+        ids: [String],
+        descriptor: ([String]) -> FetchDescriptor<Model>
+    ) throws -> [Model] {
+        let uniqueIDs = Array(Set(ids))
+        guard !uniqueIDs.isEmpty else { return [] }
+
+        var models: [Model] = []
+        var start = 0
+        while start < uniqueIDs.count {
+            let end = min(start + Self.batchedFetchIDLimit, uniqueIDs.count)
+            let chunkIDs = Array(uniqueIDs[start..<end])
+            models.append(contentsOf: try context.fetch(descriptor(chunkIDs)))
+            start = end
+        }
+        return models
+    }
+
     @discardableResult
     public func upsert(user: MattermostUser) throws -> MattermostCachedUser {
         if let cached = try cachedUser(id: user.id) {
@@ -76,8 +96,20 @@ public final class MattermostStore {
     }
 
     public func upsert(users: [MattermostUser]) throws {
+        guard !users.isEmpty else { return }
+        let ids = users.map(\.id)
+        let existing = try fetchInBatches(ids: ids) { chunkIDs in
+            FetchDescriptor<MattermostCachedUser>(predicate: #Predicate { chunkIDs.contains($0.id) })
+        }
+        var byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for user in users {
-            try upsert(user: user)
+            if let cached = byID[user.id] {
+                cached.apply(user)
+            } else {
+                let cached = MattermostCachedUser(user)
+                context.insert(cached)
+                byID[user.id] = cached
+            }
         }
     }
 
@@ -94,8 +126,20 @@ public final class MattermostStore {
     }
 
     public func upsert(statuses: [MattermostUserStatus]) throws {
+        guard !statuses.isEmpty else { return }
+        let ids = statuses.map(\.userId)
+        let existing = try fetchInBatches(ids: ids) { chunkIDs in
+            FetchDescriptor<MattermostCachedUserStatus>(predicate: #Predicate { chunkIDs.contains($0.userId) })
+        }
+        var byID = Dictionary(existing.map { ($0.userId, $0) }, uniquingKeysWith: { a, _ in a })
         for status in statuses {
-            try upsert(status: status)
+            if let cached = byID[status.userId] {
+                cached.apply(status)
+            } else {
+                let cached = MattermostCachedUserStatus(status)
+                context.insert(cached)
+                byID[status.userId] = cached
+            }
         }
     }
 
@@ -112,8 +156,20 @@ public final class MattermostStore {
     }
 
     public func upsert(teams: [MattermostTeam]) throws {
+        guard !teams.isEmpty else { return }
+        let ids = teams.map(\.id)
+        let existing = try fetchInBatches(ids: ids) { chunkIDs in
+            FetchDescriptor<MattermostCachedTeam>(predicate: #Predicate { chunkIDs.contains($0.id) })
+        }
+        var byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for team in teams {
-            try upsert(team: team)
+            if let cached = byID[team.id] {
+                cached.apply(team)
+            } else {
+                let cached = MattermostCachedTeam(team)
+                context.insert(cached)
+                byID[team.id] = cached
+            }
         }
     }
 
@@ -130,8 +186,20 @@ public final class MattermostStore {
     }
 
     public func upsert(channels: [MattermostChannel]) throws {
+        guard !channels.isEmpty else { return }
+        let ids = channels.map(\.id)
+        let existing = try fetchInBatches(ids: ids) { chunkIDs in
+            FetchDescriptor<MattermostCachedChannel>(predicate: #Predicate { chunkIDs.contains($0.id) })
+        }
+        var byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for channel in channels {
-            try upsert(channel: channel)
+            if let cached = byID[channel.id] {
+                cached.apply(channel)
+            } else {
+                let cached = MattermostCachedChannel(channel)
+                context.insert(cached)
+                byID[channel.id] = cached
+            }
         }
     }
 
@@ -164,8 +232,23 @@ public final class MattermostStore {
     }
 
     public func upsert(members: [MattermostChannelMember]) throws {
+        guard !members.isEmpty else { return }
+        let ids = members.map {
+            MattermostCachedChannelMember.cacheID(channelID: $0.channelId, userID: $0.userId)
+        }
+        let existing = try fetchInBatches(ids: ids) { chunkIDs in
+            FetchDescriptor<MattermostCachedChannelMember>(predicate: #Predicate { chunkIDs.contains($0.id) })
+        }
+        var byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for member in members {
-            try upsert(member: member)
+            let id = MattermostCachedChannelMember.cacheID(channelID: member.channelId, userID: member.userId)
+            if let cached = byID[id] {
+                cached.apply(member)
+            } else {
+                let cached = MattermostCachedChannelMember(member)
+                context.insert(cached)
+                byID[id] = cached
+            }
         }
     }
 
@@ -200,8 +283,26 @@ public final class MattermostStore {
     }
 
     public func upsert(postList: MattermostPostList) throws {
-        for post in postList.orderedPosts {
-            try upsert(post: post)
+        try upsert(posts: postList.orderedPosts)
+    }
+
+    private func upsert(posts: [MattermostPost]) throws {
+        guard !posts.isEmpty else { return }
+        let ids = posts.map(\.id)
+        let existing = try fetchInBatches(ids: ids) { chunkIDs in
+            FetchDescriptor<MattermostCachedPost>(predicate: #Predicate { chunkIDs.contains($0.id) })
+        }
+        var byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        for post in posts {
+            if let cached = byID[post.id] {
+                try cached.apply(post)
+            } else {
+                let propsJSON = try MattermostCachedPost.encodedJSON(post.props)
+                let metadataJSON = try MattermostCachedPost.encodedJSON(post.metadata)
+                let cached = MattermostCachedPost(post, propsJSON: propsJSON, metadataJSON: metadataJSON)
+                context.insert(cached)
+                byID[post.id] = cached
+            }
         }
     }
 
@@ -212,6 +313,24 @@ public final class MattermostStore {
         }
         try upsert(users: thread.participants)
 
+        return try upsertThreadState(thread, userID: userID, teamID: teamID)
+    }
+
+    public func upsert(threads: MattermostThreadList, userID: String, teamID: String) throws {
+        guard !threads.threads.isEmpty else { return }
+
+        let posts = threads.threads.compactMap(\.post)
+        let participants = threads.threads.flatMap(\.participants)
+        try upsert(posts: posts)
+        try upsert(users: participants)
+
+        for thread in threads.threads {
+            try upsertThreadState(thread, userID: userID, teamID: teamID)
+        }
+    }
+
+    @discardableResult
+    private func upsertThreadState(_ thread: MattermostThreadResponse, userID: String, teamID: String) throws -> MattermostCachedThread {
         let id = MattermostCachedThread.cacheID(rootID: thread.id, userID: userID, teamID: teamID)
         if let cached = try cachedThreadState(id: id) {
             cached.apply(thread, userID: userID, teamID: teamID)
@@ -221,12 +340,6 @@ public final class MattermostStore {
         let cached = MattermostCachedThread(thread, userID: userID, teamID: teamID)
         context.insert(cached)
         return cached
-    }
-
-    public func upsert(threads: MattermostThreadList, userID: String, teamID: String) throws {
-        for thread in threads.threads {
-            try upsert(thread: thread, userID: userID, teamID: teamID)
-        }
     }
 
     @discardableResult
@@ -247,8 +360,23 @@ public final class MattermostStore {
     }
 
     public func upsert(reactions: [MattermostReaction]) throws {
+        guard !reactions.isEmpty else { return }
+        let ids = reactions.map {
+            MattermostCachedReaction.cacheID(userID: $0.userId, postID: $0.postId, emojiName: $0.emojiName)
+        }
+        let existing = try fetchInBatches(ids: ids) { chunkIDs in
+            FetchDescriptor<MattermostCachedReaction>(predicate: #Predicate { chunkIDs.contains($0.id) })
+        }
+        var byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for reaction in reactions {
-            try upsert(reaction: reaction)
+            let id = MattermostCachedReaction.cacheID(userID: reaction.userId, postID: reaction.postId, emojiName: reaction.emojiName)
+            if let cached = byID[id] {
+                cached.apply(reaction)
+            } else {
+                let cached = MattermostCachedReaction(reaction)
+                context.insert(cached)
+                byID[id] = cached
+            }
         }
     }
 
@@ -265,8 +393,20 @@ public final class MattermostStore {
     }
 
     public func upsert(files: [MattermostFileInfo]) throws {
+        guard !files.isEmpty else { return }
+        let ids = files.map(\.id)
+        let existing = try fetchInBatches(ids: ids) { chunkIDs in
+            FetchDescriptor<MattermostCachedFile>(predicate: #Predicate { chunkIDs.contains($0.id) })
+        }
+        var byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for file in files {
-            try upsert(file: file)
+            if let cached = byID[file.id] {
+                cached.apply(file)
+            } else {
+                let cached = MattermostCachedFile(file)
+                context.insert(cached)
+                byID[file.id] = cached
+            }
         }
     }
 
@@ -283,8 +423,20 @@ public final class MattermostStore {
     }
 
     public func upsert(sidebarCategories: [MattermostSidebarCategory]) throws {
+        guard !sidebarCategories.isEmpty else { return }
+        let ids = sidebarCategories.map(\.id)
+        let existing = try fetchInBatches(ids: ids) { chunkIDs in
+            FetchDescriptor<MattermostCachedSidebarCategory>(predicate: #Predicate { chunkIDs.contains($0.id) })
+        }
+        var byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for sidebarCategory in sidebarCategories {
-            try upsert(sidebarCategory: sidebarCategory)
+            if let cached = byID[sidebarCategory.id] {
+                cached.apply(sidebarCategory)
+            } else {
+                let cached = MattermostCachedSidebarCategory(sidebarCategory)
+                context.insert(cached)
+                byID[sidebarCategory.id] = cached
+            }
         }
     }
 
@@ -560,11 +712,16 @@ public final class MattermostStore {
         guard !postIDs.isEmpty else {
             return
         }
-        let postIDs = Set(postIDs)
-        for reaction in try context.fetch(FetchDescriptor<MattermostCachedReaction>()) where postIDs.contains(reaction.postId) {
+        for reaction in try fetchInBatches(ids: postIDs, descriptor: { chunkIDs in
+            FetchDescriptor<MattermostCachedReaction>(predicate: #Predicate { chunkIDs.contains($0.postId) })
+        }) {
             context.delete(reaction)
         }
-        for file in try context.fetch(FetchDescriptor<MattermostCachedFile>()) where file.postId.map(postIDs.contains) == true {
+        for file in try fetchInBatches(ids: postIDs, descriptor: { chunkIDs in
+            FetchDescriptor<MattermostCachedFile>(predicate: #Predicate { file in
+                if let pid = file.postId { return chunkIDs.contains(pid) } else { return false }
+            })
+        }) {
             context.delete(file)
         }
     }

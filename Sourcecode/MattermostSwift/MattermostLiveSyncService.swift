@@ -274,48 +274,80 @@ public struct MattermostLiveSyncService: Sendable {
                             try store.save()
                             continuation.yield(.eventApplied(event, typedEvent))
 
+                            var unreadResult: MattermostChannelUnread?
                             if let refreshUnread,
                                let unreadRefresh = typedEvent.unreadRefresh(
                                    options: options,
                                    fallbackUserID: activeUserID
                                ) {
-                                let unread = try await refreshUnread(
-                                    unreadRefresh.userID,
-                                    unreadRefresh.channelID
-                                )
-                                try store.upsert(unread: unread, userID: unreadRefresh.userID)
-                                try store.save()
-                                continuation.yield(.channelUnreadRefreshed(unread))
+                                do {
+                                    let unread = try await refreshUnread(
+                                        unreadRefresh.userID,
+                                        unreadRefresh.channelID
+                                    )
+                                    try store.upsert(unread: unread, userID: unreadRefresh.userID)
+                                    unreadResult = unread
+                                } catch is CancellationError {
+                                    throw CancellationError()
+                                } catch {
+                                    unreadResult = nil
+                                }
                             }
 
+                            var categoriesResult: [MattermostSidebarCategory]?
                             if options.refreshSidebarCategoriesOnPreferenceChange,
                                let refreshSidebarCategories,
                                let activeTeamID,
                                typedEvent.invalidatesSidebarCategories {
-                                let categories = try await refreshSidebarCategories(activeTeamID)
-                                try store.upsert(sidebarCategories: categories)
-                                try store.save()
-                                continuation.yield(.sidebarCategoriesRefreshed(categories))
+                                do {
+                                    let categories = try await refreshSidebarCategories(activeTeamID)
+                                    try store.upsert(sidebarCategories: categories)
+                                    categoriesResult = categories
+                                } catch is CancellationError {
+                                    throw CancellationError()
+                                } catch {
+                                    categoriesResult = nil
+                                }
                             }
 
+                            var threadResult: MattermostThreadResponse?
                             if options.refreshThreadStateOnThreadEvent,
                                let refreshThreadState,
                                let threadRefresh = typedEvent.threadStateRefresh(
                                    fallbackUserID: activeUserID,
                                    fallbackTeamID: activeTeamID
                                ) {
-                                let thread = try await refreshThreadState(
-                                    threadRefresh.userID,
-                                    threadRefresh.teamID,
-                                    threadRefresh.threadID
-                                )
-                                try store.upsert(
-                                    thread: thread,
-                                    userID: threadRefresh.userID,
-                                    teamID: threadRefresh.teamID
-                                )
+                                do {
+                                    let thread = try await refreshThreadState(
+                                        threadRefresh.userID,
+                                        threadRefresh.teamID,
+                                        threadRefresh.threadID
+                                    )
+                                    try store.upsert(
+                                        thread: thread,
+                                        userID: threadRefresh.userID,
+                                        teamID: threadRefresh.teamID
+                                    )
+                                    threadResult = thread
+                                } catch is CancellationError {
+                                    throw CancellationError()
+                                } catch {
+                                    threadResult = nil
+                                }
+                            }
+
+                            if unreadResult != nil || categoriesResult != nil || threadResult != nil {
                                 try store.save()
-                                continuation.yield(.threadStateRefreshed(thread))
+
+                                if let unreadResult {
+                                    continuation.yield(.channelUnreadRefreshed(unreadResult))
+                                }
+                                if let categoriesResult {
+                                    continuation.yield(.sidebarCategoriesRefreshed(categoriesResult))
+                                }
+                                if let threadResult {
+                                    continuation.yield(.threadStateRefreshed(threadResult))
+                                }
                             }
 
                         case .reconnecting(let attempt, let delay, _):

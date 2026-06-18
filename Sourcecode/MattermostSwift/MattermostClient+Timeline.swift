@@ -47,8 +47,7 @@ public extension MattermostClient {
     ) async throws -> MattermostChannelPostSyncResult {
         let cursorScope = "channel-posts:\(channelID)"
         let cursor = try store.cachedSyncCursor(scope: cursorScope)
-        var orderedIDs: [String] = []
-        var postsByID: [String: MattermostPost] = [:]
+        var allOrderedPosts: [MattermostPost] = []
         var pageCount = 0
 
         let postLists: [MattermostPostList]
@@ -73,14 +72,13 @@ public extension MattermostClient {
         for postList in postLists {
             try store.upsert(postList: postList)
             pageCount += 1
-
-            for postID in postList.order where postsByID[postID] == nil {
-                orderedIDs.append(postID)
-            }
-            postsByID.merge(postList.posts) { _, new in new }
+            allOrderedPosts.append(contentsOf: postList.orderedPosts)
         }
 
-        let orderedPosts = orderedIDs.compactMap { postsByID[$0] }
+        // Deduplicate across pages, keeping first occurrence (matches the
+        // previous `where postsByID[postID] == nil` accumulation semantics).
+        var seen = Set<String>()
+        let orderedPosts = allOrderedPosts.filter { seen.insert($0.id).inserted }
         let lastPost = orderedPosts.max { lhs, rhs in
             lhs.cacheTimestamp < rhs.cacheTimestamp
         }
