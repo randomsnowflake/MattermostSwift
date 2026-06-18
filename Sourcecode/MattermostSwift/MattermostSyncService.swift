@@ -260,12 +260,17 @@ public struct MattermostSyncService: Sendable {
         return (inferredTeam, inferredTeamID, channels)
     }
 
+    // Keep the per-channel HTTP fan-out instead of deriving unread state locally.
+    // `MattermostChannelMember.msgCount` is the user's read position, while
+    // `MattermostChannelUnread.msgCount` is the server-computed unread count.
+    // The channels fetched in this sync pass do not carry total message counts,
+    // so computing unread counts locally would produce wrong badges.
     @MainActor
     private func refreshJoinedChannelUnreads(
         channels: [MattermostChannel],
         userID: String,
         store: MattermostStore,
-        width: Int = 4
+        width: Int = 8
     ) async throws -> Int {
         try await withThrowingTaskGroup(of: MattermostChannelUnread.self) { group in
             var iterator = channels.makeIterator()

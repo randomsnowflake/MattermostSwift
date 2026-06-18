@@ -76,6 +76,39 @@ func storeUpsertsUsersAndStatuses() throws {
 
 @MainActor
 @Test
+func storeBatchUpsertsUsersBeyondFetchChunkLimit() throws {
+    func user(_ id: Int, email: String) -> MattermostUser {
+        MattermostUser(
+            id: "user-\(id)",
+            username: "user\(id)",
+            email: email,
+            firstName: nil,
+            lastName: nil,
+            nickname: nil,
+            position: nil,
+            locale: nil,
+            timezone: nil
+        )
+    }
+
+    let store = try MattermostStore(inMemory: true)
+    let users = (0..<1_205).map { user($0, email: "old-\($0)@example.com") }
+    let updatedUsers = (0..<1_205).map { user($0, email: "new-\($0)@example.com") }
+        + [user(777, email: "latest-777@example.com")]
+
+    try store.upsert(users: users)
+    try store.upsert(users: updatedUsers)
+    try store.save()
+
+    let updated = try #require(try store.cachedUser(id: "user-777"))
+    let chunkBoundary = try #require(try store.cachedUser(id: "user-1000"))
+    #expect(try store.cachedUsersCount() == 1_205)
+    #expect(updated.email == "latest-777@example.com")
+    #expect(chunkBoundary.email == "new-1000@example.com")
+}
+
+@MainActor
+@Test
 func storeCachesChannelsPostsAndThreads() throws {
     let store = try MattermostStore(inMemory: true)
     let channel = MattermostChannel(

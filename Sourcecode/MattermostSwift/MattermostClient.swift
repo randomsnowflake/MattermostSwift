@@ -167,13 +167,7 @@ private extension HTTPURLResponse {
     }
 
     var authenticationToken: String? {
-        for (key, value) in allHeaderFields {
-            guard String(describing: key).lowercased() == "token" else {
-                continue
-            }
-            return String(describing: value)
-        }
-        return nil
+        value(forHTTPHeaderField: "Token")
     }
 
     var mattermostAuthCookieToken: String? {

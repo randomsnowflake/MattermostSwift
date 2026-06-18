@@ -371,12 +371,15 @@ func liveSyncRefreshesUnreadOnPostUnreadInvalidation() async throws {
 
     var refreshedUnread: MattermostChannelUnread?
     var appliedInvalidation: MattermostCacheInvalidationEvent?
+    var observedEvents: [String] = []
     for try await event in stream {
         switch event {
         case .eventApplied(_, .postUnread(let invalidation)):
             appliedInvalidation = invalidation
+            observedEvents.append("eventApplied")
         case .channelUnreadRefreshed(let unread):
             refreshedUnread = unread
+            observedEvents.append("channelUnreadRefreshed")
         default:
             break
         }
@@ -387,9 +390,94 @@ func liveSyncRefreshesUnreadOnPostUnreadInvalidation() async throws {
     #expect(unreadRefreshes.count == 1)
     #expect(unreadRefreshes.first?.userID == "user-1")
     #expect(unreadRefreshes.first?.channelID == "channel-1")
+    #expect(observedEvents == ["eventApplied", "channelUnreadRefreshed"])
     #expect(refreshedUnread?.msgCount == 4)
     #expect(cachedUnread.msgCount == 4)
     #expect(cachedUnread.mentionCount == 1)
+}
+
+@MainActor
+@Test
+func liveSyncAppliesEventBeforeRefreshFailureAndContinues() async throws {
+    struct RefreshFailure: LocalizedError, Equatable {
+        let errorDescription: String? = "refresh failed for test"
+    }
+
+    let service = try MattermostClient(
+        serverURL: try #require(URL(string: "https://mattermost.example.com")),
+        token: "test-token"
+    ).liveSyncService()
+    let store = try MattermostStore(inMemory: true)
+    let postUnread = MattermostLiveEvent(
+        event: "post_unread",
+        data: [
+            "channel_id": .string("channel-1"),
+            "post_id": .string("post-1"),
+        ],
+        broadcast: nil,
+        seq: 20
+    )
+    let posted = MattermostLiveEvent(
+        event: "posted",
+        data: ["post": .string("""
+        {
+          "id": "post-after-refresh-failure",
+          "create_at": 10,
+          "update_at": 10,
+          "edit_at": 0,
+          "delete_at": 0,
+          "user_id": "user-1",
+          "channel_id": "channel-1",
+          "root_id": "",
+          "message": "still applied",
+          "type": ""
+        }
+        """)],
+        broadcast: nil,
+        seq: 21
+    )
+    var unreadRefreshCount = 0
+
+    let stream = service.events(
+        to: store,
+        options: MattermostLiveSyncOptions(maxBackfillChannels: 1),
+        lifecycleEvents: {
+            AsyncThrowingStream { continuation in
+                continuation.yield(.connecting(attempt: 0))
+                continuation.yield(.event(postUnread))
+                continuation.yield(.event(posted))
+                continuation.finish()
+            }
+        },
+        backfill: { _, teamID, _, _ in
+            liveSyncBackfillResult(teamID: teamID ?? "team-1")
+        },
+        refreshUnread: { _, _ in
+            unreadRefreshCount += 1
+            throw RefreshFailure()
+        }
+    )
+
+    var appliedEvents: [String] = []
+    var refreshedUnread: MattermostChannelUnread?
+    for try await event in stream {
+        switch event {
+        case .eventApplied(_, .postUnread):
+            appliedEvents.append("post_unread")
+        case .eventApplied(_, .posted(let post)):
+            appliedEvents.append(post.id)
+        case .channelUnreadRefreshed(let unread):
+            refreshedUnread = unread
+        default:
+            break
+        }
+    }
+
+    let cachedPost = try #require(try store.cachedPost(id: "post-after-refresh-failure"))
+    #expect(appliedEvents == ["post_unread", "post-after-refresh-failure"])
+    #expect(unreadRefreshCount == 1)
+    #expect(refreshedUnread == nil)
+    #expect(cachedPost.message == "still applied")
 }
 
 @MainActor
