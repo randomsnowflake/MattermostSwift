@@ -406,7 +406,11 @@ public enum MattermostJSONValue: Codable, Equatable, Sendable {
     public var int64Value: Int64? {
         switch self {
         case .number(let value):
-            guard value.isFinite else {
+            // `Int64(Double)` traps on a finite value outside Int64's range, so bound the
+            // magnitude (< 2^63) as well as guarding NaN/infinity before converting.
+            guard value.isFinite,
+                  value >= -9_223_372_036_854_775_808.0,
+                  value < 9_223_372_036_854_775_808.0 else {
                 return nil
             }
             return Int64(value)

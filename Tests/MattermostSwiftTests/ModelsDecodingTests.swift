@@ -100,7 +100,7 @@ func decodesMattermostChannelStatsWithServerKeys() throws {
         "channel_id": "chan123",
         "member_count": 42,
         "guest_count": 3,
-        "pinnedpost_count": 5,
+        "pinned_post_count": 5,
         "total_msg_count": 1000
     }
     """

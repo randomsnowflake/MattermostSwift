@@ -60,7 +60,7 @@ public struct MattermostChannelStats: Decodable, Equatable, Sendable {
         channelId = try container.decodeIfPresent(String.self, forKey: .channelId)
         memberCount = try container.decodeIfPresent(Int64.self, forKey: .memberCount)
         guestCount = try container.decodeIfPresent(Int64.self, forKey: .guestCount)
-        pinnedPostCount = try container.decodeIfPresent(Int64.self, forKey: .pinnedpostCount)
+        pinnedPostCount = try container.decodeIfPresent(Int64.self, forKey: .pinnedPostCount)
         totalMessageCount = try container.decodeIfPresent(Int64.self, forKey: .totalMsgCount)
     }
 
@@ -68,7 +68,7 @@ public struct MattermostChannelStats: Decodable, Equatable, Sendable {
         case channelId
         case memberCount
         case guestCount
-        case pinnedpostCount
+        case pinnedPostCount
         case totalMsgCount
     }
 }
