@@ -81,11 +81,22 @@ public struct MattermostLiveEventStream: Sendable {
                         continuation.finish()
                         return
                     } catch {
+                        let failure = MattermostLiveEventStreamFailure(error: error)
                         if Self.connectionWasStable(since: connectedAt) { attempt = 0 }
                         guard policy.canRetry(attempt: attempt) else {
                             continuation.finish(throwing: error)
                             return
                         }
+                        let delay = policy.delay(for: attempt)
+                        continuation.yield(.reconnecting(attempt: attempt, delay: delay, failure: failure))
+                        do {
+                            try await Task.sleep(for: delay)
+                        } catch {
+                            continuation.finish()
+                            return
+                        }
+                        attempt += 1
+                        continue
                     }
 
                     let delay = policy.delay(for: attempt)

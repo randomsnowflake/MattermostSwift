@@ -315,7 +315,7 @@ public struct MattermostLiveSyncService: Sendable {
                                 continuation.yield(.threadStateRefreshed(thread))
                             }
 
-                        case .reconnecting(let attempt, let delay):
+                        case .reconnecting(let attempt, let delay, _):
                             continuation.yield(.reconnecting(attempt: attempt, delay: delay))
                         }
                     }
@@ -396,10 +396,52 @@ public struct MattermostLiveSyncService: Sendable {
 }
 
 /// Lifecycle-level WebSocket events used by live sync orchestration.
+public struct MattermostLiveEventStreamFailure: Equatable, Sendable {
+    public let domain: String
+    public let code: Int
+    public let underlyingDomain: String?
+    public let underlyingCode: Int?
+    public let message: String
+
+    public init(
+        domain: String,
+        code: Int,
+        underlyingDomain: String? = nil,
+        underlyingCode: Int? = nil,
+        message: String
+    ) {
+        self.domain = domain
+        self.code = code
+        self.underlyingDomain = underlyingDomain
+        self.underlyingCode = underlyingCode
+        self.message = message
+    }
+
+    public init(error: any Error) {
+        let nsError = error as NSError
+        let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
+        self.init(
+            domain: nsError.domain,
+            code: nsError.code,
+            underlyingDomain: underlying?.domain,
+            underlyingCode: underlying?.code,
+            message: Self.failureMessage(for: error)
+        )
+    }
+
+    private static func failureMessage(for error: any Error) -> String {
+        let message = error.localizedDescription
+        if !message.isEmpty {
+            return message
+        }
+        return String(describing: error)
+    }
+}
+
 public enum MattermostLiveEventStreamLifecycleEvent: Sendable {
     case connecting(attempt: Int)
     case event(MattermostLiveEvent)
-    case reconnecting(attempt: Int, delay: Duration)
+    case reconnecting(attempt: Int, delay: Duration, failure: MattermostLiveEventStreamFailure? = nil)
 }
 
 public extension MattermostClient {
