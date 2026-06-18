@@ -12,10 +12,7 @@ extension MattermostClient {
     public func channelMembers(channelID: String, page: Int = 0, perPage: Int = 60) async throws -> [MattermostChannelMember] {
         try await httpClient.get(
             "/channels/\(channelID)/members",
-            queryItems: [
-                URLQueryItem(name: "page", value: String(Self.clampedPage(page))),
-                URLQueryItem(name: "per_page", value: String(Self.clampedPerPage(perPage))),
-            ]
+            queryItems: Self.pageQueryItems(page: page, perPage: perPage)
         )
     }
 
