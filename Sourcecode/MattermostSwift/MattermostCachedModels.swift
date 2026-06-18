@@ -374,11 +374,13 @@ public final class MattermostCachedPost {
         deleteAt > 0
     }
 
-    func apply(_ post: MattermostPost, propsJSON: String?, metadataJSON: String?) {
+    func apply(_ post: MattermostPost) throws {
         guard shouldApply(post) else {
             return
         }
 
+        let propsJSON = try Self.encodedJSON(post.props)
+        let metadataJSON = try Self.encodedJSON(post.metadata)
         createAt = post.createAt
         updateAt = post.updateAt
         editAt = post.editAt

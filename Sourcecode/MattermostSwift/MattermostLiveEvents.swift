@@ -202,7 +202,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
         case .channelUpdated, .channelConverted:
             .channelUpdated(try decodedChannel())
         case .channelDeleted:
-            .channelDeleted(try decodedChannel(), channelID: try decodedChannelID())
+            try decodedChannelDeletedEvent()
         case .channelMemberUpdated:
             .channelMemberUpdated(try decodedChannelMember())
         case .userUpdated, .newUser:
@@ -226,6 +226,12 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
         case .none:
             .unknown(self)
         }
+    }
+
+    private func decodedChannelDeletedEvent() throws -> MattermostTypedLiveEvent {
+        let channel = try decodedChannel()
+        let channelID = if let id = channel?.id { id } else { try decodedChannelID() }
+        return .channelDeleted(channel, channelID: channelID)
     }
 }
 
@@ -341,6 +347,13 @@ public struct MattermostLiveBroadcast: Decodable, Equatable, Sendable {
         case teamId
     }
 
+    private enum SnakeCodingKeys: String, CodingKey {
+        case omitUsers = "omit_users"
+        case userId = "user_id"
+        case channelId = "channel_id"
+        case teamId = "team_id"
+    }
+
     public init(
         omitUsers: [String]? = nil,
         userId: String? = nil,
@@ -355,10 +368,15 @@ public struct MattermostLiveBroadcast: Decodable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        omitUsers = try? container.decode([String].self, forKey: .omitUsers)
-        userId = try? container.decode(String.self, forKey: .userId)
-        channelId = try? container.decode(String.self, forKey: .channelId)
-        teamId = try? container.decode(String.self, forKey: .teamId)
+        let snakeContainer = try decoder.container(keyedBy: SnakeCodingKeys.self)
+        omitUsers = try container.decodeIfPresent([String].self, forKey: .omitUsers)
+            ?? snakeContainer.decodeIfPresent([String].self, forKey: .omitUsers)
+        userId = try container.decodeIfPresent(String.self, forKey: .userId)
+            ?? snakeContainer.decodeIfPresent(String.self, forKey: .userId)
+        channelId = try container.decodeIfPresent(String.self, forKey: .channelId)
+            ?? snakeContainer.decodeIfPresent(String.self, forKey: .channelId)
+        teamId = try container.decodeIfPresent(String.self, forKey: .teamId)
+            ?? snakeContainer.decodeIfPresent(String.self, forKey: .teamId)
     }
 }
 

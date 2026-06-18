@@ -6,7 +6,7 @@ import Testing
 struct MattermostHTTPClientErrorTests {
     @Test
     func clientMapsMattermostErrorResponseMessage() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me")
             let body = Data(#"{"id":"api.context.permissions.app_error","message":"No permission"}"#.utf8)
             return try Self.response(statusCode: 403, body: body, request: request)
@@ -19,7 +19,7 @@ struct MattermostHTTPClientErrorTests {
 
     @Test
     func clientMapsHTTPStatusWithoutMattermostErrorMessage() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             try Self.response(statusCode: 502, body: Data("Bad gateway".utf8), request: request)
         }
 
@@ -30,12 +30,42 @@ struct MattermostHTTPClientErrorTests {
 
     @Test
     func clientRejectsEmptySuccessfulJSONResponse() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             try Self.response(statusCode: 200, body: Data(), request: request)
         }
 
         await #expect(throws: MattermostError.emptyResponse) {
             _ = try await client.currentUser()
+        }
+    }
+
+    @Test
+    func clientWrapsURLSessionErrorsAsTransportFailure() async throws {
+        let client = try await Self.makeClient { _ in
+            throw URLError(.networkConnectionLost)
+        }
+
+        do {
+            _ = try await client.currentUser()
+            Issue.record("Expected a transport failure.")
+        } catch MattermostError.transportFailure(let message) {
+            #expect(message.isEmpty == false)
+        }
+    }
+
+    @Test
+    func clientPreservesCancellationErrors() async throws {
+        let client = try await Self.makeClient { _ in
+            throw URLError(.cancelled)
+        }
+
+        do {
+            _ = try await client.currentUser()
+            Issue.record("Expected cancellation to be preserved.")
+        } catch let error as URLError {
+            #expect(error.code == .cancelled)
+        } catch {
+            Issue.record("Expected URLError.cancelled, got \(error).")
         }
     }
 
@@ -47,7 +77,7 @@ struct MattermostHTTPClientErrorTests {
         )
         let httpClient = MattermostHTTPClient(
             configuration: configuration,
-            urlSession: Self.urlSession { request in
+            urlSession: await Self.urlSession { request in
                 let body = Data(#"{"message":"File not found"}"#.utf8)
                 return try Self.response(statusCode: 404, body: body, request: request)
             }
@@ -60,7 +90,7 @@ struct MattermostHTTPClientErrorTests {
 
     @Test
     func clientDownloadsProfileImageBytes() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/image")
             #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token")
             #expect(request.value(forHTTPHeaderField: "User-Agent") == MattermostUserAgent.browser)
@@ -75,7 +105,7 @@ struct MattermostHTTPClientErrorTests {
 
     @Test
     func clientDownloadsDefaultProfileImageBytes() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/user-id/image/default")
             #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token")
             #expect(request.value(forHTTPHeaderField: "User-Agent") == MattermostUserAgent.browser)
@@ -90,7 +120,7 @@ struct MattermostHTTPClientErrorTests {
 
     @Test
     func clientAttachesMobileDeviceToSession() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/sessions/device")
             #expect(request.httpMethod == "PUT")
             let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
@@ -105,7 +135,7 @@ struct MattermostHTTPClientErrorTests {
 
     @Test
     func clientDetachesMobileDeviceFromSession() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/sessions/device")
             #expect(request.httpMethod == "DELETE")
             let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
@@ -121,7 +151,7 @@ struct MattermostHTTPClientErrorTests {
     @Test
     func clientPinsAndUnpinsPostWithoutBody() async throws {
         let requested = MattermostRequestLog()
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             requested.append("\(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
             #expect(request.httpBody == nil)
             return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
@@ -139,7 +169,7 @@ struct MattermostHTTPClientErrorTests {
     @Test
     func clientSetsThreadFollowingWithExpectedMethod() async throws {
         let requested = MattermostRequestLog()
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             requested.append("\(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
             #expect(request.httpBody == nil)
             return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
@@ -157,7 +187,7 @@ struct MattermostHTTPClientErrorTests {
     @Test
     func clientSetsAndClearsCustomStatus() async throws {
         let requested = MattermostRequestLog()
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             requested.append("\(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
             if request.httpMethod == "PUT" {
                 let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
@@ -181,7 +211,7 @@ struct MattermostHTTPClientErrorTests {
 
     @Test
     func clientClampsChannelUsersPagination() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users?in_channel=channel-id&page=0&per_page=1")
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
@@ -193,7 +223,7 @@ struct MattermostHTTPClientErrorTests {
 
     @Test
     func clientClampsChannelMembersPagination() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/members?page=0&per_page=1")
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
@@ -205,7 +235,7 @@ struct MattermostHTTPClientErrorTests {
 
     @Test
     func clientClampsPublicChannelPagination() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/teams/team-id/channels?page=0&per_page=1")
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
@@ -217,7 +247,7 @@ struct MattermostHTTPClientErrorTests {
 
     @Test
     func clientClampsTeamMemberPagination() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/teams/team-id/members?page=0&per_page=1&exclude_deleted_users=true")
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
@@ -234,7 +264,7 @@ struct MattermostHTTPClientErrorTests {
 
     @Test
     func clientClampsChannelPostsPagination() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/posts?page=0&per_page=1")
             return try Self.response(statusCode: 200, body: Data(#"{"order":[],"posts":{}}"#.utf8), request: request)
         }
@@ -247,7 +277,7 @@ struct MattermostHTTPClientErrorTests {
 
     @Test
     func clientClampsCustomEmojiPagination() async throws {
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/emoji?page=0&per_page=1&sort=name")
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
@@ -267,7 +297,7 @@ struct MattermostHTTPClientErrorTests {
             lastItemID: "old-post"
         )
 
-        let client = try Self.makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/posts?since=1780000000000")
             let body = Data("""
             {
@@ -326,7 +356,7 @@ struct MattermostHTTPClientErrorTests {
         )
         let client = try session.client(
             serverURL: try #require(URL(string: "https://mattermost.example.com")),
-            urlSession: Self.urlSession { request in
+            urlSession: await Self.urlSession { request in
                 #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer session-token")
                 let body = Data(#"{"id":"user-id","username":"alice"}"#.utf8)
                 return try Self.response(statusCode: 200, body: body, request: request)
@@ -345,7 +375,7 @@ struct MattermostHTTPClientErrorTests {
             serverURL: try #require(URL(string: "https://mattermost.example.com")),
             loginID: "user@example.com",
             password: "password",
-            urlSession: Self.urlSession { request in
+            urlSession: await Self.urlSession { request in
                 #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/login")
                 #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
                 #expect(request.value(forHTTPHeaderField: "X-Requested-With") == "XMLHttpRequest")
@@ -377,7 +407,7 @@ struct MattermostHTTPClientErrorTests {
             serverURL: try #require(URL(string: "https://mattermost.example.com")),
             loginID: "user@example.com",
             password: "password",
-            urlSession: Self.urlSession { request in
+            urlSession: await Self.urlSession { request in
                 #expect(request.value(forHTTPHeaderField: "X-Requested-With") == "XMLHttpRequest")
                 #expect(request.value(forHTTPHeaderField: "User-Agent") == MattermostUserAgent.browser)
                 let body = Data(#"{"id":"user-id","username":"alice"}"#.utf8)
@@ -401,12 +431,27 @@ struct MattermostHTTPClientErrorTests {
     }
 
     @Test
+    func loginThrowsMissingAuthenticationTokenWhenHeaderAndCookieAreAbsent() async throws {
+        await #expect(throws: MattermostError.missingAuthenticationToken) {
+            _ = try await MattermostClient.login(
+                serverURL: try #require(URL(string: "https://mattermost.example.com")),
+                loginID: "user@example.com",
+                password: "password",
+                urlSession: await Self.urlSession { request in
+                    let body = Data(#"{"id":"user-id","username":"alice"}"#.utf8)
+                    return try Self.response(statusCode: 200, body: body, request: request)
+                }
+            )
+        }
+    }
+
+    @Test
     func loginFindsMattermostAuthCookieAmongBrowserSessionCookies() async throws {
         let session = try await MattermostClient.login(
             serverURL: try #require(URL(string: "https://mattermost.example.com")),
             loginID: "user@example.com",
             password: "password",
-            urlSession: Self.urlSession { request in
+            urlSession: await Self.urlSession { request in
                 let body = Data(#"{"id":"user-id","username":"alice"}"#.utf8)
                 let url = try #require(request.url)
                 let response = try #require(HTTPURLResponse(
@@ -432,21 +477,18 @@ struct MattermostHTTPClientErrorTests {
 
     private static func makeClient(
         handler: @escaping @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)
-    ) throws -> MattermostClient {
+    ) async throws -> MattermostClient {
         try MattermostClient(
             serverURL: try #require(URL(string: "https://mattermost.example.com")),
             token: "token",
-            urlSession: urlSession(handler: handler)
+            urlSession: await urlSession(handler: handler)
         )
     }
 
     private static func urlSession(
         handler: @escaping @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)
-    ) -> URLSession {
-        MattermostMockURLProtocol.setHandler(handler)
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [MattermostMockURLProtocol.self]
-        return URLSession(configuration: configuration)
+    ) async -> URLSession {
+        await MattermostTestSupport.urlSession(handler: handler)
     }
 
     private static func response(
@@ -455,96 +497,15 @@ struct MattermostHTTPClientErrorTests {
         contentType: String = "application/json",
         request: URLRequest
     ) throws -> (HTTPURLResponse, Data) {
-        let url = try #require(request.url)
-        let response = try #require(HTTPURLResponse(
-            url: url,
+        try MattermostTestSupport.response(
             statusCode: statusCode,
-            httpVersion: "HTTP/1.1",
-            headerFields: ["Content-Type": contentType]
-        ))
-        return (response, body)
+            body: body,
+            contentType: contentType,
+            request: request
+        )
     }
 
     private static func bodyData(from request: URLRequest) throws -> Data {
-        if let body = request.httpBody {
-            return body
-        }
-        let stream = try #require(request.httpBodyStream)
-        stream.open()
-        defer { stream.close() }
-        var data = Data()
-        var buffer = [UInt8](repeating: 0, count: 4096)
-        while stream.hasBytesAvailable {
-            let count = stream.read(&buffer, maxLength: buffer.count)
-            if count < 0 {
-                throw stream.streamError ?? MattermostTestError.unreadableBodyStream
-            }
-            if count == 0 {
-                break
-            }
-            data.append(buffer, count: count)
-        }
-        return data
-    }
-}
-
-private enum MattermostTestError: Error {
-    case unreadableBodyStream
-}
-
-private final class MattermostRequestLog: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage: [String] = []
-
-    var values: [String] {
-        lock.withLock { storage }
-    }
-
-    func append(_ value: String) {
-        lock.withLock {
-            storage.append(value)
-        }
-    }
-}
-
-private final class MattermostMockURLProtocol: URLProtocol, @unchecked Sendable {
-    private static let lock = NSLock()
-    nonisolated(unsafe) private static var handler: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))?
-
-    static func setHandler(_ handler: @escaping @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)) {
-        lock.withLock {
-            Self.handler = handler
-        }
-    }
-
-    override class func canInit(with request: URLRequest) -> Bool {
-        true
-    }
-
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-        request
-    }
-
-    override func startLoading() {
-        do {
-            let (response, data) = try Self.response(for: request)
-            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: data)
-            client?.urlProtocolDidFinishLoading(self)
-        } catch {
-            client?.urlProtocol(self, didFailWithError: error)
-        }
-    }
-
-    override func stopLoading() {}
-
-    private static func response(for request: URLRequest) throws -> (HTTPURLResponse, Data) {
-        let handler = lock.withLock {
-            Self.handler
-        }
-        guard let handler else {
-            throw MattermostError.invalidHTTPResponse
-        }
-        return try handler(request)
+        try MattermostTestSupport.bodyData(from: request)
     }
 }

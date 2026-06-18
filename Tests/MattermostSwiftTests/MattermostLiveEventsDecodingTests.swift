@@ -64,6 +64,25 @@ func liveBroadcastDecodesOmitUsersAndTolaratesMissingKeys() throws {
 }
 
 @Test
+func liveBroadcastDecodesWithPlainDecoder() throws {
+    let json = """
+    {
+      "omit_users": ["a"],
+      "user_id": "user-1",
+      "channel_id": "channel-1",
+      "team_id": "team-1"
+    }
+    """
+
+    let broadcast = try JSONDecoder().decode(MattermostLiveBroadcast.self, from: Data(json.utf8))
+
+    #expect(broadcast.omitUsers == ["a"])
+    #expect(broadcast.userId == "user-1")
+    #expect(broadcast.channelId == "channel-1")
+    #expect(broadcast.teamId == "team-1")
+}
+
+@Test
 func jsonValueDecodesMixedTypes() throws {
     let json = """
     {
@@ -120,4 +139,33 @@ func typedEventMapsHelloAndCacheInvalidation() throws {
         postID: "post-1"
     )
     #expect(try postUnread.typedEvent() == .postUnread(expected))
+}
+
+@Test
+func typedEventMapsUnknownNamesWithoutThrowing() throws {
+    let event = MattermostLiveEvent(
+        event: "some_future_event",
+        data: ["value": .number(1)],
+        broadcast: nil,
+        seq: 10
+    )
+
+    #expect(try event.typedEvent() == .unknown(event))
+}
+
+@Test
+func webSocketEnvelopeThrowsOnWrongTypedFields() {
+    let json = """
+    {
+      "event": "typing",
+      "data": "not an object",
+      "broadcast": {
+        "channel_id": 42
+      }
+    }
+    """
+
+    #expect(throws: DecodingError.self) {
+        _ = try mattermostSnakeCaseDecoder.decode(MattermostWebSocketEnvelope.self, from: Data(json.utf8))
+    }
 }
