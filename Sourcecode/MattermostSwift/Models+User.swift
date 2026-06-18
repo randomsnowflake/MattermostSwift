@@ -106,3 +106,21 @@ public struct MattermostUserAutocomplete: Decodable, Equatable, Sendable {
         case outOfChannel
     }
 }
+
+/// Session metadata returned by Mattermost for active user sessions.
+public struct MattermostUserSession: Decodable, Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
+    public let id: String
+    public let userId: String?
+    public let createAt: Int64?
+    public let expiresAt: Int64?
+    /// Credential-bearing session token. Do not log or persist outside secure storage.
+    public let token: String?
+
+    public var description: String {
+        "MattermostUserSession(id: \(id), userId: \(userId ?? "-"), expiresAt: \(expiresAt.map(String.init) ?? "-"))"
+    }
+
+    public var debugDescription: String {
+        description
+    }
+}

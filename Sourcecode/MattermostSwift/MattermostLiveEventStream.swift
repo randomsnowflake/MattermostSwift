@@ -268,7 +268,7 @@ private struct MattermostWebSocketAuthenticationData: Encodable, Sendable {
     let token: String
 }
 
-private struct MattermostWebSocketEnvelope: Decodable, Sendable {
+struct MattermostWebSocketEnvelope: Decodable, Sendable {
     let event: String?
     let data: [String: MattermostJSONValue]?
     let broadcast: MattermostLiveBroadcast?
@@ -289,13 +289,13 @@ private struct MattermostWebSocketEnvelope: Decodable, Sendable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        event = try? container.decode(String.self, forKey: .event)
-        data = try? container.decode([String: MattermostJSONValue].self, forKey: .data)
-        broadcast = try? container.decode(MattermostLiveBroadcast.self, forKey: .broadcast)
+        event = try container.decodeIfPresent(String.self, forKey: .event)
+        data = try container.decodeIfPresent([String: MattermostJSONValue].self, forKey: .data)
+        broadcast = try container.decodeIfPresent(MattermostLiveBroadcast.self, forKey: .broadcast)
         seq = Self.decodeInt(container, forKey: .seq)
         seqReply = Self.decodeInt(container, forKey: .seqReply)
-        status = try? container.decode(String.self, forKey: .status)
-        error = try? container.decode(MattermostWebSocketError.self, forKey: .error)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
+        error = try container.decodeIfPresent(MattermostWebSocketError.self, forKey: .error)
     }
 
     var liveEvent: MattermostLiveEvent? {
@@ -324,7 +324,7 @@ private struct MattermostWebSocketEnvelope: Decodable, Sendable {
     }
 }
 
-private struct MattermostWebSocketError: Decodable, Sendable {
+struct MattermostWebSocketError: Decodable, Sendable {
     let message: String?
 }
 
