@@ -212,7 +212,11 @@ public struct MattermostLiveEventStream: Sendable {
 
 
     private func receiveEvent(from webSocketTask: URLSessionWebSocketTask) async throws -> MattermostLiveEvent? {
-        try await receiveEnvelope(from: webSocketTask).liveEvent
+        do {
+            return try await receiveEnvelope(from: webSocketTask).liveEvent
+        } catch is DecodingError {
+            return nil
+        }
     }
 
     private func receiveEnvelope(from webSocketTask: URLSessionWebSocketTask) async throws -> MattermostWebSocketEnvelope {
@@ -316,13 +320,13 @@ struct MattermostWebSocketEnvelope: Decodable, Sendable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        event = try container.decodeIfPresent(String.self, forKey: .event)
-        data = try container.decodeIfPresent([String: MattermostJSONValue].self, forKey: .data)
-        broadcast = try container.decodeIfPresent(MattermostLiveBroadcast.self, forKey: .broadcast)
+        event = Self.decodeIfPresent(String.self, from: container, forKey: .event)
+        data = Self.decodeIfPresent([String: MattermostJSONValue].self, from: container, forKey: .data)
+        broadcast = Self.decodeIfPresent(MattermostLiveBroadcast.self, from: container, forKey: .broadcast)
         seq = Self.decodeInt(container, forKey: .seq)
         seqReply = Self.decodeInt(container, forKey: .seqReply)
-        status = try container.decodeIfPresent(String.self, forKey: .status)
-        error = try container.decodeIfPresent(MattermostWebSocketError.self, forKey: .error)
+        status = Self.decodeIfPresent(String.self, from: container, forKey: .status)
+        error = Self.decodeIfPresent(MattermostWebSocketError.self, from: container, forKey: .error)
     }
 
     var liveEvent: MattermostLiveEvent? {
@@ -335,6 +339,18 @@ struct MattermostWebSocketEnvelope: Decodable, Sendable {
             broadcast: broadcast,
             seq: seq
         )
+    }
+
+    private static func decodeIfPresent<Value: Decodable>(
+        _ type: Value.Type,
+        from container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys
+    ) -> Value? {
+        do {
+            return try container.decodeIfPresent(type, forKey: key)
+        } catch {
+            return nil
+        }
     }
 
     private static func decodeInt(
