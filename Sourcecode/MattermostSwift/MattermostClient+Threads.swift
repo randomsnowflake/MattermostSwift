@@ -14,6 +14,10 @@ extension MattermostClient {
         collapsedThreads: Bool? = nil,
         collapsedThreadsExtended: Bool? = nil
     ) async throws -> MattermostPostList {
+        // The thread endpoint intentionally uses camelCase query parameters
+        // (`perPage`, `fromPost`, `fromCreateAt`, `skipFetchThreads`, ...), unlike the
+        // snake_case parameters used elsewhere. This matches Mattermost's
+        // `GET /posts/{post_id}/thread` contract — do not "normalize" these to snake_case.
         var queryItems = [
             URLQueryItem(name: "perPage", value: String(perPage)),
         ]
