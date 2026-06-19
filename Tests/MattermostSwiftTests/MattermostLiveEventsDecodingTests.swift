@@ -44,7 +44,7 @@ func liveEventDecodesCoreFieldsAndBroadcast() throws {
 }
 
 @Test
-func liveBroadcastDecodesOmitUsersAndTolaratesMissingKeys() throws {
+func liveBroadcastDecodesOmitUsersAndToleratesMissingKeys() throws {
     let json = """
     {
       "omit_users": ["a", "b"],
@@ -60,6 +60,28 @@ func liveBroadcastDecodesOmitUsersAndTolaratesMissingKeys() throws {
     #expect(broadcast.omitUsers == ["a", "b"])
     #expect(broadcast.channelId == "channel-9")
     #expect(broadcast.userId == nil)
+    #expect(broadcast.teamId == nil)
+}
+
+@Test
+func liveBroadcastToleratesUnexpectedFieldTypes() throws {
+    let json = """
+    {
+      "omit_users": "a",
+      "user_id": true,
+      "channel_id": 42,
+      "team_id": null
+    }
+    """
+
+    let broadcast = try mattermostSnakeCaseDecoder.decode(
+        MattermostLiveBroadcast.self,
+        from: Data(json.utf8)
+    )
+
+    #expect(broadcast.omitUsers == ["a"])
+    #expect(broadcast.userId == nil)
+    #expect(broadcast.channelId == nil)
     #expect(broadcast.teamId == nil)
 }
 
@@ -154,7 +176,7 @@ func typedEventMapsUnknownNamesWithoutThrowing() throws {
 }
 
 @Test
-func webSocketEnvelopeThrowsOnWrongTypedFields() {
+func webSocketEnvelopeToleratesWrongTypedFields() throws {
     let json = """
     {
       "event": "typing",
@@ -165,7 +187,13 @@ func webSocketEnvelopeThrowsOnWrongTypedFields() {
     }
     """
 
-    #expect(throws: DecodingError.self) {
-        _ = try mattermostSnakeCaseDecoder.decode(MattermostWebSocketEnvelope.self, from: Data(json.utf8))
-    }
+    let envelope = try mattermostSnakeCaseDecoder.decode(
+        MattermostWebSocketEnvelope.self,
+        from: Data(json.utf8)
+    )
+    let event = try #require(envelope.liveEvent)
+
+    #expect(event.event == "typing")
+    #expect(event.data == [:])
+    #expect(event.broadcast?.channelId == nil)
 }

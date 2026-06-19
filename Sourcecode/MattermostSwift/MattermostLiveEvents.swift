@@ -369,14 +369,34 @@ public struct MattermostLiveBroadcast: Decodable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let snakeContainer = try decoder.container(keyedBy: SnakeCodingKeys.self)
-        omitUsers = try container.decodeIfPresent([String].self, forKey: .omitUsers)
-            ?? snakeContainer.decodeIfPresent([String].self, forKey: .omitUsers)
-        userId = try container.decodeIfPresent(String.self, forKey: .userId)
-            ?? snakeContainer.decodeIfPresent(String.self, forKey: .userId)
-        channelId = try container.decodeIfPresent(String.self, forKey: .channelId)
-            ?? snakeContainer.decodeIfPresent(String.self, forKey: .channelId)
-        teamId = try container.decodeIfPresent(String.self, forKey: .teamId)
-            ?? snakeContainer.decodeIfPresent(String.self, forKey: .teamId)
+        omitUsers = Self.decodeStringArray(from: container, forKey: .omitUsers)
+            ?? Self.decodeStringArray(from: snakeContainer, forKey: .omitUsers)
+        userId = Self.decodeString(from: container, forKey: .userId)
+            ?? Self.decodeString(from: snakeContainer, forKey: .userId)
+        channelId = Self.decodeString(from: container, forKey: .channelId)
+            ?? Self.decodeString(from: snakeContainer, forKey: .channelId)
+        teamId = Self.decodeString(from: container, forKey: .teamId)
+            ?? Self.decodeString(from: snakeContainer, forKey: .teamId)
+    }
+
+    private static func decodeString<Key: CodingKey>(
+        from container: KeyedDecodingContainer<Key>,
+        forKey key: Key
+    ) -> String? {
+        try? container.decodeIfPresent(String.self, forKey: key)
+    }
+
+    private static func decodeStringArray<Key: CodingKey>(
+        from container: KeyedDecodingContainer<Key>,
+        forKey key: Key
+    ) -> [String]? {
+        if let value = try? container.decodeIfPresent([String].self, forKey: key) {
+            return value
+        }
+        if let value = try? container.decodeIfPresent(String.self, forKey: key) {
+            return [value]
+        }
+        return nil
     }
 }
 
