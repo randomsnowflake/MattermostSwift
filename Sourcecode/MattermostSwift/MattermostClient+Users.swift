@@ -114,9 +114,7 @@ extension MattermostClient {
             "/users",
             queryItems: [
                 URLQueryItem(name: "in_channel", value: channelID),
-                URLQueryItem(name: "page", value: String(Self.clampedPage(page))),
-                URLQueryItem(name: "per_page", value: String(Self.clampedPerPage(perPage))),
-            ]
+            ] + Self.pageQueryItems(page: page, perPage: perPage)
         )
     }
 

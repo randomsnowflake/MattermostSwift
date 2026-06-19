@@ -26,10 +26,7 @@ extension MattermostClient {
         sort: String? = nil,
         excludeDeletedUsers: Bool = false
     ) async throws -> [MattermostTeamMember] {
-        var queryItems = [
-            URLQueryItem(name: "page", value: String(Self.clampedPage(page))),
-            URLQueryItem(name: "per_page", value: String(Self.clampedPerPage(perPage))),
-        ]
+        var queryItems = Self.pageQueryItems(page: page, perPage: perPage)
         if let sort, !sort.isEmpty {
             queryItems.append(URLQueryItem(name: "sort", value: sort))
         }
