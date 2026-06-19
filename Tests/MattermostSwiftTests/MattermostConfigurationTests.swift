@@ -1491,6 +1491,9 @@ func decodesPostListAndPostState() throws {
           "pending_post_id": "",
           "file_ids": [],
           "has_reactions": false,
+          "reply_count": 3,
+          "last_reply_at": 40,
+          "is_following": true,
           "props": {
             "mmswift": {
               "ok": true,
@@ -1519,6 +1522,9 @@ func decodesPostListAndPostState() throws {
     #expect(post.isRootPost)
     #expect(post.isEdited)
     #expect(!post.isDeleted)
+    #expect(post.replyCount == 3)
+    #expect(post.lastReplyAt == 40)
+    #expect(post.isFollowing == true)
     #expect(post.props?["mmswift"] == .object([
         "ok": .bool(true),
         "count": .number(2),

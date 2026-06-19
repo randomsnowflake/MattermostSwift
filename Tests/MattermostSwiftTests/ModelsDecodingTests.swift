@@ -61,7 +61,10 @@ func decodesMattermostPostAndComputedProps() throws {
         "channelId": "chan123",
         "rootId": "",
         "message": "hello world",
-        "type": ""
+        "type": "",
+        "replyCount": 4,
+        "lastReplyAt": 500,
+        "isFollowing": true
     }
     """
     let post = try JSONDecoder().decode(MattermostPost.self, from: Data(payload.utf8))
@@ -71,6 +74,9 @@ func decodesMattermostPostAndComputedProps() throws {
     #expect(post.isEdited == true)
     #expect(post.isDeleted == false)
     #expect(post.cacheTimestamp == 300)
+    #expect(post.replyCount == 4)
+    #expect(post.lastReplyAt == 500)
+    #expect(post.isFollowing == true)
 }
 
 @Test

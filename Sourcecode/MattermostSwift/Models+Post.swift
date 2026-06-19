@@ -49,6 +49,33 @@ public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
     public let props: [String: MattermostJSONValue]?
     public let metadata: [String: MattermostJSONValue]?
     public let isPinned: Bool?
+    public let replyCount: Int64
+    public let lastReplyAt: Int64
+    public let isFollowing: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case createAt
+        case updateAt
+        case editAt
+        case deleteAt
+        case userId
+        case channelId
+        case rootId
+        case originalId
+        case message
+        case type
+        case hashtags
+        case pendingPostId
+        case fileIds
+        case hasReactions
+        case props
+        case metadata
+        case isPinned
+        case replyCount
+        case lastReplyAt
+        case isFollowing
+    }
 
     public init(
         id: String,
@@ -68,7 +95,10 @@ public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
         hasReactions: Bool?,
         props: [String: MattermostJSONValue]? = nil,
         metadata: [String: MattermostJSONValue]? = nil,
-        isPinned: Bool? = nil
+        isPinned: Bool? = nil,
+        replyCount: Int64 = 0,
+        lastReplyAt: Int64 = 0,
+        isFollowing: Bool? = nil
     ) {
         self.id = id
         self.createAt = createAt
@@ -88,6 +118,34 @@ public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
         self.props = props
         self.metadata = metadata
         self.isPinned = isPinned
+        self.replyCount = replyCount
+        self.lastReplyAt = lastReplyAt
+        self.isFollowing = isFollowing
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        createAt = try container.decode(Int64.self, forKey: .createAt)
+        updateAt = try container.decode(Int64.self, forKey: .updateAt)
+        editAt = try container.decode(Int64.self, forKey: .editAt)
+        deleteAt = try container.decode(Int64.self, forKey: .deleteAt)
+        userId = try container.decode(String.self, forKey: .userId)
+        channelId = try container.decode(String.self, forKey: .channelId)
+        rootId = try container.decode(String.self, forKey: .rootId)
+        originalId = try container.decodeIfPresent(String.self, forKey: .originalId)
+        message = try container.decode(String.self, forKey: .message)
+        type = try container.decode(String.self, forKey: .type)
+        hashtags = try container.decodeIfPresent(String.self, forKey: .hashtags)
+        pendingPostId = try container.decodeIfPresent(String.self, forKey: .pendingPostId)
+        fileIds = try container.decodeIfPresent([String].self, forKey: .fileIds)
+        hasReactions = try container.decodeIfPresent(Bool.self, forKey: .hasReactions)
+        props = try container.decodeIfPresent([String: MattermostJSONValue].self, forKey: .props)
+        metadata = try container.decodeIfPresent([String: MattermostJSONValue].self, forKey: .metadata)
+        isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned)
+        replyCount = try container.decodeIfPresent(Int64.self, forKey: .replyCount) ?? 0
+        lastReplyAt = try container.decodeIfPresent(Int64.self, forKey: .lastReplyAt) ?? 0
+        isFollowing = try container.decodeIfPresent(Bool.self, forKey: .isFollowing)
     }
 
     public var isDeleted: Bool {
