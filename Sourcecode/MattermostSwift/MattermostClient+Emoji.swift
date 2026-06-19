@@ -7,9 +7,7 @@ extension MattermostClient {
     public func customEmoji(page: Int = 0, perPage: Int = 60, sort: String = "name") async throws -> [MattermostCustomEmoji] {
         try await httpClient.get(
             "/emoji",
-            queryItems: [
-                URLQueryItem(name: "page", value: String(Self.clampedPage(page))),
-                URLQueryItem(name: "per_page", value: String(Self.clampedPerPage(perPage))),
+            queryItems: Self.pageQueryItems(page: page, perPage: perPage) + [
                 URLQueryItem(name: "sort", value: sort),
             ]
         )

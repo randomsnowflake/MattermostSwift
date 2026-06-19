@@ -16,10 +16,7 @@ extension MattermostClient {
             return try await postsSince(channelID: channelID, since: since)
         }
 
-        var queryItems = [
-            URLQueryItem(name: "page", value: String(Self.clampedPage(page))),
-            URLQueryItem(name: "per_page", value: String(Self.clampedPerPage(perPage))),
-        ]
+        var queryItems = Self.pageQueryItems(page: page, perPage: perPage)
 
         if let before, !before.isEmpty {
             queryItems.append(URLQueryItem(name: "before", value: before))

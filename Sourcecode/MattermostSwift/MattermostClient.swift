@@ -40,6 +40,17 @@ public struct MattermostClient: Sendable {
     static func clampedPerPage(_ perPage: Int) -> Int {
         max(1, perPage)
     }
+
+    /// Clamped `page`/`per_page` query items shared by every paginated endpoint.
+    ///
+    /// Centralizing this keeps the pagination contract (page ≥ 0, per_page ≥ 1) and the
+    /// query-parameter names in one place instead of duplicated across each endpoint.
+    static func pageQueryItems(page: Int, perPage: Int) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: "page", value: String(clampedPage(page))),
+            URLQueryItem(name: "per_page", value: String(clampedPerPage(perPage))),
+        ]
+    }
 }
 
 public extension MattermostClient {
