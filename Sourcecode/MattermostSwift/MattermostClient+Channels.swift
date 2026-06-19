@@ -17,9 +17,7 @@ extension MattermostClient {
     ) async throws -> [MattermostChannel] {
         try await httpClient.get(
             "/teams/\(teamID)/channels",
-            queryItems: [
-                URLQueryItem(name: "page", value: String(Self.clampedPage(page))),
-                URLQueryItem(name: "per_page", value: String(Self.clampedPerPage(perPage))),
+            queryItems: Self.pageQueryItems(page: page, perPage: perPage) + [
                 URLQueryItem(name: "include_deleted", value: String(includeDeleted)),
             ]
         )
@@ -101,10 +99,7 @@ extension MattermostClient {
     public func deletedChannels(teamID: String, page: Int = 0, perPage: Int = 60) async throws -> [MattermostChannel] {
         try await httpClient.get(
             "/teams/\(teamID)/channels/deleted",
-            queryItems: [
-                URLQueryItem(name: "page", value: String(Self.clampedPage(page))),
-                URLQueryItem(name: "per_page", value: String(Self.clampedPerPage(perPage))),
-            ]
+            queryItems: Self.pageQueryItems(page: page, perPage: perPage)
         )
     }
 
