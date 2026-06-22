@@ -1,14 +1,27 @@
 # MattermostSwift
 
+[![Swift Package Index](https://img.shields.io/endpoint?url=https://swiftpackageindex.com/api/packages/randomsnowflake/MattermostSwift/badge?type=swift-versions)](https://swiftpackageindex.com/randomsnowflake/MattermostSwift)
+[![Swift Package Index](https://img.shields.io/endpoint?url=https://swiftpackageindex.com/api/packages/randomsnowflake/MattermostSwift/badge?type=platforms)](https://swiftpackageindex.com/randomsnowflake/MattermostSwift)
+[![Documentation](https://img.shields.io/badge/documentation-DocC-blue)](https://swiftpackageindex.com/randomsnowflake/MattermostSwift/documentation/mattermostswift)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 MattermostSwift is an unofficial Swift SDK for Mattermost. It gives you the core loop for building your own Swift-based Mattermost app: authenticate, load teams and channels, read timelines, send and edit posts, sync local state, and react to live WebSocket events.
 
 This project is not affiliated with, endorsed by, sponsored by, or supported by Mattermost, Inc. Mattermost is a trademark of Mattermost, Inc.; this repository uses the name only to describe API compatibility.
 
 The package is written with Swift concurrency, ships as a Swift Package, and keeps UI choices out of the library target so it can be used from SwiftUI, AppKit/UIKit, command-line tools, or shared app cores.
 
+## At a Glance
+
+- Swift tools version: 6.0
+- Platforms: iOS 18 and macOS 15
+- Products: `MattermostSwift` library and `MattermostSwiftCLI` executable
+- Documentation: hosted by Swift Package Index at `https://swiftpackageindex.com/randomsnowflake/MattermostSwift`
+- Stability: pre-`1.0.0`; public APIs may evolve between minor releases
+
 ## Installation
 
-After the first release tag is pushed, add MattermostSwift to your package with a version requirement:
+Add MattermostSwift to your package with a version requirement:
 
 ```swift
 // Package.swift
@@ -25,13 +38,19 @@ targets: [
 ]
 ```
 
-Before a release exists, use a branch or local path dependency during app development:
+To test unreleased changes, use a branch or local path dependency during app development:
 
 ```swift
 .package(url: "https://github.com/randomsnowflake/MattermostSwift.git", branch: "main")
 ```
 
 The library target has no SwiftUI or Combine dependency.
+
+## Documentation
+
+The package includes DocC documentation for the library target. Swift Package Index builds and hosts the latest documentation from the package page:
+
+`https://swiftpackageindex.com/randomsnowflake/MattermostSwift`
 
 ## Quick Start
 
