@@ -5,3 +5,33 @@
 *.xcuserstate
 xcuserdata/
 .claude/
+
+# Local credentials and environment overrides.
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs and local diagnostic output.
+*.log
+*.trace
+*.xcresult
+
+# Local stores and generated runtime state.
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+
+# Screenshots, recordings, and exported archives.
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.heic
+*.mov
+*.mp4
+*.zip
+*.tar
+*.tar.gz
+*.tgz

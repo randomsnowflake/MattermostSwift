@@ -1,100 +1,19 @@
 # MattermostSwift
 
-MattermostSwift is a Swift Package for operating a Mattermost server from Swift code. The package currently contains the reusable `MattermostSwift` library and `MattermostSwiftCLI`, a developer harness for live verification against a real server.
+MattermostSwift is an unofficial Swift SDK for Mattermost. It gives you the core loop for building your own Swift-based Mattermost app: authenticate, load teams and channels, read timelines, send and edit posts, sync local state, and react to live WebSocket events.
 
-This is an early implementation. The first live flow is working end-to-end:
+This project is not affiliated with, endorsed by, sponsored by, or supported by Mattermost, Inc. Mattermost is a trademark of Mattermost, Inc.; this repository uses the name only to describe API compatibility.
 
-```sh
-swift run MattermostSwiftCLI me
-swift run MattermostSwiftCLI get-user
-swift run MattermostSwiftCLI profile-image
-swift run MattermostSwiftCLI default-profile-image
-swift run MattermostSwiftCLI get-users USER_ID USER_ID
-swift run MattermostSwiftCLI get-users-by-username USERNAME
-swift run MattermostSwiftCLI status
-swift run MattermostSwiftCLI server-info
-swift run MattermostSwiftCLI search-users USERNAME
-swift run MattermostSwiftCLI autocomplete-users USERNAME
-swift run MattermostSwiftCLI known-users --profiles
-swift run MattermostSwiftCLI list-channels
-swift run MattermostSwiftCLI list-public-channels
-swift run MattermostSwiftCLI channel-info
-swift run MattermostSwiftCLI channel-by-name --team TEAM_ID town-square
-swift run MattermostSwiftCLI channel-by-team-name TEAM_NAME town-square
-swift run MattermostSwiftCLI channel-stats
-swift run MattermostSwiftCLI channel-timezones
-swift run MattermostSwiftCLI channel-member-counts
-swift run MattermostSwiftCLI search-channels town
-swift run MattermostSwiftCLI search-group-channels USERNAME
-swift run MattermostSwiftCLI direct-channel-test USER_ID
-swift run MattermostSwiftCLI channel-member
-swift run MattermostSwiftCLI list-channel-members
-swift run MattermostSwiftCLI channel-members-by-id USER_ID
-swift run MattermostSwiftCLI add-channel-member USER_ID
-swift run MattermostSwiftCLI remove-channel-member USER_ID
-swift run MattermostSwiftCLI channel-unread
-swift run MattermostSwiftCLI list-unread-posts
-swift run MattermostSwiftCLI list-channel-users
-swift run MattermostSwiftCLI send-typing
-swift run MattermostSwiftCLI list-categories
-swift run MattermostSwiftCLI list-threads
-swift run MattermostSwiftCLI list-preferences
-swift run MattermostSwiftCLI preferences-test
-swift run MattermostSwiftCLI preference-roundtrip-test
-swift run MattermostSwiftCLI list-posts
-swift run MattermostSwiftCLI list-post-updates 1780000000000
-swift run MattermostSwiftCLI send-message "hello from MattermostSwift"
-swift run MattermostSwiftCLI edit-message POST_ID "edited from MattermostSwift"
-swift run MattermostSwiftCLI delete-message POST_ID
-swift run MattermostSwiftCLI pinned-posts
-swift run MattermostSwiftCLI thread-test
-swift run MattermostSwiftCLI timeline-test
-swift run MattermostSwiftCLI props-test
-swift run MattermostSwiftCLI unread-posts-test
-swift run MattermostSwiftCLI threads-test
-swift run MattermostSwiftCLI reaction-test
-swift run MattermostSwiftCLI search "from:USERNAME"
-swift run MattermostSwiftCLI search-test
-swift run MattermostSwiftCLI upload-file ./example.txt
-swift run MattermostSwiftCLI download-file FILE_ID ./downloaded-example.txt
-swift run MattermostSwiftCLI file-test
-swift run MattermostSwiftCLI list-emoji
-swift run MattermostSwiftCLI search-emoji party
-swift run MattermostSwiftCLI list-teams
-swift run MattermostSwiftCLI team-info
-swift run MattermostSwiftCLI list-team-members
-swift run MattermostSwiftCLI stream-events 5
-swift run MattermostSwiftCLI websocket-test
-swift run MattermostSwiftCLI live-sync-test
-swift run MattermostSwiftCLI reconnect-backfill-test
-swift run MattermostSwiftCLI deletion-backfill-test
-swift run MattermostSwiftCLI live-sync-reconnect-test
-swift run MattermostSwiftCLI all-channel-backfill-test
-swift run MattermostSwiftCLI all-channel-reconnect-test
-swift run MattermostSwiftCLI failure-cleanup-test
-swift run MattermostSwiftCLI residue-audit
-swift run MattermostSwiftCLI typing-test
-swift run MattermostSwiftCLI create-test-channel
-swift run MattermostSwiftCLI rename-test-channel CHANNEL_ID
-swift run MattermostSwiftCLI archive-channel CHANNEL_ID
-swift run MattermostSwiftCLI channel-test
-swift run MattermostSwiftCLI sidebar-category-test
-swift run MattermostSwiftCLI sidebar-move-test
-swift run MattermostSwiftCLI sync
-swift run MattermostSwiftCLI cache-check
-swift run MattermostSwiftCLI since-test
-swift run MattermostSwiftCLI login-test
-swift run MattermostSwiftCLI check
-```
+The package is written with Swift concurrency, ships as a Swift Package, and keeps UI choices out of the library target so it can be used from SwiftUI, AppKit/UIKit, command-line tools, or shared app cores.
 
 ## Installation
 
-Add MattermostSwift to a Swift package with a branch or version requirement after publishing:
+After the first release tag is pushed, add MattermostSwift to your package with a version requirement:
 
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/randomsnowflake/MattermostSwift.git", branch: "main"),
+    .package(url: "https://github.com/randomsnowflake/MattermostSwift.git", from: "0.1.0"),
 ],
 targets: [
     .target(
@@ -106,7 +25,127 @@ targets: [
 ]
 ```
 
-For local app development before publishing, add this repository as a package dependency and import `MattermostSwift` from the reusable app/core target. The library has no SwiftUI or Combine dependency.
+Before a release exists, use a branch or local path dependency during app development:
+
+```swift
+.package(url: "https://github.com/randomsnowflake/MattermostSwift.git", branch: "main")
+```
+
+The library target has no SwiftUI or Combine dependency.
+
+## Quick Start
+
+Create a client, load the current account, find joined channels, and send a post:
+
+```swift
+import Foundation
+import MattermostSwift
+
+let client = try MattermostClient(
+    serverURL: URL(string: "https://mattermost.example.com")!,
+    token: "personal-access-token"
+)
+
+let me = try await client.currentUser()
+let teams = try await client.teams()
+let channels = try await client.joinedChannelsAcrossTeams()
+
+if let channel = channels.first {
+    let post = try await client.sendPost(
+        channelID: channel.id,
+        message: "hello from MattermostSwift"
+    )
+
+    let timeline = try await client.timeline(.channel(id: channel.id))
+    print("sent \(post.id), loaded \(timeline.posts.count) posts")
+}
+
+print("signed in as \(me.username), joined \(teams.count) teams")
+```
+
+Load a channel timeline:
+
+```swift
+let page = try await client.timeline(.channel(id: "channel-id"))
+
+for post in page.posts {
+    print("\(post.userId): \(post.message)")
+}
+```
+
+Keep an app cache warm with SwiftData:
+
+```swift
+let store = try MattermostStore(inMemory: false)
+
+let result = try await client.syncService().sync(
+    to: store,
+    channelID: "channel-id"
+)
+
+try store.save()
+print("cached \(result.cachedChannelsCount) channels")
+```
+
+Listen for live events:
+
+```swift
+for try await event in client.liveEventStream().events() {
+    if let post = try event.decodedPost() {
+        print("post event: \(event.event) \(post.id)")
+    }
+}
+```
+
+## Authentication
+
+Use a Mattermost personal access token when possible:
+
+```swift
+let client = try MattermostClient(
+    serverURL: URL(string: "https://mattermost.example.com")!,
+    token: "personal-access-token"
+)
+```
+
+For tools, tests, or local scripts, credentials can also come from the environment:
+
+```sh
+export MATTERMOST_URL="https://mattermost.example.com"
+export MATTERMOST_TOKEN="your-personal-access-token"
+```
+
+```swift
+let client = try MattermostClient.liveFromEnvironment()
+```
+
+Username/password login is available for deployments that permit it. The SDK returns the session token to the caller and does not store it:
+
+```swift
+let session = try await MattermostClient.login(
+    serverURL: URL(string: "https://mattermost.example.com")!,
+    loginID: "user@example.com",
+    password: "password"
+)
+
+let client = try session.client(serverURL: URL(string: "https://mattermost.example.com")!)
+```
+
+Store any returned token in your app's secure storage, such as Keychain on Apple platforms.
+
+## Supported APIs
+
+The SDK currently covers:
+
+- Authentication helpers for personal access tokens and username/password sessions.
+- Users, profiles, profile images, statuses, custom statuses, MFA helpers, and sessions.
+- Teams and team members.
+- Channels, direct messages, group messages, channel members, unread state, typing, notification props, and channel view state.
+- Posts, replies, pinned posts, edits, deletes, search, files, reactions, threads, and timeline loading.
+- Preferences, sidebar categories, category order, and channel moves.
+- Custom emoji listing, lookup, search, autocomplete, and image downloads.
+- Server ping and client configuration.
+- WebSocket live events, typed live-event decoding, reconnect handling, live sync, reconnect backfill, and a SwiftData cache/store.
 
 ## Package Layout
 
@@ -138,128 +177,11 @@ export MATTERMOST_PASSWORD="password"
 `MATTERMOST_USERNAME` and `MATTERMOST_PASSWORD` are optional and are used only by `login-test`. Password login sends Mattermost's browser-style `X-Requested-With: XMLHttpRequest` login header and returns a `MattermostSession` from the `Token` response header when present, or from Mattermost's `MMAUTHTOKEN` session cookie when a deployment follows the browser/webapp path.
 `notify-props-test` is read-only; it loads channel membership and prints the typed per-channel notification properties plus the raw server keys.
 
-## Minimal Use
+## Live Test Warning
 
-```swift
-import Foundation
-import MattermostSwift
+`scripts/test-live.sh` and `scripts/test-e2e.sh` run against a real Mattermost server. Some e2e flows create, edit, delete, archive, upload, move sidebar items, change preferences, and send WebSocket-visible events. Run them only against a workspace and account where that activity is expected.
 
-guard let serverURL = URL(string: "https://mattermost.example.com") else {
-    throw URLError(.badURL)
-}
-
-let client = try MattermostClient(serverURL: serverURL, token: "personal-access-token")
-let users = try await client.searchUsers(term: "alice")
-print(users.map(\.username))
-let resolvedUsers = try await client.users(ids: users.map(\.id))
-print(resolvedUsers.count)
-let namedUsers = try await client.users(usernames: ["alice"])
-print(namedUsers.count)
-let suggestions = try await client.autocompleteUsers(name: "ali")
-print(suggestions.allUsers.map(\.username))
-let knownUserIDs = try await client.knownUserIDs()
-print(knownUserIDs.count)
-let notifyProps = try await client.channelMember(channelID: "channel-id").channelNotifyProps
-print(notifyProps.desktop ?? "default")
-let dm = try await client.createDirectChannel(
-    userID: "current-user-id",
-    otherUserID: "other-user-id"
-)
-print(dm.id)
-
-let session = try await MattermostClient.login(
-    serverURL: serverURL,
-    loginID: "user@example.com",
-    password: "password"
-)
-let passwordClient = try session.client(serverURL: serverURL)
-print(session.tokenSource)
-
-let user = try await client.currentUser()
-let status = try await client.status(userID: user.id)
-let avatar = try await client.userProfileImage(userID: user.id)
-let joinedTeams = try await client.teams()
-let teamMembers = try await client.teamMembers(teamID: "team-id", perPage: 20)
-let channels = try await client.joinedChannelsAcrossTeams()
-let publicChannels = try await client.publicChannels(teamID: "team-id", perPage: 20)
-let townSquare = try await client.channel(teamID: "team-id", name: "town-square")
-let stats = try await client.channelStats(channelID: townSquare.id)
-let timezones = try await client.channelTimezones(channelID: townSquare.id)
-let memberCounts = try await client.channelMemberCounts(channelIDs: [townSquare.id])
-let userPreferences = try await client.preferences()
-let store = try await MattermostStore(inMemory: true)
-
-try await store.upsert(user: user)
-try await store.upsert(status: status)
-try await store.upsert(teams: joinedTeams)
-try await store.upsert(channels: channels)
-try await store.save()
-print(teamMembers.count)
-
-if let channel = channels.first {
-    let unread = try await client.channelUnread(channelID: channel.id)
-    let member = try await client.channelMember(channelID: channel.id)
-    let pageOfMembers = try await client.channelMembers(channelID: channel.id, perPage: 20)
-    let resolvedMembers = try await client.channelMembers(channelID: channel.id, userIDs: [user.id])
-
-    let post = try await client.sendPost(
-        channelID: channel.id,
-        message: "hello from MattermostSwift",
-        props: [
-            "client": .string("MattermostSwift"),
-        ]
-    )
-
-    try await store.upsert(member: member)
-    try await store.upsert(unread: unread, userID: user.id)
-    let postSync = try await client.syncChannelPosts(channelID: channel.id, to: store)
-    let timeline = try await client.timeline(.channel(id: channel.id))
-    let pinned = try await client.pinnedPosts(channelID: channel.id)
-    let updates = try await client.postsSince(channelID: channel.id, since: postSync.cursorLastSyncAt)
-    _ = try await client.postsAroundLastUnread(
-        channelID: channel.id,
-        collapsedThreads: true,
-        collapsedThreadsExtended: true
-    )
-    try await store.save()
-}
-
-if let teamID = channels.compactMap(\.teamId).first {
-    let threadList = try await client.userThreads(teamID: teamID, request: MattermostThreadListRequest(perPage: 20, extended: true))
-    try await store.upsert(threads: threadList, userID: user.id, teamID: teamID)
-    try await store.save()
-}
-
-if let firstChannelID = channels.first?.id {
-    _ = try store.cachedTimeline(
-        .channel(id: firstChannelID),
-        includeDeleted: false
-    )
-}
-
-let syncResult = try await client.syncService().sync(
-    to: store,
-    channelID: channels.first?.id
-)
-
-for try await event in client.liveSyncService().events(
-    to: store,
-    options: MattermostLiveSyncOptions(channelIDs: channels.prefix(3).map(\.id))
-) {
-    if let state = event.connectionState {
-        print("live-sync state: \(state)")
-    }
-    if case .backfillFailed(let failure) = event {
-        print("live-sync backfill failed: \(failure.message)")
-    }
-    print(event)
-    break
-}
-
-// For a small workspace or an explicit catch-up action, hosts can ask reconnect
-// backfill to sweep every joined channel instead of the default channel cap.
-let fullBackfill = MattermostLiveSyncOptions(backfillAllJoinedChannelPosts: true)
-```
+The e2e script uses `mmswift-test-` and `MattermostSwift Test` markers and attempts to clean up created resources, but interrupted runs or server-side failures can leave residue. See `TESTING.md` for details.
 
 ## Development
 
@@ -269,8 +191,9 @@ scripts/test-live.sh
 scripts/test-e2e.sh
 ```
 
-`scripts/test-e2e.sh` includes an isolated mutating flow that creates a temporary
-test channel/category and cleans up the resources it created.
+`MattermostSwiftCLI` is a development and verification harness, not the primary product surface. Use it to probe endpoints, exercise live server behavior, and run the scripted checks.
+
+`scripts/test-e2e.sh` includes an isolated mutating flow that creates a temporary test channel/category and cleans up the resources it created.
 
 See `ARCHITECTURE.md`, `TESTING.md`, and `ROADMAP.md` for the current design and next milestones.
 The library target also includes a DocC quick-start article at `Sourcecode/MattermostSwift/MattermostSwift.docc/MattermostSwift.md`.
