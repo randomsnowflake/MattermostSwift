@@ -81,6 +81,28 @@ struct MattermostClientRequestTests {
         #expect(users.first?.username == "alice")
     }
 
+    @Test
+    func updateUserProfileImageUsesMattermostMultipartContract() async throws {
+        let client = try await Self.makeClient { request in
+            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/user-id/image")
+            #expect(request.httpMethod == "POST")
+            #expect(request.value(forHTTPHeaderField: "Content-Type")?.hasPrefix("multipart/form-data; boundary=") == true)
+            let text = String(decoding: try Self.bodyData(from: request), as: UTF8.self)
+            #expect(text.contains(#"Content-Disposition: form-data; name="image"; filename="profile.png""#))
+            #expect(text.contains("Content-Type: image/png"))
+            #expect(text.contains("profile-image-bytes"))
+            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+        }
+
+        let status = try await client.updateUserProfileImage(
+            userID: "user-id",
+            data: Data("profile-image-bytes".utf8),
+            contentType: "image/png"
+        )
+
+        #expect(status.isOK)
+    }
+
     // MARK: - Helpers
 
     private static func makeClient(

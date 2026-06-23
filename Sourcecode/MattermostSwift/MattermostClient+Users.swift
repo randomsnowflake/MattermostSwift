@@ -81,11 +81,10 @@ extension MattermostClient {
     ) async throws -> MattermostStatusOK {
         try await httpClient.multipart(
             "/users/\(userID)/image",
-            method: "PUT",
             parts: [
                 MattermostMultipartPart(
                     name: "image",
-                    filename: "profile-image",
+                    filename: "profile.png",
                     contentType: contentType,
                     data: data
                 ),
