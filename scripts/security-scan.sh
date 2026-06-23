@@ -7,7 +7,10 @@ secret_patterns='(token|secret|password|passwd|authorization|bearer|api[_-]?key|
 artifact_patterns='(\.env|\.log|\.png|\.jpe?g|\.gif|\.heic|\.mov|\.mp4|\.zip|\.tar|\.gz|\.sqlite|\.db|\.xcresult|\.build|\.mattermostswift)'
 
 scan_pathspec=(. ':!.git' ':!scripts/security-scan.sh')
-mapfile -t git_revisions < <(git rev-list --all)
+git_revisions=()
+while IFS= read -r revision; do
+  git_revisions+=("$revision")
+done < <(git rev-list --all)
 expected_artifact_pattern='^(\.env\.example|Assets/integration-icon\.png)$'
 
 filter_expected_artifacts() {
