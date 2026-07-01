@@ -1453,6 +1453,32 @@ func channelNotifyPropsPreservesKnownAndUnknownValues() {
 }
 
 @Test
+func channelNotifyPropsMarkUnreadMentionsOnlyIsNotMutedByItself() {
+    let markUnreadOnly = MattermostChannelNotifyProps(
+        desktop: MattermostChannelNotifyProps.notifyAll,
+        markUnread: MattermostChannelNotifyProps.markUnreadMention,
+        push: MattermostChannelNotifyProps.notifyAll,
+        ignoreChannelMentions: MattermostChannelNotifyProps.ignoreChannelMentionsOff
+    )
+    let pushOnly = MattermostChannelNotifyProps(
+        desktop: MattermostChannelNotifyProps.notifyAll,
+        markUnread: MattermostChannelNotifyProps.markUnreadAll,
+        push: MattermostChannelNotifyProps.notifyNone,
+        ignoreChannelMentions: MattermostChannelNotifyProps.ignoreChannelMentionsOff
+    )
+    let desktopOnly = MattermostChannelNotifyProps(
+        desktop: MattermostChannelNotifyProps.notifyNone,
+        markUnread: MattermostChannelNotifyProps.markUnreadAll,
+        push: MattermostChannelNotifyProps.notifyAll,
+        ignoreChannelMentions: MattermostChannelNotifyProps.ignoreChannelMentionsOff
+    )
+
+    #expect(!markUnreadOnly.isMuted)
+    #expect(!pushOnly.isMuted)
+    #expect(!desktopOnly.isMuted)
+}
+
+@Test
 func channelNotifyPropsMuteHelperSuppressesNotificationDelivery() {
     let props = MattermostChannelNotifyProps(
         desktop: MattermostChannelNotifyProps.notifyAll,

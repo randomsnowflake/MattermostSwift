@@ -156,12 +156,14 @@ public struct MattermostChannelNotifyProps: Equatable, Sendable {
 
     /// Whether these props represent Mattermost's muted-channel behavior.
     ///
-    /// Older server/client states may only set `mark_unread=mention`; newer app
-    /// integrations also suppress push/desktop delivery and channel-wide mentions.
+    /// `mark_unread=mention` is the core Mattermost mute signal, but clients may
+    /// also expose that preference as a standalone "mark unread only for mentions"
+    /// setting. Treat it as muted only when it is paired with delivery suppression
+    /// or channel-wide mention suppression.
     public var isMuted: Bool {
-        markUnread == Self.markUnreadMention
-            || push == Self.notifyNone
-            || desktop == Self.notifyNone
+        guard markUnread == Self.markUnreadMention else { return false }
+        return ignoreChannelMentions == Self.ignoreChannelMentionsOn
+            || (push == Self.notifyNone && desktop == Self.notifyNone)
     }
 
     /// Returns a copy with channel mute semantics applied while preserving unknown
