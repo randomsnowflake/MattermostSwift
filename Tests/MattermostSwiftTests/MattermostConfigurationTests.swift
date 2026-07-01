@@ -1453,6 +1453,67 @@ func channelNotifyPropsPreservesKnownAndUnknownValues() {
 }
 
 @Test
+func channelNotifyPropsMuteHelperSuppressesNotificationDelivery() {
+    let props = MattermostChannelNotifyProps(
+        desktop: MattermostChannelNotifyProps.notifyAll,
+        email: "true",
+        markUnread: MattermostChannelNotifyProps.markUnreadAll,
+        push: MattermostChannelNotifyProps.notifyMention,
+        ignoreChannelMentions: MattermostChannelNotifyProps.ignoreChannelMentionsOff,
+        rawValues: ["custom": "kept"]
+    )
+
+    let muted = props.settingMuted(true)
+
+    #expect(muted.isMuted)
+    #expect(muted.markUnread == MattermostChannelNotifyProps.markUnreadMention)
+    #expect(muted.push == MattermostChannelNotifyProps.notifyNone)
+    #expect(muted.desktop == MattermostChannelNotifyProps.notifyNone)
+    #expect(muted.ignoreChannelMentions == MattermostChannelNotifyProps.ignoreChannelMentionsOn)
+    #expect(muted.email == "true")
+    #expect(muted["custom"] == "kept")
+}
+
+@Test
+func channelNotifyPropsUnmuteRestoresOwnedMuteValuesOnly() {
+    let muted = MattermostChannelNotifyProps(
+        desktop: MattermostChannelNotifyProps.notifyNone,
+        email: "false",
+        markUnread: MattermostChannelNotifyProps.markUnreadMention,
+        push: MattermostChannelNotifyProps.notifyNone,
+        ignoreChannelMentions: MattermostChannelNotifyProps.ignoreChannelMentionsOn,
+        rawValues: ["custom": "kept"]
+    )
+
+    let unmuted = muted.settingMuted(false, unmutedNotifyValue: MattermostChannelNotifyProps.notifyMention)
+
+    #expect(!unmuted.isMuted)
+    #expect(unmuted.markUnread == MattermostChannelNotifyProps.markUnreadAll)
+    #expect(unmuted.push == MattermostChannelNotifyProps.notifyMention)
+    #expect(unmuted.desktop == MattermostChannelNotifyProps.notifyMention)
+    #expect(unmuted.ignoreChannelMentions == MattermostChannelNotifyProps.ignoreChannelMentionsOff)
+    #expect(unmuted.email == "false")
+    #expect(unmuted["custom"] == "kept")
+}
+
+@Test
+func channelNotifyPropsUnmutePreservesExplicitNonNoneDeliveryValues() {
+    let quietMentions = MattermostChannelNotifyProps(
+        desktop: MattermostChannelNotifyProps.notifyMention,
+        markUnread: MattermostChannelNotifyProps.markUnreadMention,
+        push: MattermostChannelNotifyProps.notifyMention,
+        ignoreChannelMentions: MattermostChannelNotifyProps.ignoreChannelMentionsDefault
+    )
+
+    let unmuted = quietMentions.settingMuted(false)
+
+    #expect(unmuted.markUnread == MattermostChannelNotifyProps.markUnreadAll)
+    #expect(unmuted.push == MattermostChannelNotifyProps.notifyMention)
+    #expect(unmuted.desktop == MattermostChannelNotifyProps.notifyMention)
+    #expect(unmuted.ignoreChannelMentions == MattermostChannelNotifyProps.ignoreChannelMentionsDefault)
+}
+
+@Test
 func decodesChannelViewResponse() throws {
     let json = """
     {

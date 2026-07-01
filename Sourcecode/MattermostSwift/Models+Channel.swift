@@ -97,6 +97,16 @@ public struct MattermostChannelNotifyProps: Equatable, Sendable {
     public static let pushKey = "push"
     public static let ignoreChannelMentionsKey = "ignore_channel_mentions"
 
+    public static let notifyDefault = "default"
+    public static let notifyAll = "all"
+    public static let notifyMention = "mention"
+    public static let notifyNone = "none"
+    public static let markUnreadAll = "all"
+    public static let markUnreadMention = "mention"
+    public static let ignoreChannelMentionsDefault = "default"
+    public static let ignoreChannelMentionsOff = "off"
+    public static let ignoreChannelMentionsOn = "on"
+
     public var rawValues: [String: String]
 
     public init(
@@ -142,6 +152,61 @@ public struct MattermostChannelNotifyProps: Equatable, Sendable {
 
     public subscript(key: String) -> String? {
         rawValues[key]
+    }
+
+    /// Whether these props represent Mattermost's muted-channel behavior.
+    ///
+    /// Older server/client states may only set `mark_unread=mention`; newer app
+    /// integrations also suppress push/desktop delivery and channel-wide mentions.
+    public var isMuted: Bool {
+        markUnread == Self.markUnreadMention
+            || push == Self.notifyNone
+            || desktop == Self.notifyNone
+    }
+
+    /// Returns a copy with channel mute semantics applied while preserving unknown
+    /// server keys and unrelated notification preferences.
+    ///
+    /// Muting makes the channel visually quiet (`mark_unread=mention`) and prevents
+    /// delivery-oriented notifications (`push=none`, `desktop=none`). Unmuting
+    /// restores only values this helper previously owns: `mark_unread` goes back
+    /// to `all`, and `push`/`desktop` move from `none` to `unmutedNotifyValue`.
+    ///
+    /// - Parameter isMuted: `true` to mute the channel, `false` to unmute it.
+    /// - Parameter unmutedNotifyValue: Notification value to use when unmuting a
+    ///   `none` push/desktop value. Defaults to `all`, matching Mattermost's
+    ///   channel-level non-muted setting.
+    public func settingMuted(
+        _ isMuted: Bool,
+        unmutedNotifyValue: String = Self.notifyAll
+    ) -> MattermostChannelNotifyProps {
+        var copy = self
+        copy.setMuted(isMuted, unmutedNotifyValue: unmutedNotifyValue)
+        return copy
+    }
+
+    /// Mutates this value with the same semantics as ``settingMuted(_:unmutedNotifyValue:)``.
+    public mutating func setMuted(
+        _ isMuted: Bool,
+        unmutedNotifyValue: String = Self.notifyAll
+    ) {
+        if isMuted {
+            rawValues[Self.markUnreadKey] = Self.markUnreadMention
+            rawValues[Self.pushKey] = Self.notifyNone
+            rawValues[Self.desktopKey] = Self.notifyNone
+            rawValues[Self.ignoreChannelMentionsKey] = Self.ignoreChannelMentionsOn
+        } else {
+            rawValues[Self.markUnreadKey] = Self.markUnreadAll
+            if push == Self.notifyNone {
+                rawValues[Self.pushKey] = unmutedNotifyValue
+            }
+            if desktop == Self.notifyNone {
+                rawValues[Self.desktopKey] = unmutedNotifyValue
+            }
+            if ignoreChannelMentions == Self.ignoreChannelMentionsOn {
+                rawValues[Self.ignoreChannelMentionsKey] = Self.ignoreChannelMentionsOff
+            }
+        }
     }
 }
 
