@@ -4,6 +4,10 @@ All notable changes to MattermostSwift are documented here.
 
 This project follows semantic versioning before `1.0.0` with one caveat: public APIs may still evolve between minor releases while the SDK hardens against more Mattermost deployments.
 
+## Unreleased
+
+- Added typed channel mute helpers for notification props so clients can suppress channel delivery while preserving unknown Mattermost fields.
+
 ## 0.1.0
 
 Initial public release.
