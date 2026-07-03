@@ -16,7 +16,7 @@ The current unit tests cover:
 - request construction,
 - post update request construction with the `since` timestamp query,
 - unread-context and collapsed-thread request construction,
-- thread inbox request construction, decoding, and cache upserts,
+- thread inbox request construction, thread read-state request construction, decoding, and cache upserts,
 - query item construction,
 - REST error handling for Mattermost error bodies, non-JSON error bodies, empty successful JSON responses, and binary/data endpoints,
 - initial Mattermost response decoding,
