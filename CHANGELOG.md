@@ -6,6 +6,7 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Added `MattermostClient.markThreadRead` for Mattermost's per-user thread read endpoint, using Mattermost millisecond server timestamps.
 - Added typed channel mute helpers for notification props so clients can suppress channel delivery while preserving unknown Mattermost fields.
 
 ## 0.1.0

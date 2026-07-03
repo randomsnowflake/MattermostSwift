@@ -139,6 +139,22 @@ extension MattermostClient {
         )
     }
 
+    /// Marks a followed thread read up to the supplied server timestamp.
+    ///
+    /// Mattermost expects milliseconds since epoch here, matching post `create_at`
+    /// and thread `last_reply_at` values. Passing seconds leaves the thread unread.
+    @discardableResult
+    public func markThreadRead(
+        userID: String = "me",
+        teamID: String,
+        threadID: String,
+        timestamp: Int64
+    ) async throws -> MattermostThreadResponse {
+        try await httpClient.put(
+            "/users/\(userID)/teams/\(teamID)/threads/\(threadID)/read/\(timestamp)"
+        )
+    }
+
     /// Updates whether a user follows a collapsed reply thread.
     @discardableResult
     public func setThreadFollowing(

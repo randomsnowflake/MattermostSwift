@@ -105,6 +105,14 @@ func loadTimeline(
         request: MattermostTimelineRequest(perPage: 40)
     )
 
+    if let lastReplyAt = threadPage.posts.map(\.createAt).max() {
+        try await client.markThreadRead(
+            teamID: "team-id",
+            threadID: rootPostID,
+            timestamp: lastReplyAt
+        )
+    }
+
     _ = try await client.syncTimeline(.channel(id: channelID), to: store)
     let cachedChannelPosts = try store.cachedTimeline(.channel(id: channelID))
     let visibleCachedPosts = try store.cachedTimeline(.channel(id: channelID), includeDeleted: false)
@@ -117,6 +125,8 @@ func loadTimeline(
 ```
 
 The timeline target owns the cache scope, so host apps do not need to invent cursor keys. Cached timelines keep deleted-post tombstones for sync correctness, including deletes recovered later through cursor backfill; pass `includeDeleted: false` for normal visible message lists.
+
+Use `markThreadRead(teamID:threadID:timestamp:)` to clear a followed thread's unread state after presenting it. Pass a Mattermost server timestamp in milliseconds, such as a post `createAt` value or thread `lastReplyAt`; seconds-based Unix timestamps leave the thread unread.
 
 ## Maintain Live State
 

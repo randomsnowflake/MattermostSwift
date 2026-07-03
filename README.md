@@ -160,7 +160,7 @@ The SDK currently covers:
 - Users, profiles, profile images, statuses, custom statuses, MFA helpers, and sessions.
 - Teams and team members.
 - Channels, direct messages, group messages, channel members, unread state, typing, notification props, and channel view state.
-- Posts, replies, pinned posts, edits, deletes, search, files, reactions, threads, and timeline loading.
+- Posts, replies, pinned posts, edits, deletes, search, files, reactions, threads, per-user thread read state, and timeline loading.
 - Preferences, sidebar categories, category order, and channel moves.
 - Custom emoji listing, lookup, search, autocomplete, and image downloads.
 - Server ping and client configuration.
