@@ -103,6 +103,27 @@ struct MattermostClientRequestTests {
         #expect(status.isOK)
     }
 
+    @Test
+    func markThreadReadUsesMillisecondTimestampPath() async throws {
+        let client = try await Self.makeClient { request in
+            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/teams/team-id/threads/thread-id/read/1780000000123")
+            #expect(request.httpMethod == "PUT")
+            #expect(request.httpBody == nil)
+            let responseBody = Data(#"{"id":"thread-id","reply_count":4,"last_reply_at":1780000000123,"last_viewed_at":1780000000123,"participants":[],"post":null,"unread_replies":0,"unread_mentions":0,"is_urgent":false,"delete_at":0,"is_following":true}"#.utf8)
+            return try Self.response(statusCode: 200, body: responseBody, request: request)
+        }
+
+        let thread = try await client.markThreadRead(
+            teamID: "team-id",
+            threadID: "thread-id",
+            timestamp: 1_780_000_000_123
+        )
+
+        #expect(thread.id == "thread-id")
+        #expect(thread.unreadReplies == 0)
+        #expect(thread.lastViewedAt == 1_780_000_000_123)
+    }
+
     // MARK: - Helpers
 
     private static func makeClient(
