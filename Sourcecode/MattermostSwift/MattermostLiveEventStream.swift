@@ -177,7 +177,10 @@ public struct MattermostLiveEventStream: Sendable {
             try Task.checkCancellation()
             try await Self.withTimeout(
                 heartbeatTimeout,
-                timeoutMessage: "Mattermost WebSocket ping timed out."
+                timeoutMessage: "Mattermost WebSocket ping timed out.",
+                onTimeout: {
+                    webSocketTask.cancel(with: .goingAway, reason: nil)
+                }
             ) {
                 try await self.sendPing(to: webSocketTask)
             }
@@ -251,12 +254,14 @@ public struct MattermostLiveEventStream: Sendable {
     private static func withTimeout<T: Sendable>(
         _ duration: Duration,
         timeoutMessage: String,
+        onTimeout: @escaping @Sendable () -> Void = {},
         operation: @escaping @Sendable () async throws -> T
     ) async throws -> T {
         try await withThrowingTaskGroup(of: T.self) { group in
             group.addTask { try await operation() }
             group.addTask {
                 try await Task.sleep(for: duration)
+                onTimeout()
                 throw MattermostError.transportFailure(timeoutMessage)
             }
             defer { group.cancelAll() }
@@ -296,17 +301,17 @@ public struct MattermostLiveEventStream: Sendable {
     }
 
     private func sendPing(to webSocketTask: URLSessionWebSocketTask) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let resumeOnce = MattermostOneShotCallback<Error?> { error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume()
+        let state = MattermostPingContinuation()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                state.install(continuation)
+                webSocketTask.sendPing { error in
+                    state.finish(error)
                 }
             }
-            webSocketTask.sendPing { error in
-                resumeOnce(error)
-            }
+        } onCancel: {
+            webSocketTask.cancel(with: .goingAway, reason: nil)
+            state.finish(CancellationError())
         }
     }
 
@@ -317,6 +322,52 @@ public struct MattermostLiveEventStream: Sendable {
             try await webSocketTask.receive()
         } onCancel: {
             webSocketTask.cancel(with: .goingAway, reason: nil)
+        }
+    }
+}
+
+/// Bridges URLSessionWebSocketTask.sendPing's callback API to cancellation-aware
+/// async code. Both cancellation and the callback may race; only the first one
+/// resumes the continuation.
+private final class MattermostPingContinuation: @unchecked Sendable {
+    private enum Completion {
+        case success
+        case failure(Error)
+    }
+
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var completion: Completion?
+
+    func install(_ continuation: CheckedContinuation<Void, Error>) {
+        let completion = lock.withLock { () -> Completion? in
+            if let completion = self.completion {
+                return completion
+            }
+            self.continuation = continuation
+            return nil
+        }
+        guard let completion else { return }
+        switch completion {
+        case .success:
+            continuation.resume()
+        case .failure(let error):
+            continuation.resume(throwing: error)
+        }
+    }
+
+    func finish(_ error: Error?) {
+        let continuation = lock.withLock { () -> CheckedContinuation<Void, Error>? in
+            guard completion == nil else { return nil }
+            completion = error.map(Completion.failure) ?? .success
+            defer { self.continuation = nil }
+            return self.continuation
+        }
+        guard let continuation else { return }
+        if let error {
+            continuation.resume(throwing: error)
+        } else {
+            continuation.resume()
         }
     }
 }
