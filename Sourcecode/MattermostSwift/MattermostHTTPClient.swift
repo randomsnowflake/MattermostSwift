@@ -156,8 +156,9 @@ struct MattermostHTTPClient: Sendable {
     }
 
     // Native async transport. `URLSession.data(for:)` propagates Task cancellation
-    // (it cancels the underlying data task). A transient connection blip (a reused
-    // keep-alive socket reset by the edge: -1005 / ENOTCONN) is retried with backoff.
+    // (it cancels the underlying data task). Only safe read requests retry a transient
+    // keep-alive socket reset: a mutation may have committed before its response was
+    // lost, so replaying POST/PUT/PATCH/DELETE is not generally safe.
     private func loadData(for request: URLRequest) async throws -> (Data, URLResponse) {
         var attempt = 0
         while true {
@@ -168,7 +169,9 @@ struct MattermostHTTPClient: Sendable {
                 if Self.isCancellation(error) {
                     throw error
                 }
-                guard attempt <= Self.maxTransientRetries, Self.isTransient(error) else {
+                guard attempt <= Self.maxTransientRetries,
+                      Self.isTransient(error),
+                      Self.allowsAutomaticRetry(for: request) else {
                     throw MattermostError.transportFailure(error.localizedDescription)
                 }
                 try await Task.sleep(for: .milliseconds(200 * attempt))
@@ -177,6 +180,15 @@ struct MattermostHTTPClient: Sendable {
     }
 
     private static let maxTransientRetries = 2
+
+    private static func allowsAutomaticRetry(for request: URLRequest) -> Bool {
+        switch request.httpMethod?.uppercased() {
+        case nil, "GET", "HEAD", "OPTIONS":
+            true
+        default:
+            false
+        }
+    }
 
     private static func isCancellation(_ error: Error) -> Bool {
         if error is CancellationError {
