@@ -3,6 +3,20 @@ import Testing
 @testable import MattermostSwift
 
 @Test
+func oneShotCallbackIgnoresRepeatedInvocations() {
+    let log = MattermostRequestLog()
+    let callback = MattermostOneShotCallback<Int> { value in
+        log.append("\(value)")
+    }
+
+    callback(1)
+    callback(2)
+    callback(3)
+
+    #expect(log.values == ["1"])
+}
+
+@Test
 func liveEventStreamFailureCapturesNSErrorAndUnderlyingNSErrorDetails() {
     let underlying = NSError(domain: NSPOSIXErrorDomain, code: 57)
     let error = NSError(

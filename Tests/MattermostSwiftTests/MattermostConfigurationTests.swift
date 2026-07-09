@@ -234,6 +234,25 @@ func liveEventStreamBuildsUnauthenticatedWebSocketRequestWithBrowserUserAgent() 
 }
 
 @Test
+func liveEventStreamConfiguresHeartbeatLiveness() throws {
+    let configuration = try MattermostConfiguration(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        authentication: .bearerToken("token")
+    )
+    let defaultStream = MattermostLiveEventStream(configuration: configuration)
+    let customStream = MattermostLiveEventStream(
+        configuration: configuration,
+        heartbeatInterval: .seconds(3),
+        heartbeatTimeout: .seconds(1)
+    )
+
+    #expect(defaultStream.heartbeatInterval == .seconds(25))
+    #expect(defaultStream.heartbeatTimeout == .seconds(10))
+    #expect(customStream.heartbeatInterval == .seconds(3))
+    #expect(customStream.heartbeatTimeout == .seconds(1))
+}
+
+@Test
 func httpClientBuildsQueryRequest() throws {
     let configuration = try MattermostConfiguration(
         serverURL: #require(URL(string: "https://mattermost.example.com")),

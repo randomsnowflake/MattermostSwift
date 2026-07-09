@@ -77,6 +77,66 @@ func decodesMattermostPostAndComputedProps() throws {
     #expect(post.replyCount == 4)
     #expect(post.lastReplyAt == 500)
     #expect(post.isFollowing == true)
+    #expect(post.postMetadata == nil)
+}
+
+@Test
+func decodesMattermostPostEmbeddedMetadata() throws {
+    let payload = """
+    {
+        "id": "post123",
+        "createAt": 100,
+        "updateAt": 200,
+        "editAt": 0,
+        "deleteAt": 0,
+        "userId": "user123",
+        "channelId": "chan123",
+        "rootId": "",
+        "message": "with files",
+        "type": "",
+        "metadata": {
+            "files": [
+                {"id": "file1", "name": "report.pdf", "extension": "pdf", "size": 1024, "mimeType": "application/pdf"}
+            ],
+            "reactions": [
+                {"userId": "user123", "postId": "post123", "emojiName": "thumbsup", "createAt": 100}
+            ]
+        }
+    }
+    """
+    let post = try JSONDecoder().decode(MattermostPost.self, from: Data(payload.utf8))
+    #expect(post.postMetadata?.files?.count == 1)
+    #expect(post.postMetadata?.files?.first?.name == "report.pdf")
+    #expect(post.postMetadata?.files?.first?.extensionName == "pdf")
+    #expect(post.postMetadata?.reactions?.count == 1)
+    #expect(post.postMetadata?.reactions?.first?.emojiName == "thumbsup")
+    // The raw metadata dictionary stays available alongside the typed view.
+    #expect(post.metadata?["files"] != nil)
+}
+
+@Test
+func decodesMattermostPostWithMalformedMetadataAsNil() throws {
+    // Malformed embedded metadata must never fail post decoding.
+    let payload = """
+    {
+        "id": "post123",
+        "createAt": 100,
+        "updateAt": 200,
+        "editAt": 0,
+        "deleteAt": 0,
+        "userId": "user123",
+        "channelId": "chan123",
+        "rootId": "",
+        "message": "bad metadata",
+        "type": "",
+        "metadata": {
+            "files": [{"name": 42}]
+        }
+    }
+    """
+    let post = try JSONDecoder().decode(MattermostPost.self, from: Data(payload.utf8))
+    #expect(post.id == "post123")
+    #expect(post.postMetadata == nil)
 }
 
 @Test
