@@ -3,6 +3,16 @@ import Foundation
 // MARK: - Users
 
 extension MattermostClient {
+    /// Revokes the authenticated login session on the Mattermost server.
+    ///
+    /// Personal access tokens are not server sessions and may be rejected by
+    /// this endpoint; callers should treat failure as remote-cleanup telemetry
+    /// after they have already discarded their local credential.
+    @discardableResult
+    public func logoutCurrentSession() async throws -> MattermostStatusOK {
+        try await httpClient.post("/users/logout")
+    }
+
     /// Loads the authenticated user.
     public func currentUser() async throws -> MattermostUser {
         try await httpClient.get("/users/me")
