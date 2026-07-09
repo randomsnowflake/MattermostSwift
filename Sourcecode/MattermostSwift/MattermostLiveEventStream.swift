@@ -4,10 +4,19 @@ import Foundation
 public struct MattermostLiveEventStream: Sendable {
     private let configuration: MattermostConfiguration
     private let urlSession: URLSession
+    let heartbeatInterval: Duration
+    let heartbeatTimeout: Duration
 
-    public init(configuration: MattermostConfiguration, urlSession: URLSession = .mattermost) {
+    public init(
+        configuration: MattermostConfiguration,
+        urlSession: URLSession = .mattermost,
+        heartbeatInterval: Duration = .seconds(25),
+        heartbeatTimeout: Duration = .seconds(10)
+    ) {
         self.configuration = configuration
         self.urlSession = urlSession
+        self.heartbeatInterval = heartbeatInterval
+        self.heartbeatTimeout = heartbeatTimeout
     }
 
     /// Connects, authenticates, and yields server events until cancelled or the socket fails.
@@ -128,6 +137,29 @@ public struct MattermostLiveEventStream: Sendable {
             onEvent(event)
         }
 
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await self.receiveEvents(from: webSocketTask, onEvent: onEvent)
+            }
+            group.addTask {
+                try await self.keepConnectionAlive(webSocketTask)
+            }
+
+            do {
+                _ = try await group.next()
+                group.cancelAll()
+            } catch {
+                webSocketTask.cancel(with: .goingAway, reason: nil)
+                group.cancelAll()
+                throw error
+            }
+        }
+    }
+
+    private func receiveEvents(
+        from webSocketTask: URLSessionWebSocketTask,
+        onEvent: @escaping @Sendable (MattermostLiveEvent) -> Void
+    ) async throws {
         while !Task.isCancelled {
             if let event = try await receiveEvent(from: webSocketTask) {
                 onEvent(event)
@@ -135,10 +167,28 @@ public struct MattermostLiveEventStream: Sendable {
         }
     }
 
+    private func keepConnectionAlive(_ webSocketTask: URLSessionWebSocketTask) async throws {
+        guard heartbeatInterval > .zero, heartbeatTimeout > .zero else { return }
+
+        while !Task.isCancelled {
+            try await Task.sleep(for: heartbeatInterval)
+            try Task.checkCancellation()
+            try await Self.withTimeout(
+                heartbeatTimeout,
+                timeoutMessage: "Mattermost WebSocket ping timed out."
+            ) {
+                try await self.sendPing(to: webSocketTask)
+            }
+        }
+    }
+
     private func authenticate(_ webSocketTask: URLSessionWebSocketTask) async throws -> [MattermostLiveEvent] {
         // Bound the handshake: a server that upgrades the socket but never sends `hello`
         // or an auth reply would otherwise hang this loop forever.
-        try await Self.withTimeout(.seconds(15)) {
+        try await Self.withTimeout(
+            .seconds(15),
+            timeoutMessage: "Mattermost WebSocket authentication timed out."
+        ) {
             let authSequence = 1
             let token: String
             switch self.configuration.authentication {
@@ -194,13 +244,14 @@ public struct MattermostLiveEventStream: Sendable {
     /// Runs `operation`, failing with a transport error if it does not finish within `duration`.
     private static func withTimeout<T: Sendable>(
         _ duration: Duration,
+        timeoutMessage: String,
         operation: @escaping @Sendable () async throws -> T
     ) async throws -> T {
         try await withThrowingTaskGroup(of: T.self) { group in
             group.addTask { try await operation() }
             group.addTask {
                 try await Task.sleep(for: duration)
-                throw MattermostError.transportFailure("Mattermost WebSocket authentication timed out.")
+                throw MattermostError.transportFailure(timeoutMessage)
             }
             defer { group.cancelAll() }
             guard let result = try await group.next() else {
@@ -238,6 +289,21 @@ public struct MattermostLiveEventStream: Sendable {
         try await webSocketTask.send(message)
     }
 
+    private func sendPing(to webSocketTask: URLSessionWebSocketTask) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let resumeOnce = MattermostOneShotCallback<Error?> { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+            webSocketTask.sendPing { error in
+                resumeOnce(error)
+            }
+        }
+    }
+
     private func receive(from webSocketTask: URLSessionWebSocketTask) async throws -> URLSessionWebSocketTask.Message {
         // Cancel the socket on Task cancellation so a suspended receive on a quiet channel
         // tears down promptly instead of waiting for the next server message.
@@ -246,6 +312,23 @@ public struct MattermostLiveEventStream: Sendable {
         } onCancel: {
             webSocketTask.cancel(with: .goingAway, reason: nil)
         }
+    }
+}
+
+final class MattermostOneShotCallback<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var callback: (@Sendable (Value) -> Void)?
+
+    init(_ callback: @escaping @Sendable (Value) -> Void) {
+        self.callback = callback
+    }
+
+    func callAsFunction(_ value: Value) {
+        let callback = lock.withLock {
+            defer { self.callback = nil }
+            return self.callback
+        }
+        callback?(value)
     }
 }
 

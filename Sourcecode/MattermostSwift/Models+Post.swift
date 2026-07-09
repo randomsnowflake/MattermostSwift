@@ -29,6 +29,19 @@ public struct MattermostPostSearchResults: Decodable, Equatable, Sendable {
     }
 }
 
+/// Typed subset of the `metadata` payload the server embeds with each post
+/// (files and reactions). Lets clients skip the per-post `fileInfos`/`reactions`
+/// lookups when the server already delivered them inline.
+public struct MattermostPostMetadata: Decodable, Equatable, Sendable {
+    public let files: [MattermostFileInfo]?
+    public let reactions: [MattermostReaction]?
+
+    public init(files: [MattermostFileInfo]? = nil, reactions: [MattermostReaction]? = nil) {
+        self.files = files
+        self.reactions = reactions
+    }
+}
+
 /// Mattermost post/message metadata.
 public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
     public let id: String
@@ -48,6 +61,7 @@ public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
     public let hasReactions: Bool?
     public let props: [String: MattermostJSONValue]?
     public let metadata: [String: MattermostJSONValue]?
+    public let postMetadata: MattermostPostMetadata?
     public let isPinned: Bool?
     public let replyCount: Int64
     public let lastReplyAt: Int64
@@ -95,6 +109,7 @@ public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
         hasReactions: Bool?,
         props: [String: MattermostJSONValue]? = nil,
         metadata: [String: MattermostJSONValue]? = nil,
+        postMetadata: MattermostPostMetadata? = nil,
         isPinned: Bool? = nil,
         replyCount: Int64 = 0,
         lastReplyAt: Int64 = 0,
@@ -117,6 +132,7 @@ public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
         self.hasReactions = hasReactions
         self.props = props
         self.metadata = metadata
+        self.postMetadata = postMetadata
         self.isPinned = isPinned
         self.replyCount = replyCount
         self.lastReplyAt = lastReplyAt
@@ -142,6 +158,9 @@ public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
         hasReactions = try container.decodeIfPresent(Bool.self, forKey: .hasReactions)
         props = try container.decodeIfPresent([String: MattermostJSONValue].self, forKey: .props)
         metadata = try container.decodeIfPresent([String: MattermostJSONValue].self, forKey: .metadata)
+        // Tolerant second decode of the same key: malformed embedded metadata must
+        // never fail post decoding — clients fall back to per-post lookups instead.
+        postMetadata = (try? container.decodeIfPresent(MattermostPostMetadata.self, forKey: .metadata)) ?? nil
         isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned)
         replyCount = try container.decodeIfPresent(Int64.self, forKey: .replyCount) ?? 0
         lastReplyAt = try container.decodeIfPresent(Int64.self, forKey: .lastReplyAt) ?? 0
