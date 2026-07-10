@@ -140,7 +140,7 @@ public struct MattermostLiveEventStream: Sendable {
         // A non-positive heartbeat configuration explicitly disables pinging; it must not
         // add a child task that returns immediately and tears down an otherwise healthy
         // receive loop through the task-group race below.
-        guard heartbeatsEnabled else {
+        guard isHeartbeatEnabled else {
             try await receiveEvents(from: webSocketTask, onEvent: onEvent)
             return
         }
