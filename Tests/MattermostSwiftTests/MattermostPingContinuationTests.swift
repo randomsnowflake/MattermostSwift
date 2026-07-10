@@ -29,3 +29,37 @@ func pingContinuationIgnoresSecondCompletionAfterInstall() async throws {
         state.finish(MattermostError.transportFailure("late duplicate"))
     }
 }
+
+@Test
+func timeoutDoesNotRunTeardownWhenOperationWins() async throws {
+    let calls = MattermostRequestLog()
+
+    let value = try await MattermostLiveEventStream.withTimeout(
+        .seconds(1),
+        timeoutMessage: "should not time out",
+        onTimeout: { calls.append("timeout") }
+    ) {
+        42
+    }
+
+    #expect(value == 42)
+    #expect(calls.values.isEmpty)
+}
+
+@Test
+func timeoutRunsTeardownAfterTimerWins() async throws {
+    let calls = MattermostRequestLog()
+
+    await #expect(throws: MattermostError.self) {
+        _ = try await MattermostLiveEventStream.withTimeout(
+            .milliseconds(10),
+            timeoutMessage: "expected timeout",
+            onTimeout: { calls.append("timeout") }
+        ) {
+            try await Task.sleep(for: .seconds(1))
+            return 42
+        }
+    }
+
+    #expect(calls.values == ["timeout"])
+}

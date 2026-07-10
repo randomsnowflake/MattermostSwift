@@ -251,24 +251,32 @@ public struct MattermostLiveEventStream: Sendable {
     }
 
     /// Runs `operation`, failing with a transport error if it does not finish within `duration`.
-    private static func withTimeout<T: Sendable>(
+    static func withTimeout<T: Sendable>(
         _ duration: Duration,
         timeoutMessage: String,
         onTimeout: @escaping @Sendable () -> Void = {},
         operation: @escaping @Sendable () async throws -> T
     ) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { try await operation() }
+        try await withThrowingTaskGroup(of: MattermostTimeoutResult<T>.self) { group in
+            group.addTask { .value(try await operation()) }
             group.addTask {
                 try await Task.sleep(for: duration)
-                onTimeout()
-                throw MattermostError.transportFailure(timeoutMessage)
+                return .timedOut
             }
             defer { group.cancelAll() }
             guard let result = try await group.next() else {
                 throw CancellationError()
             }
-            return result
+            switch result {
+            case .value(let value):
+                return value
+            case .timedOut:
+                // Run the teardown only after the timer is known to be the task group's
+                // first completed result. A near-simultaneous successful ping must not
+                // spuriously cancel a healthy WebSocket.
+                onTimeout()
+                throw MattermostError.transportFailure(timeoutMessage)
+            }
         }
     }
 
@@ -324,6 +332,11 @@ public struct MattermostLiveEventStream: Sendable {
             webSocketTask.cancel(with: .goingAway, reason: nil)
         }
     }
+}
+
+private enum MattermostTimeoutResult<Value: Sendable>: Sendable {
+    case value(Value)
+    case timedOut
 }
 
 /// Bridges URLSessionWebSocketTask.sendPing's callback API to cancellation-aware
