@@ -11,20 +11,7 @@ public final class MattermostStore {
     private static let batchedFetchIDLimit = 500
 
     public static var schema: Schema {
-        Schema([
-            MattermostCachedUser.self,
-            MattermostCachedUserStatus.self,
-            MattermostCachedTeam.self,
-            MattermostCachedChannel.self,
-            MattermostCachedChannelMember.self,
-            MattermostCachedChannelUnread.self,
-            MattermostCachedThread.self,
-            MattermostCachedPost.self,
-            MattermostCachedReaction.self,
-            MattermostCachedFile.self,
-            MattermostCachedSidebarCategory.self,
-            MattermostSyncCursor.self,
-        ])
+        Schema(versionedSchema: MattermostCacheSchemaV1.self)
     }
 
     public let container: ModelContainer
@@ -57,7 +44,11 @@ public final class MattermostStore {
             )
         }
 
-        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let container = try ModelContainer(
+            for: schema,
+            migrationPlan: MattermostCacheMigrationPlan.self,
+            configurations: [configuration]
+        )
         self.init(container: container)
     }
 
@@ -203,6 +194,26 @@ public final class MattermostStore {
         }
     }
 
+    /// Replaces the server-authoritative joined-channel collection for one team.
+    /// Rows absent from this proven team scope are removed together with their local content.
+    public func replaceJoinedChannels(_ channels: [MattermostChannel], teamID: String) throws {
+        try upsert(channels: channels)
+        let retained = Set(channels.map(\.id))
+        let existing = try context.fetch(FetchDescriptor<MattermostCachedChannel>(
+            predicate: #Predicate { $0.teamId == teamID }
+        ))
+        for channel in existing where !retained.contains(channel.id) {
+            let channelID = channel.id
+            try deleteChannelContent(channelID: channelID)
+            for member in try context.fetch(FetchDescriptor<MattermostCachedChannelMember>(
+                predicate: #Predicate { $0.channelId == channelID }
+            )) {
+                context.delete(member)
+            }
+            context.delete(channel)
+        }
+    }
+
     public func markChannelDeleted(id: String, at deletedAt: Int64 = Int64(Date.now.timeIntervalSince1970 * 1000)) throws {
         if let cached = try cachedChannel(id: id, includeDeleted: true) {
             cached.markDeleted(at: deletedAt)
@@ -249,6 +260,25 @@ public final class MattermostStore {
                 context.insert(cached)
                 byID[id] = cached
             }
+        }
+    }
+
+    /// Replaces the active user's memberships for the channels belonging to one team.
+    /// The caller must pass a complete response for that user/team; an empty array is meaningful.
+    public func replaceChannelMembers(
+        _ members: [MattermostChannelMember],
+        userID: String,
+        teamID: String
+    ) throws {
+        try upsert(members: members)
+        let teamChannelIDs = Set(try context.fetch(FetchDescriptor<MattermostCachedChannel>(
+            predicate: #Predicate { $0.teamId == teamID }
+        )).map(\.id))
+        let retained = Set(members.map(\.channelId))
+        let existing = try cachedChannelMembers(userID: userID)
+        for member in existing
+            where teamChannelIDs.contains(member.channelId) && !retained.contains(member.channelId) {
+            context.delete(member)
         }
     }
 
@@ -437,6 +467,33 @@ public final class MattermostStore {
                 context.insert(cached)
                 byID[sidebarCategory.id] = cached
             }
+        }
+    }
+
+    /// Replaces one user's server-authoritative sidebar categories for a team.
+    public func replaceSidebarCategories(
+        _ categories: [MattermostSidebarCategory],
+        userID: String,
+        teamID: String
+    ) throws {
+        try upsert(sidebarCategories: categories)
+        let retained = Set(categories.map(\.id))
+        let existing = try context.fetch(FetchDescriptor<MattermostCachedSidebarCategory>(
+            predicate: #Predicate { $0.userId == userID && $0.teamId == teamID }
+        ))
+        for category in existing where !retained.contains(category.id) {
+            context.delete(category)
+        }
+    }
+
+    /// Removes unread rows for channels no longer present in an authoritative team response.
+    public func reconcileChannelUnreads(userID: String, teamID: String, channelIDs: [String]) throws {
+        let retained = Set(channelIDs)
+        let existing = try context.fetch(FetchDescriptor<MattermostCachedChannelUnread>(
+            predicate: #Predicate { $0.userId == userID && $0.teamId == teamID }
+        ))
+        for unread in existing where !retained.contains(unread.channelId) {
+            context.delete(unread)
         }
     }
 

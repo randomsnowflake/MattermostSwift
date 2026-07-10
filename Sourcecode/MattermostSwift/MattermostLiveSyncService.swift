@@ -233,7 +233,10 @@ public struct MattermostLiveSyncService: Sendable {
         refreshSidebarCategories: MattermostLiveSyncSidebarRefresh? = nil,
         refreshThreadState: MattermostLiveSyncThreadStateRefresh? = nil
     ) -> AsyncThrowingStream<MattermostLiveSyncEvent, Error> {
-        AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
+        // Host output is bounded independently from socket ingress. A lagging host gets an
+        // explicit gap error instead of a silently stale event history; the store itself has
+        // already applied each event on its owning actor.
+        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(256)) { continuation in
             let streamTask = Task { @MainActor in
                 do {
                     var activeTeamID = teamID
@@ -243,7 +246,7 @@ public struct MattermostLiveSyncService: Sendable {
 
                         switch lifecycleEvent {
                         case .connecting(let attempt):
-                            continuation.yield(.connecting(attempt: attempt))
+                            try Self.yield(.connecting(attempt: attempt), to: continuation)
                             // A backfill failure is reported but no longer terminates the stream:
                             // the lifecycle loop keeps running so the socket can connect and a later
                             // reconnect can retry the backfill. Only cancellation tears the stream down.
@@ -256,14 +259,14 @@ public struct MattermostLiveSyncService: Sendable {
                                 )
                                 activeTeamID = backfillResult.sync.teamID ?? activeTeamID
                                 activeUserID = backfillResult.sync.user.id
-                                continuation.yield(.backfilled(backfillResult))
+                                try Self.yield(.backfilled(backfillResult), to: continuation)
                             } catch is CancellationError {
                                 throw CancellationError()
                             } catch {
-                                continuation.yield(.backfillFailed(MattermostLiveSyncFailure(
+                                try Self.yield(.backfillFailed(MattermostLiveSyncFailure(
                                     attempt: attempt,
                                     message: Self.failureMessage(for: error)
-                                )))
+                                )), to: continuation)
                             }
 
                         case .connected:
@@ -272,7 +275,17 @@ public struct MattermostLiveSyncService: Sendable {
                         case .event(let event):
                             let typedEvent = try store.apply(liveEvent: event)
                             try store.save()
-                            continuation.yield(.eventApplied(event, typedEvent))
+                            try Self.yield(.eventApplied(event, typedEvent), to: continuation)
+
+                            // Membership broadcasts do not carry a complete enough collection to
+                            // safely delete locally. Re-run the bounded authoritative sync so a
+                            // user_added/user_removed event cannot leave stale navigation or data.
+                            if typedEvent.requiresAuthoritativeWorkspaceRefresh {
+                                let result = try await backfill(store, activeTeamID, teamName, options)
+                                activeTeamID = result.sync.teamID ?? activeTeamID
+                                activeUserID = result.sync.user.id
+                                try Self.yield(.backfilled(result), to: continuation)
+                            }
 
                             var unreadResult: MattermostChannelUnread?
                             if let refreshUnread,
@@ -301,7 +314,15 @@ public struct MattermostLiveSyncService: Sendable {
                                typedEvent.invalidatesSidebarCategories {
                                 do {
                                     let categories = try await refreshSidebarCategories(activeTeamID)
-                                    try store.upsert(sidebarCategories: categories)
+                                    if let activeUserID {
+                                        try store.replaceSidebarCategories(
+                                            categories,
+                                            userID: activeUserID,
+                                            teamID: activeTeamID
+                                        )
+                                    } else {
+                                        try store.upsert(sidebarCategories: categories)
+                                    }
                                     categoriesResult = categories
                                 } catch is CancellationError {
                                     throw CancellationError()
@@ -340,18 +361,18 @@ public struct MattermostLiveSyncService: Sendable {
                                 try store.save()
 
                                 if let unreadResult {
-                                    continuation.yield(.channelUnreadRefreshed(unreadResult))
+                                    try Self.yield(.channelUnreadRefreshed(unreadResult), to: continuation)
                                 }
                                 if let categoriesResult {
-                                    continuation.yield(.sidebarCategoriesRefreshed(categoriesResult))
+                                    try Self.yield(.sidebarCategoriesRefreshed(categoriesResult), to: continuation)
                                 }
                                 if let threadResult {
-                                    continuation.yield(.threadStateRefreshed(threadResult))
+                                    try Self.yield(.threadStateRefreshed(threadResult), to: continuation)
                                 }
                             }
 
                         case .reconnecting(let attempt, let delay, _):
-                            continuation.yield(.reconnecting(attempt: attempt, delay: delay))
+                            try Self.yield(.reconnecting(attempt: attempt, delay: delay), to: continuation)
                         }
                     }
 
@@ -366,6 +387,22 @@ public struct MattermostLiveSyncService: Sendable {
             continuation.onTermination = { @Sendable _ in
                 streamTask.cancel()
             }
+        }
+    }
+
+    private static func yield(
+        _ event: MattermostLiveSyncEvent,
+        to continuation: AsyncThrowingStream<MattermostLiveSyncEvent, Error>.Continuation
+    ) throws {
+        switch continuation.yield(event) {
+        case .enqueued:
+            return
+        case .dropped:
+            throw MattermostError.liveEventGap
+        case .terminated:
+            throw CancellationError()
+        @unknown default:
+            throw MattermostError.liveEventGap
         }
     }
 
@@ -494,6 +531,14 @@ private struct MattermostLiveSyncThreadStateRefreshRequest: Equatable {
 }
 
 private extension MattermostTypedLiveEvent {
+    var requiresAuthoritativeWorkspaceRefresh: Bool {
+        if case .cacheInvalidated = self {
+            true
+        } else {
+            false
+        }
+    }
+
     var invalidatesSidebarCategories: Bool {
         switch self {
         case .preferencesChanged, .preferencesDeleted:

@@ -10,6 +10,9 @@ public enum MattermostError: Error, Equatable, Sendable {
     case httpStatus(code: Int, message: String?)
     case emptyResponse
     case transportFailure(String)
+    case fileTooLarge(limit: Int64)
+    case incompleteSync(String)
+    case liveEventGap
     case missingAuthenticationToken
     case sidebarCategoryNotFound(String)
 }
@@ -37,6 +40,12 @@ extension MattermostError: LocalizedError {
             "Mattermost returned an empty response."
         case .transportFailure(let message):
             "Mattermost transport failed: \(message)"
+        case .fileTooLarge(let limit):
+            "Mattermost file exceeds the configured \(limit)-byte limit."
+        case .incompleteSync(let message):
+            "Mattermost sync is incomplete: \(message)"
+        case .liveEventGap:
+            "Mattermost live event delivery overflowed; reconciliation is required."
         case .missingAuthenticationToken:
             "Mattermost login response did not include an authentication token."
         case .sidebarCategoryNotFound(let categoryID):

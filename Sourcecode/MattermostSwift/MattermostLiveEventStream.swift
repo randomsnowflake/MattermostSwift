@@ -20,13 +20,15 @@ public struct MattermostLiveEventStream: Sendable {
     }
 
     /// Connects, authenticates, and yields server events until cancelled or the socket fails.
+    /// The queue holds at most 256 events; a slow consumer receives `MattermostError.liveEventGap`
+    /// rather than silently observing an incomplete sequence.
     public func events() -> AsyncThrowingStream<MattermostLiveEvent, Error> {
-        AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
+        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(256)) { continuation in
             let streamTask = Task {
                 do {
                     try await runAuthenticatedConnection(
                         onConnected: {},
-                        onEvent: { continuation.yield($0) }
+                        onEvent: { try Self.yield($0, to: continuation) }
                     )
                     continuation.finish()
                 } catch is CancellationError {
@@ -52,25 +54,27 @@ public struct MattermostLiveEventStream: Sendable {
     }
 
     /// Yields connection lifecycle notifications and live events, reconnecting with exponential backoff.
+    /// Its queue holds at most 512 lifecycle records. Ingress overflow aborts the current socket
+    /// generation and follows the normal reconnect/backfill path instead of hiding a gap.
     public func lifecycleEvents(
         policy: MattermostLiveEventReconnectPolicy = .default
     ) -> AsyncThrowingStream<MattermostLiveEventStreamLifecycleEvent, Error> {
-        AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
+        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(512)) { continuation in
             let streamTask = Task {
                 var attempt = 0
 
                 while !Task.isCancelled {
-                    continuation.yield(.connecting(attempt: attempt))
+                    try Self.yield(.connecting(attempt: attempt), to: continuation)
 
                     let connectedAt = ContinuousClock.now
                     let currentAttempt = attempt
                     do {
                         try await runAuthenticatedConnection(
                             onConnected: {
-                                continuation.yield(.connected(attempt: currentAttempt))
+                                try Self.yield(.connected(attempt: currentAttempt), to: continuation)
                             },
                             onEvent: { event in
-                                continuation.yield(.event(event))
+                                try Self.yield(.event(event), to: continuation)
                             }
                         )
 
@@ -90,7 +94,7 @@ public struct MattermostLiveEventStream: Sendable {
                             return
                         }
                         let delay = policy.delay(for: attempt)
-                        continuation.yield(.reconnecting(attempt: attempt, delay: delay, failure: failure))
+                        try Self.yield(.reconnecting(attempt: attempt, delay: delay, failure: failure), to: continuation)
                         do {
                             try await Task.sleep(for: delay)
                         } catch {
@@ -102,7 +106,7 @@ public struct MattermostLiveEventStream: Sendable {
                     }
 
                     let delay = policy.delay(for: attempt)
-                    continuation.yield(.reconnecting(attempt: attempt, delay: delay))
+                    try Self.yield(.reconnecting(attempt: attempt, delay: delay), to: continuation)
                     do {
                         try await Task.sleep(for: delay)
                     } catch {
@@ -122,8 +126,8 @@ public struct MattermostLiveEventStream: Sendable {
     }
 
     private func runAuthenticatedConnection(
-        onConnected: @escaping @Sendable () async -> Void,
-        onEvent: @escaping @Sendable (MattermostLiveEvent) -> Void
+        onConnected: @escaping @Sendable () async throws -> Void,
+        onEvent: @escaping @Sendable (MattermostLiveEvent) async throws -> Void
     ) async throws {
         let webSocketTask = urlSession.webSocketTask(with: makeWebSocketRequest())
         webSocketTask.resume()
@@ -132,9 +136,9 @@ public struct MattermostLiveEventStream: Sendable {
         }
 
         let pendingEvents = try await authenticate(webSocketTask)
-        await onConnected()
+        try await onConnected()
         for event in pendingEvents {
-            onEvent(event)
+            try await onEvent(event)
         }
 
         // A non-positive heartbeat configuration explicitly disables pinging; it must not
@@ -168,11 +172,11 @@ public struct MattermostLiveEventStream: Sendable {
 
     private func receiveEvents(
         from webSocketTask: URLSessionWebSocketTask,
-        onEvent: @escaping @Sendable (MattermostLiveEvent) -> Void
+        onEvent: @escaping @Sendable (MattermostLiveEvent) async throws -> Void
     ) async throws {
         while !Task.isCancelled {
             if let event = try await receiveEvent(from: webSocketTask) {
-                onEvent(event)
+                try await onEvent(event)
             }
         }
     }
@@ -196,6 +200,22 @@ public struct MattermostLiveEventStream: Sendable {
 
     var isHeartbeatEnabled: Bool {
         heartbeatInterval > .zero && heartbeatTimeout > .zero
+    }
+
+    private static func yield<Element: Sendable>(
+        _ element: Element,
+        to continuation: AsyncThrowingStream<Element, Error>.Continuation
+    ) throws {
+        switch continuation.yield(element) {
+        case .enqueued:
+            return
+        case .dropped:
+            throw MattermostError.liveEventGap
+        case .terminated:
+            throw CancellationError()
+        @unknown default:
+            throw MattermostError.liveEventGap
+        }
     }
 
     private func authenticate(_ webSocketTask: URLSessionWebSocketTask) async throws -> [MattermostLiveEvent] {

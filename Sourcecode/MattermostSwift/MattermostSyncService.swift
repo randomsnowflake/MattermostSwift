@@ -144,7 +144,12 @@ public struct MattermostSyncService: Sendable {
         if let team = resolvedTeam.team {
             try store.upsert(team: team)
         }
-        try store.upsert(channels: resolvedTeam.channels)
+        if let teamID = resolvedTeam.teamID {
+            try store.replaceJoinedChannels(resolvedTeam.channels, teamID: teamID)
+        } else {
+            // Across-team responses do not establish a deletion scope for direct/group channels.
+            try store.upsert(channels: resolvedTeam.channels)
+        }
 
         let syncedTeamsCount = joinedTeams.count
         var syncedUsersCount = 1
@@ -174,12 +179,12 @@ public struct MattermostSyncService: Sendable {
 
         if let teamID = resolvedTeam.teamID {
             let members = try await client.channelMembersForUser(userID: user.id, teamID: teamID)
-            try store.upsert(members: members)
+            try store.replaceChannelMembers(members, userID: user.id, teamID: teamID)
             syncedMembersCount = max(syncedMembersCount, members.count)
 
             if options.includeSidebarCategories {
                 let categories = try await client.sidebarCategories(teamID: teamID)
-                try store.upsert(sidebarCategories: categories)
+                try store.replaceSidebarCategories(categories, userID: user.id, teamID: teamID)
                 syncedCategoriesCount = categories.count
             }
         }
@@ -190,6 +195,13 @@ public struct MattermostSyncService: Sendable {
                 userID: user.id,
                 store: store
             )
+            if let teamID = resolvedTeam.teamID {
+                try store.reconcileChannelUnreads(
+                    userID: user.id,
+                    teamID: teamID,
+                    channelIDs: resolvedTeam.channels.map(\.id)
+                )
+            }
         } else if let postChannelID {
             let unread = try await client.channelUnread(userID: user.id, channelID: postChannelID)
             try store.upsert(unread: unread, userID: user.id)

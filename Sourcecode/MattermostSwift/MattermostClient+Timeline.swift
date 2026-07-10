@@ -49,20 +49,45 @@ public extension MattermostClient {
         let cursor = try store.cachedSyncCursor(scope: cursorScope)
         var allOrderedPosts: [MattermostPost] = []
         var pageCount = 0
+        let pageSize = max(1, perPage)
 
         let postLists: [MattermostPostList]
         if let since = cursor?.lastSyncAt, since > 0 {
-            postLists = [try await postsSince(channelID: channelID, since: since)]
+            let incremental = try await postsSince(channelID: channelID, since: since)
+            // Mattermost caps posts/since responses at 1,000. A saturated response cannot
+            // safely advance the cursor because omitted changes would become unrecoverable.
+            // Re-read a bounded complete history instead; if the caller's bound is insufficient,
+            // leave the cursor untouched and make the incomplete state explicit.
+            if incremental.orderedPosts.count >= 1_000 {
+                var pages: [MattermostPostList] = []
+                var reachedEnd = false
+                for page in 0..<max(1, maxPages) {
+                    let history = try await posts(channelID: channelID, page: page, perPage: pageSize)
+                    pages.append(history)
+                    if history.orderedPosts.count < pageSize {
+                        reachedEnd = true
+                        break
+                    }
+                }
+                guard reachedEnd else {
+                    throw MattermostError.incompleteSync(
+                        "posts/since for channel \(channelID) reached Mattermost's 1,000-post cap; increase maxPages before retrying"
+                    )
+                }
+                postLists = pages
+            } else {
+                postLists = [incremental]
+            }
         } else {
             var pages: [MattermostPostList] = []
             for page in 0..<max(1, maxPages) {
                 let postList = try await posts(
                     channelID: channelID,
                     page: page,
-                    perPage: max(1, perPage)
+                    perPage: pageSize
                 )
                 pages.append(postList)
-                if postList.orderedPosts.count < max(1, perPage) {
+                if postList.orderedPosts.count < pageSize {
                     break
                 }
             }

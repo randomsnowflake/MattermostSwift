@@ -85,6 +85,34 @@ struct MattermostHTTPClient: Sendable {
         return data
     }
 
+    /// Downloads a response to disk. The destination is replaced only after a successful
+    /// HTTP response and optional size validation, so large payload bytes are not materialized.
+    func download(
+        _ endpoint: String,
+        to destinationURL: URL,
+        maximumSize: Int64? = nil
+    ) async throws -> URL {
+        let request = try makeRequest(endpoint: endpoint, method: "GET")
+        let (temporaryURL, response) = try await urlSession.download(for: request)
+        let httpResponse = try validate(Data(), response)
+        if let maximumSize,
+           let length = httpResponse.value(forHTTPHeaderField: "Content-Length").flatMap(Int64.init),
+           length > maximumSize {
+            throw MattermostError.fileTooLarge(limit: maximumSize)
+        }
+        let size = try temporaryURL.resourceValues(forKeys: [.fileSizeKey]).fileSize.map(Int64.init) ?? 0
+        guard maximumSize == nil || size <= maximumSize! else {
+            throw MattermostError.fileTooLarge(limit: maximumSize!)
+        }
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            try fileManager.removeItem(at: destinationURL)
+        }
+        try fileManager.moveItem(at: temporaryURL, to: destinationURL)
+        return destinationURL
+    }
+
     func multipart<Response: Decodable & Sendable>(
         _ endpoint: String,
         method: String = "POST",

@@ -221,3 +221,25 @@ scripts/test-e2e.sh
 
 See `ARCHITECTURE.md`, `TESTING.md`, and `ROADMAP.md` for the current design and next milestones.
 The library target also includes a DocC quick-start article at `Sourcecode/MattermostSwift/MattermostSwift.docc/MattermostSwift.md`.
+
+## Cache and large files
+
+`MattermostStore` uses an append-only SwiftData schema/migration history. Keep the store on its
+own main-actor boundary, and perform cache mutations through store APIs. Joined channels,
+memberships, sidebar categories, and unread rows are reconciled only from complete scoped server
+responses, so an empty response can safely remove stale local rows for that scope.
+
+For production-sized attachments, use the file URL overloads instead of materialising the payload:
+
+```swift
+let uploaded = try await client.uploadFile(
+    channelID: channelID,
+    filename: "archive.zip",
+    fileURL: sourceURL
+)
+try await client.downloadFile(id: uploaded.fileInfos[0].id, to: destinationURL, maximumSize: 500_000_000)
+```
+
+Live event streams use finite queues. If a consumer cannot keep up, they finish with
+`MattermostError.liveEventGap`; restart live sync to run its normal authoritative backfill before
+presenting the cache as current.

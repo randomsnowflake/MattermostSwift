@@ -93,4 +93,19 @@ extension MattermostClient {
     public func downloadFile(id: String) async throws -> Data {
         try await httpClient.data("/files/\(id)")
     }
+
+    /// Downloads a file directly to disk without allocating its contents as `Data`.
+    /// `maximumSize` rejects responses larger than the supplied byte limit.
+    @discardableResult
+    public func downloadFile(
+        id: String,
+        to destinationURL: URL,
+        maximumSize: Int64? = nil
+    ) async throws -> URL {
+        try await httpClient.download(
+            "/files/\(id)",
+            to: destinationURL,
+            maximumSize: maximumSize
+        )
+    }
 }
