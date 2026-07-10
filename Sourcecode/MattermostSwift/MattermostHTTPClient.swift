@@ -156,8 +156,10 @@ struct MattermostHTTPClient: Sendable {
     }
 
     // Native async transport. `URLSession.data(for:)` propagates Task cancellation
-    // (it cancels the underlying data task). A transient connection blip (a reused
-    // keep-alive socket reset by the edge: -1005 / ENOTCONN) is retried with backoff.
+    // (it cancels the underlying data task). Safe requests and explicitly audited
+    // read-only POST endpoints retry a transient keep-alive socket reset; a mutation may
+    // have committed before its response was lost, so other POST/PUT/PATCH/DELETE requests
+    // are never replayed automatically.
     private func loadData(for request: URLRequest) async throws -> (Data, URLResponse) {
         var attempt = 0
         while true {
@@ -168,7 +170,9 @@ struct MattermostHTTPClient: Sendable {
                 if Self.isCancellation(error) {
                     throw error
                 }
-                guard attempt <= Self.maxTransientRetries, Self.isTransient(error) else {
+                guard attempt <= Self.maxTransientRetries,
+                      Self.isTransient(error),
+                      Self.allowsAutomaticRetry(for: request) else {
                     throw MattermostError.transportFailure(error.localizedDescription)
                 }
                 try await Task.sleep(for: .milliseconds(200 * attempt))
@@ -177,6 +181,41 @@ struct MattermostHTTPClient: Sendable {
     }
 
     private static let maxTransientRetries = 2
+
+    private static func allowsAutomaticRetry(for request: URLRequest) -> Bool {
+        switch request.httpMethod?.uppercased() {
+        case nil, "GET", "HEAD", "OPTIONS":
+            true
+        case "POST":
+            isReadOnlyPOST(request)
+        default:
+            false
+        }
+    }
+
+    /// Mattermost models some searches and batch reads as POST requests because they carry a
+    /// JSON query. Keep this small, endpoint-specific allowlist reviewable instead of treating
+    /// every POST as safe to replay.
+    private static func isReadOnlyPOST(_ request: URLRequest) -> Bool {
+        guard let path = request.url?.path else { return false }
+
+        return switch path {
+        case _ where path.hasSuffix("/users/mfa"),
+             _ where path.hasSuffix("/users/ids"),
+             _ where path.hasSuffix("/users/usernames"),
+             _ where path.hasSuffix("/users/search"),
+             _ where path.hasSuffix("/users/status/ids"),
+             _ where path.hasSuffix("/channels/stats/member_count"),
+             _ where path.hasSuffix("/channels/search"),
+             _ where path.hasSuffix("/channels/group/search"),
+             _ where path.hasSuffix("/emoji/search"),
+             _ where path.hasSuffix("/posts/search"),
+             _ where path.hasSuffix("/members/ids"):
+            true
+        default:
+            false
+        }
+    }
 
     private static func isCancellation(_ error: Error) -> Bool {
         if error is CancellationError {

@@ -5,6 +5,18 @@ import Testing
 @Suite(.serialized)
 struct MattermostClientRequestTests {
     @Test
+    func logoutRevokesCurrentSession() async throws {
+        let client = try await Self.makeClient { request in
+            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/logout")
+            #expect(request.httpMethod == "POST")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token")
+            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+        }
+
+        #expect(try await client.logoutCurrentSession().status == "OK")
+    }
+
+    @Test
     func currentUserDecodesAuthenticatedUser() async throws {
         let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me")

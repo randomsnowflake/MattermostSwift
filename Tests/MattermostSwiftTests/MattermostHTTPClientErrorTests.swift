@@ -54,6 +54,37 @@ struct MattermostHTTPClientErrorTests {
     }
 
     @Test
+    func clientRetriesAuditedReadOnlyPOSTButNeverReplaysMutationPOST() async throws {
+        let readAttempts = MattermostRequestLog()
+        let readClient = try await Self.makeClient { request in
+            readAttempts.append(request.httpMethod ?? "")
+            if readAttempts.values.count == 1 {
+                throw URLError(.networkConnectionLost)
+            }
+            return try Self.response(
+                statusCode: 200,
+                body: Data(#"[{"id":"user-id","username":"alice"}]"#.utf8),
+                request: request
+            )
+        }
+
+        let users = try await readClient.users(ids: ["user-id"])
+        #expect(users.map(\.id) == ["user-id"])
+        #expect(readAttempts.values == ["POST", "POST"])
+
+        let mutationAttempts = MattermostRequestLog()
+        let mutationClient = try await Self.makeClient { request in
+            mutationAttempts.append(request.httpMethod ?? "")
+            throw URLError(.networkConnectionLost)
+        }
+
+        await #expect(throws: MattermostError.self) {
+            _ = try await mutationClient.sendPost(channelID: "channel-id", message: "must not replay")
+        }
+        #expect(mutationAttempts.values == ["POST"])
+    }
+
+    @Test
     func clientPreservesCancellationErrors() async throws {
         let client = try await Self.makeClient { _ in
             throw URLError(.cancelled)
