@@ -51,9 +51,14 @@ let session = try await MattermostClient.login(
 
 let client = try session.client(serverURL: serverURL)
 print(session.tokenSource)
+
+// Attempt remote server-session cleanup before discarding the local token.
+try await client.logoutCurrentSession()
 ```
 
 `MattermostSession.tokenSource` reports whether Mattermost returned the documented `Token` response header or the browser-compatible `MMAUTHTOKEN` cookie. The login request sends Mattermost's web-client `X-Requested-With: XMLHttpRequest` header so deployments that attach browser session cookies can be handled without storing the password in the SDK.
+`logoutCurrentSession()` is best-effort remote cleanup for password-login sessions; discard the
+local token even if it fails, and do not expect a personal access token to be accepted.
 
 ## Hydrate Local Cache
 
