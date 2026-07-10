@@ -248,8 +248,29 @@ func liveEventStreamConfiguresHeartbeatLiveness() throws {
 
     #expect(defaultStream.heartbeatInterval == .seconds(25))
     #expect(defaultStream.heartbeatTimeout == .seconds(10))
+    #expect(defaultStream.isHeartbeatEnabled)
     #expect(customStream.heartbeatInterval == .seconds(3))
     #expect(customStream.heartbeatTimeout == .seconds(1))
+    #expect(customStream.isHeartbeatEnabled)
+}
+
+@Test
+func liveEventStreamAllowsHeartbeatToBeDisabled() throws {
+    let configuration = try MattermostConfiguration(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        authentication: .bearerToken("token")
+    )
+    let disabledByInterval = MattermostLiveEventStream(
+        configuration: configuration,
+        heartbeatInterval: .zero
+    )
+    let disabledByTimeout = MattermostLiveEventStream(
+        configuration: configuration,
+        heartbeatTimeout: .zero
+    )
+
+    #expect(!disabledByInterval.isHeartbeatEnabled)
+    #expect(!disabledByTimeout.isHeartbeatEnabled)
 }
 
 @Test
