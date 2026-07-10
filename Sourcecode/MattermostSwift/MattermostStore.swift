@@ -175,7 +175,7 @@ public final class MattermostStore {
 
     @discardableResult
     public func upsert(channel: MattermostChannel) throws -> MattermostCachedChannel {
-        if let cached = try cachedChannel(id: channel.id) {
+        if let cached = try cachedChannel(id: channel.id, includeDeleted: true) {
             cached.apply(channel)
             return cached
         }
@@ -204,7 +204,7 @@ public final class MattermostStore {
     }
 
     public func markChannelDeleted(id: String, at deletedAt: Int64 = Int64(Date.now.timeIntervalSince1970 * 1000)) throws {
-        if let cached = try cachedChannel(id: id) {
+        if let cached = try cachedChannel(id: id, includeDeleted: true) {
             cached.markDeleted(at: deletedAt)
         }
     }
@@ -484,17 +484,25 @@ public final class MattermostStore {
         try context.fetchCount(FetchDescriptor<MattermostCachedTeam>())
     }
 
-    public func cachedChannel(id: String) throws -> MattermostCachedChannel? {
-        var descriptor = FetchDescriptor<MattermostCachedChannel>(
-            predicate: #Predicate { $0.id == id }
-        )
+    public func cachedChannel(id: String, includeDeleted: Bool = false) throws -> MattermostCachedChannel? {
+        var descriptor: FetchDescriptor<MattermostCachedChannel>
+        if includeDeleted {
+            descriptor = FetchDescriptor(predicate: #Predicate { $0.id == id })
+        } else {
+            descriptor = FetchDescriptor(predicate: #Predicate {
+                $0.id == id && ($0.deleteAt == nil || $0.deleteAt == 0)
+            })
+        }
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
     }
 
-    public func cachedChannels(teamID: String? = nil) throws -> [MattermostCachedChannel] {
+    public func cachedChannels(
+        teamID: String? = nil,
+        includeDeleted: Bool = false
+    ) throws -> [MattermostCachedChannel] {
         let sort = [SortDescriptor(\MattermostCachedChannel.displayName)]
-        if let teamID {
+        if let teamID, includeDeleted {
             return try context.fetch(
                 FetchDescriptor(
                     predicate: #Predicate { $0.teamId == teamID },
@@ -502,8 +510,21 @@ public final class MattermostStore {
                 )
             )
         }
-
-        return try context.fetch(FetchDescriptor(sortBy: sort))
+        if let teamID {
+            return try context.fetch(FetchDescriptor(
+                predicate: #Predicate {
+                    $0.teamId == teamID && ($0.deleteAt == nil || $0.deleteAt == 0)
+                },
+                sortBy: sort
+            ))
+        }
+        if includeDeleted {
+            return try context.fetch(FetchDescriptor(sortBy: sort))
+        }
+        return try context.fetch(FetchDescriptor(
+            predicate: #Predicate { $0.deleteAt == nil || $0.deleteAt == 0 },
+            sortBy: sort
+        ))
     }
 
     public func cachedChannelsCount() throws -> Int {
@@ -581,33 +602,42 @@ public final class MattermostStore {
     public func cachedPosts(
         channelID: String,
         limit: Int? = nil,
-        includeDeleted: Bool = true
+        includeDeleted: Bool = false
     ) throws -> [MattermostCachedPost] {
-        var descriptor = FetchDescriptor<MattermostCachedPost>(
-            predicate: #Predicate { $0.channelId == channelID },
-            sortBy: [SortDescriptor(\MattermostCachedPost.createAt, order: .reverse)]
-        )
+        var descriptor: FetchDescriptor<MattermostCachedPost>
+        if includeDeleted {
+            descriptor = FetchDescriptor(
+                predicate: #Predicate { $0.channelId == channelID },
+                sortBy: [SortDescriptor(\MattermostCachedPost.createAt, order: .reverse)]
+            )
+        } else {
+            descriptor = FetchDescriptor(
+                predicate: #Predicate { $0.channelId == channelID && $0.deleteAt == 0 },
+                sortBy: [SortDescriptor(\MattermostCachedPost.createAt, order: .reverse)]
+            )
+        }
         if let limit {
             descriptor.fetchLimit = limit
         }
-        let posts = try context.fetch(descriptor)
-        guard !includeDeleted else {
-            return posts
-        }
-        return posts.filter { !$0.isDeleted }
+        return try context.fetch(descriptor)
     }
 
-    public func cachedThread(rootID: String, includeDeleted: Bool = true) throws -> [MattermostCachedPost] {
-        let posts = try context.fetch(
-            FetchDescriptor(
+    public func cachedThread(rootID: String, includeDeleted: Bool = false) throws -> [MattermostCachedPost] {
+        let descriptor: FetchDescriptor<MattermostCachedPost>
+        if includeDeleted {
+            descriptor = FetchDescriptor(
                 predicate: #Predicate { $0.id == rootID || $0.rootId == rootID },
                 sortBy: [SortDescriptor(\MattermostCachedPost.createAt)]
             )
-        )
-        guard !includeDeleted else {
-            return posts
+        } else {
+            descriptor = FetchDescriptor(
+                predicate: #Predicate {
+                    ($0.id == rootID || $0.rootId == rootID) && $0.deleteAt == 0
+                },
+                sortBy: [SortDescriptor(\MattermostCachedPost.createAt)]
+            )
         }
-        return posts.filter { !$0.isDeleted }
+        return try context.fetch(descriptor)
     }
 
     public func cachedThreadState(rootID: String, userID: String, teamID: String) throws -> MattermostCachedThread? {
@@ -640,24 +670,30 @@ public final class MattermostStore {
     public func cachedTimeline(
         _ target: MattermostTimelineTarget,
         limit: Int? = nil,
-        includeDeleted: Bool = true
+        includeDeleted: Bool = false
     ) throws -> [MattermostCachedPost] {
         switch target {
         case .channel(let channelID):
             return try cachedPosts(channelID: channelID, limit: limit, includeDeleted: includeDeleted)
         case .thread(let rootPostID):
-            var descriptor = FetchDescriptor<MattermostCachedPost>(
-                predicate: #Predicate { $0.id == rootPostID || $0.rootId == rootPostID },
-                sortBy: [SortDescriptor(\MattermostCachedPost.createAt)]
-            )
+            var descriptor: FetchDescriptor<MattermostCachedPost>
+            if includeDeleted {
+                descriptor = FetchDescriptor(
+                    predicate: #Predicate { $0.id == rootPostID || $0.rootId == rootPostID },
+                    sortBy: [SortDescriptor(\MattermostCachedPost.createAt)]
+                )
+            } else {
+                descriptor = FetchDescriptor(
+                    predicate: #Predicate {
+                        ($0.id == rootPostID || $0.rootId == rootPostID) && $0.deleteAt == 0
+                    },
+                    sortBy: [SortDescriptor(\MattermostCachedPost.createAt)]
+                )
+            }
             if let limit {
                 descriptor.fetchLimit = limit
             }
-            let posts = try context.fetch(descriptor)
-            guard !includeDeleted else {
-                return posts
-            }
-            return posts.filter { !$0.isDeleted }
+            return try context.fetch(descriptor)
         }
     }
 
@@ -686,7 +722,7 @@ public final class MattermostStore {
 
     public func prunePosts(channelID: String, keepCount: Int = 200) throws {
         let keepCount = max(0, keepCount)
-        let posts = try cachedPosts(channelID: channelID)
+        let posts = try cachedPosts(channelID: channelID, includeDeleted: true)
         let prunedPosts = Array(posts.dropFirst(keepCount))
         try deleteCachedPostContent(postIDs: prunedPosts.map(\.id))
         for post in prunedPosts {
@@ -695,7 +731,7 @@ public final class MattermostStore {
     }
 
     public func deleteChannelContent(channelID: String) throws {
-        let posts = try cachedPosts(channelID: channelID)
+        let posts = try cachedPosts(channelID: channelID, includeDeleted: true)
 
         for post in posts {
             context.delete(post)

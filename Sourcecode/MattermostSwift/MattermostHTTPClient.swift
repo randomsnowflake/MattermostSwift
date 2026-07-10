@@ -98,6 +98,25 @@ struct MattermostHTTPClient: Sendable {
         return try await perform(request: request)
     }
 
+    /// Sends a multipart request whose file payload is copied in bounded chunks to a
+    /// temporary request body. `URLSession` then uploads that body from disk, so a
+    /// large attachment is never duplicated into one in-memory `Data` value.
+    func multipart<Response: Decodable & Sendable>(
+        _ endpoint: String,
+        method: String = "POST",
+        parts: [MattermostMultipartPart],
+        filePart: MattermostMultipartFilePart,
+        queryItems: [URLQueryItem] = []
+    ) async throws -> Response {
+        let boundary = "MattermostSwift-\(UUID().uuidString)"
+        var request = try makeRequest(endpoint: endpoint, method: method, queryItems: queryItems)
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        let bodyURL = try makeMultipartBodyFile(parts: parts, filePart: filePart, boundary: boundary)
+        defer { try? FileManager.default.removeItem(at: bodyURL) }
+        let (data, response) = try await urlSession.upload(for: request, fromFile: bodyURL)
+        return try decodeResponse(data: data, response: response).value
+    }
+
     private func send<Request: Encodable & Sendable, Response: Decodable & Sendable>(
         _ endpoint: String,
         method: String,
@@ -233,6 +252,9 @@ struct MattermostHTTPClient: Sendable {
 
         var request = URLRequest(url: url)
         request.httpMethod = method
+        // Bearer-token clients must not attach ambient browser/session cookies supplied by a
+        // caller-owned URLSession. Login extracts only its current response's token/cookie.
+        request.httpShouldHandleCookies = false
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         MattermostUserAgent.applyBrowserUserAgent(to: &request)
 
@@ -283,6 +305,45 @@ struct MattermostHTTPClient: Sendable {
         return body
     }
 
+    private func makeMultipartBodyFile(
+        parts: [MattermostMultipartPart],
+        filePart: MattermostMultipartFilePart,
+        boundary: String
+    ) throws -> URL {
+        let bodyURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MattermostSwift-\(UUID().uuidString).multipart")
+        FileManager.default.createFile(atPath: bodyURL.path, contents: nil)
+        let output = try FileHandle(forWritingTo: bodyURL)
+        defer { try? output.close() }
+
+        func write(_ value: String) throws {
+            try output.write(contentsOf: Data(value.utf8))
+        }
+        func writeHeaders(for part: some MattermostMultipartPartProtocol) throws {
+            try write("--\(boundary)\r\n")
+            try write(part.contentDisposition)
+            try write("\r\n")
+            if let contentType = part.contentType {
+                try write("Content-Type: \(contentType)\r\n")
+            }
+            try write("\r\n")
+        }
+
+        for part in parts {
+            try writeHeaders(for: part)
+            try output.write(contentsOf: part.data)
+            try write("\r\n")
+        }
+        try writeHeaders(for: filePart)
+        let input = try FileHandle(forReadingFrom: filePart.fileURL)
+        defer { try? input.close() }
+        while let chunk = try input.read(upToCount: 64 * 1024), !chunk.isEmpty {
+            try output.write(contentsOf: chunk)
+        }
+        try write("\r\n--\(boundary)--\r\n")
+        return bodyURL
+    }
+
 
     private func decodeMattermostAPIError(from data: Data) -> MattermostAPIError? {
         guard !data.isEmpty else {
@@ -297,11 +358,31 @@ struct MattermostHTTPResponse<Value: Sendable>: Sendable {
     let httpResponse: HTTPURLResponse
 }
 
-struct MattermostMultipartPart: Sendable {
+private protocol MattermostMultipartPartProtocol {
+    var contentDisposition: String { get }
+    var contentType: String? { get }
+}
+
+struct MattermostMultipartPart: Sendable, MattermostMultipartPartProtocol {
     let name: String
     let filename: String?
     let contentType: String?
     let data: Data
+
+    var contentDisposition: String {
+        var value = "Content-Disposition: form-data; name=\"\(name.multipartQuotedStringEscaped)\""
+        if let filename {
+            value += "; filename=\"\(filename.multipartQuotedStringEscaped)\""
+        }
+        return value
+    }
+}
+
+struct MattermostMultipartFilePart: Sendable, MattermostMultipartPartProtocol {
+    let name: String
+    let filename: String?
+    let contentType: String?
+    let fileURL: URL
 
     var contentDisposition: String {
         var value = "Content-Disposition: form-data; name=\"\(name.multipartQuotedStringEscaped)\""

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 16.4
+        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+      - name: Cache SwiftPM build products
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-xcode16.4-swiftpm-${{ hashFiles('Package.swift', 'Package.resolved') }}
+          restore-keys: ${{ runner.os }}-xcode16.4-swiftpm-
+      - name: Unit tests
+        run: scripts/test-unit.sh
+      - name: Build for generic iOS device
+        run: xcodebuild -scheme MattermostSwift -destination 'generic/platform=iOS' -skipPackagePluginValidation build
+      - name: Build DocC without warnings
+        run: xcodebuild docbuild -scheme MattermostSwift -destination 'generic/platform=iOS' OTHER_SWIFT_FLAGS='-warnings-as-errors'
+      - name: Block committed token signatures and private artifacts
+        run: scripts/security-scan.sh --strict
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4

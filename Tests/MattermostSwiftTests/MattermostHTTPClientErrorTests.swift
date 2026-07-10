@@ -54,6 +54,36 @@ struct MattermostHTTPClientErrorTests {
     }
 
     @Test
+    func clientRetriesTransientGETButNeverReplaysPOST() async throws {
+        let getAttempts = MattermostRequestLog()
+        let getClient = try await Self.makeClient { request in
+            getAttempts.append(request.httpMethod ?? "")
+            if getAttempts.values.count == 1 {
+                throw URLError(.networkConnectionLost)
+            }
+            return try Self.response(
+                statusCode: 200,
+                body: Data(#"{"id":"user-id","username":"alice"}"#.utf8),
+                request: request
+            )
+        }
+
+        _ = try await getClient.currentUser()
+        #expect(getAttempts.values == ["GET", "GET"])
+
+        let postAttempts = MattermostRequestLog()
+        let postClient = try await Self.makeClient { request in
+            postAttempts.append(request.httpMethod ?? "")
+            throw URLError(.networkConnectionLost)
+        }
+
+        await #expect(throws: MattermostError.self) {
+            _ = try await postClient.sendPost(channelID: "channel-id", message: "must not replay")
+        }
+        #expect(postAttempts.values == ["POST"])
+    }
+
+    @Test
     func clientPreservesCancellationErrors() async throws {
         let client = try await Self.makeClient { _ in
             throw URLError(.cancelled)
@@ -515,6 +545,7 @@ struct MattermostHTTPClientErrorTests {
                 #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
                 #expect(request.value(forHTTPHeaderField: "X-Requested-With") == "XMLHttpRequest")
                 #expect(request.value(forHTTPHeaderField: "User-Agent") == MattermostUserAgent.browser)
+                #expect(!request.httpShouldHandleCookies)
                 let body = Data(#"{"id":"user-id","username":"alice"}"#.utf8)
                 let url = try #require(request.url)
                 let response = try #require(HTTPURLResponse(
@@ -545,6 +576,7 @@ struct MattermostHTTPClientErrorTests {
             urlSession: await Self.urlSession { request in
                 #expect(request.value(forHTTPHeaderField: "X-Requested-With") == "XMLHttpRequest")
                 #expect(request.value(forHTTPHeaderField: "User-Agent") == MattermostUserAgent.browser)
+                #expect(!request.httpShouldHandleCookies)
                 let body = Data(#"{"id":"user-id","username":"alice"}"#.utf8)
                 let url = try #require(request.url)
                 let response = try #require(HTTPURLResponse(
