@@ -88,9 +88,7 @@ public extension MattermostClient {
         )
         request.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
         let response: MattermostHTTPResponse<MattermostUser> = try await httpClient.performWithResponse(request: request)
-        if let sessionToken = response.httpResponse.mattermostSessionToken(
-            cookieStorage: urlSession.configuration.httpCookieStorage
-        ) {
+        if let sessionToken = response.httpResponse.mattermostSessionToken() {
             return MattermostSession(
                 user: response.value,
                 token: sessionToken.token,
@@ -154,23 +152,12 @@ public extension MattermostClient {
 }
 
 private extension HTTPURLResponse {
-    func mattermostSessionToken(
-        cookieStorage: HTTPCookieStorage?
-    ) -> (token: String, source: MattermostSessionTokenSource)? {
+    func mattermostSessionToken() -> (token: String, source: MattermostSessionTokenSource)? {
         if let token = authenticationToken.nonEmpty {
             return (token, .responseHeader)
         }
 
         if let token = mattermostAuthCookieToken.nonEmpty {
-            return (token, .authCookie)
-        }
-
-        if let url,
-           let token = cookieStorage?
-               .cookies(for: url)?
-               .first(where: { $0.name == "MMAUTHTOKEN" })?
-               .value
-               .nonEmpty {
             return (token, .authCookie)
         }
 
@@ -219,9 +206,13 @@ public extension URLSession {
     /// request indefinitely. This session caps a single request at 30s and a full transfer
     /// (e.g. a file download) at 5 minutes.
     static let mattermost: URLSession = {
-        let configuration = URLSessionConfiguration.default
+        // The SDK is token-authenticated; it deliberately does not inherit a host app's
+        // browser cookie jar or persist login cookies between accounts.
+        let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 300
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieAcceptPolicy = .never
         return URLSession(configuration: configuration)
     }()
 }

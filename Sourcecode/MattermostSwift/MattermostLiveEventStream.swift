@@ -137,6 +137,14 @@ public struct MattermostLiveEventStream: Sendable {
             onEvent(event)
         }
 
+        // A non-positive heartbeat configuration explicitly disables pinging; it must not
+        // add a child task that returns immediately and tears down an otherwise healthy
+        // receive loop through the task-group race below.
+        guard isHeartbeatEnabled else {
+            try await receiveEvents(from: webSocketTask, onEvent: onEvent)
+            return
+        }
+
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
                 try await self.receiveEvents(from: webSocketTask, onEvent: onEvent)
@@ -171,7 +179,6 @@ public struct MattermostLiveEventStream: Sendable {
 
     private func keepConnectionAlive(_ webSocketTask: URLSessionWebSocketTask) async throws {
         guard isHeartbeatEnabled else { return }
-
         while !Task.isCancelled {
             try await Task.sleep(for: heartbeatInterval)
             try Task.checkCancellation()
@@ -338,7 +345,6 @@ private enum MattermostTimeoutResult<Value: Sendable>: Sendable {
     case value(Value)
     case timedOut
 }
-
 /// Bridges URLSessionWebSocketTask.sendPing's callback API to cancellation-aware
 /// async code. Both cancellation and the callback may race; only the first one
 /// resumes the continuation.
@@ -404,6 +410,11 @@ final class MattermostOneShotCallback<Value: Sendable>: @unchecked Sendable {
 
 /// Backoff controls for reconnecting Mattermost WebSocket event streams.
 public struct MattermostLiveEventReconnectPolicy: Equatable, Sendable {
+    // Keep a margin below `Int.max`: converting a rounded `Double(Int.max)` can
+    // otherwise cross the signed-integer boundary on some architectures.
+    private static let maximumDelayMilliseconds = Int.max / 2
+    private static let maximumDelaySeconds = Double(maximumDelayMilliseconds) / 1_000
+
     public static let `default` = MattermostLiveEventReconnectPolicy()
 
     public static let disabled = MattermostLiveEventReconnectPolicy(maxRetries: 0)
@@ -421,10 +432,14 @@ public struct MattermostLiveEventReconnectPolicy: Equatable, Sendable {
         maxRetries: Int? = nil,
         reconnectAfterCleanClose: Bool = true
     ) {
-        self.initialDelaySeconds = initialDelaySeconds
-        self.maxDelaySeconds = maxDelaySeconds
-        self.multiplier = multiplier
-        self.maxRetries = maxRetries
+        let initial = Self.normalizedDelay(initialDelaySeconds, fallback: 1)
+        self.initialDelaySeconds = initial
+        self.maxDelaySeconds = max(
+            initial,
+            Self.normalizedDelay(maxDelaySeconds, fallback: 60)
+        )
+        self.multiplier = multiplier.isFinite && multiplier >= 1 ? multiplier : 1
+        self.maxRetries = maxRetries.map { max(0, $0) }
         self.reconnectAfterCleanClose = reconnectAfterCleanClose
     }
 
@@ -437,8 +452,20 @@ public struct MattermostLiveEventReconnectPolicy: Equatable, Sendable {
 
     public func delay(for attempt: Int) -> Duration {
         let exponent = pow(multiplier, Double(max(0, attempt)))
-        let delaySeconds = min(maxDelaySeconds, initialDelaySeconds * exponent)
-        return .milliseconds(Int(delaySeconds * 1000))
+        let computedSeconds = initialDelaySeconds * exponent
+        let delaySeconds = computedSeconds.isFinite
+            ? min(maxDelaySeconds, computedSeconds)
+            : maxDelaySeconds
+        let milliseconds = min(
+            Self.maximumDelayMilliseconds,
+            max(0, Int(delaySeconds * 1_000))
+        )
+        return .milliseconds(milliseconds)
+    }
+
+    private static func normalizedDelay(_ value: Double, fallback: Double) -> Double {
+        guard value.isFinite, value >= 0 else { return fallback }
+        return min(value, maximumDelaySeconds)
     }
 }
 

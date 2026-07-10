@@ -54,34 +54,32 @@ struct MattermostHTTPClientErrorTests {
     }
 
     @Test
-    func clientRetriesAuditedReadOnlyPOSTButNeverReplaysMutationPOST() async throws {
-        let readAttempts = MattermostRequestLog()
-        let readClient = try await Self.makeClient { request in
-            readAttempts.append(request.httpMethod ?? "")
-            if readAttempts.values.count == 1 {
+    func clientRetriesTransientGETButNeverReplaysPOST() async throws {
+        let getAttempts = MattermostRequestLog()
+        let getClient = try await Self.makeClient { request in
+            getAttempts.append(request.httpMethod ?? "")
+            if getAttempts.values.count == 1 {
                 throw URLError(.networkConnectionLost)
             }
             return try Self.response(
                 statusCode: 200,
-                body: Data(#"[{"id":"user-id","username":"alice"}]"#.utf8),
+                body: Data(#"{"id":"user-id","username":"alice"}"#.utf8),
                 request: request
             )
         }
 
-        let users = try await readClient.users(ids: ["user-id"])
-        #expect(users.map(\.id) == ["user-id"])
-        #expect(readAttempts.values == ["POST", "POST"])
+        _ = try await getClient.currentUser()
+        #expect(getAttempts.values == ["GET", "GET"])
 
-        let mutationAttempts = MattermostRequestLog()
-        let mutationClient = try await Self.makeClient { request in
-            mutationAttempts.append(request.httpMethod ?? "")
+        let postAttempts = MattermostRequestLog()
+        let postClient = try await Self.makeClient { request in
+            postAttempts.append(request.httpMethod ?? "")
             throw URLError(.networkConnectionLost)
         }
-
         await #expect(throws: MattermostError.self) {
-            _ = try await mutationClient.sendPost(channelID: "channel-id", message: "must not replay")
+            _ = try await postClient.sendPost(channelID: "channel-id", message: "must not replay")
         }
-        #expect(mutationAttempts.values == ["POST"])
+        #expect(postAttempts.values == ["POST"])
     }
 
     @Test
@@ -546,6 +544,7 @@ struct MattermostHTTPClientErrorTests {
                 #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
                 #expect(request.value(forHTTPHeaderField: "X-Requested-With") == "XMLHttpRequest")
                 #expect(request.value(forHTTPHeaderField: "User-Agent") == MattermostUserAgent.browser)
+                #expect(!request.httpShouldHandleCookies)
                 let body = Data(#"{"id":"user-id","username":"alice"}"#.utf8)
                 let url = try #require(request.url)
                 let response = try #require(HTTPURLResponse(
@@ -576,6 +575,7 @@ struct MattermostHTTPClientErrorTests {
             urlSession: await Self.urlSession { request in
                 #expect(request.value(forHTTPHeaderField: "X-Requested-With") == "XMLHttpRequest")
                 #expect(request.value(forHTTPHeaderField: "User-Agent") == MattermostUserAgent.browser)
+                #expect(!request.httpShouldHandleCookies)
                 let body = Data(#"{"id":"user-id","username":"alice"}"#.utf8)
                 let url = try #require(request.url)
                 let response = try #require(HTTPURLResponse(

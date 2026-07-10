@@ -126,8 +126,42 @@ func jsonValueDecodesMixedTypes() throws {
     #expect(decoded["count"]?.int64Value == 42)
     #expect(decoded["flag"]?.boolValue == true)
     #expect(decoded["missing"] == .null)
-    #expect(decoded["tags"] == .array([.string("x"), .number(1), .bool(false)]))
+    #expect(decoded["tags"] == .array([.string("x"), .integer(1), .bool(false)]))
     #expect(decoded["nested"] == .object(["key": .string("value")]))
+}
+
+@Test
+func jsonValuePreservesIntegerBoundariesWithoutDoubleRounding() throws {
+    let input = Data("""
+    {
+      "before": 9007199254740991,
+      "at": 9007199254740992,
+      "after": 9007199254740993,
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "unsignedMaximum": 18446744073709551615,
+      "fraction": 1.5,
+      "exponent": 1e20
+    }
+    """.utf8)
+
+    let decoded = try JSONDecoder().decode([String: MattermostJSONValue].self, from: input)
+
+    #expect(decoded["before"] == .integer(9_007_199_254_740_991))
+    #expect(decoded["at"] == .integer(9_007_199_254_740_992))
+    #expect(decoded["after"] == .integer(9_007_199_254_740_993))
+    #expect(decoded["minimum"] == .integer(.min))
+    #expect(decoded["maximum"] == .integer(.max))
+    #expect(decoded["unsignedMaximum"] == .unsignedInteger(.max))
+    #expect(decoded["fraction"] == .number(1.5))
+    #expect(decoded["exponent"] == .number(1e20))
+    #expect(decoded["after"]?.int64Value == 9_007_199_254_740_993)
+    #expect(decoded["unsignedMaximum"]?.int64Value == nil)
+    #expect(decoded["fraction"]?.int64Value == nil)
+
+    let encoded = try JSONEncoder().encode(decoded)
+    let roundTripped = try JSONDecoder().decode([String: MattermostJSONValue].self, from: encoded)
+    #expect(roundTripped == decoded)
 }
 
 @Test

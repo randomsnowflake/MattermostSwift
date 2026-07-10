@@ -403,6 +403,10 @@ public struct MattermostLiveBroadcast: Decodable, Equatable, Sendable {
 /// Generic JSON value used for tolerant Mattermost JSON payloads.
 public enum MattermostJSONValue: Codable, Equatable, Sendable {
     case string(String)
+    /// A signed JSON integer preserved without converting through `Double`.
+    case integer(Int64)
+    /// An unsigned JSON integer preserved without converting through `Double`.
+    case unsignedInteger(UInt64)
     case number(Double)
     case bool(Bool)
     case object([String: MattermostJSONValue])
@@ -425,12 +429,17 @@ public enum MattermostJSONValue: Codable, Equatable, Sendable {
 
     public var int64Value: Int64? {
         switch self {
+        case .integer(let value):
+            return value
+        case .unsignedInteger(let value):
+            return Int64(exactly: value)
         case .number(let value):
             // `Int64(Double)` traps on a finite value outside Int64's range, so bound the
             // magnitude (< 2^63) as well as guarding NaN/infinity before converting.
             guard value.isFinite,
                   value >= -9_223_372_036_854_775_808.0,
-                  value < 9_223_372_036_854_775_808.0 else {
+                  value < 9_223_372_036_854_775_808.0,
+                  value.rounded(.towardZero) == value else {
                 return nil
             }
             return Int64(value)
@@ -457,6 +466,10 @@ public enum MattermostJSONValue: Codable, Equatable, Sendable {
             self = .null
         } else if let value = try? container.decode(Bool.self) {
             self = .bool(value)
+        } else if let value = try? container.decode(Int64.self) {
+            self = .integer(value)
+        } else if let value = try? container.decode(UInt64.self) {
+            self = .unsignedInteger(value)
         } else if let value = try? container.decode(Double.self) {
             self = .number(value)
         } else if let value = try? container.decode(String.self) {
@@ -473,6 +486,10 @@ public enum MattermostJSONValue: Codable, Equatable, Sendable {
 
         switch self {
         case .string(let value):
+            try container.encode(value)
+        case .integer(let value):
+            try container.encode(value)
+        case .unsignedInteger(let value):
             try container.encode(value)
         case .number(let value):
             try container.encode(value)
@@ -492,6 +509,10 @@ private extension MattermostJSONValue {
     var jsonObject: Any {
         switch self {
         case .string(let value):
+            value
+        case .integer(let value):
+            value
+        case .unsignedInteger(let value):
             value
         case .number(let value):
             value

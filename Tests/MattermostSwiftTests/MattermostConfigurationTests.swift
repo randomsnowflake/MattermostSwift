@@ -245,6 +245,11 @@ func liveEventStreamConfiguresHeartbeatLiveness() throws {
         heartbeatInterval: .seconds(3),
         heartbeatTimeout: .seconds(1)
     )
+    let disabledStream = MattermostLiveEventStream(
+        configuration: configuration,
+        heartbeatInterval: .zero,
+        heartbeatTimeout: .seconds(1)
+    )
 
     #expect(defaultStream.heartbeatInterval == .seconds(25))
     #expect(defaultStream.heartbeatTimeout == .seconds(10))
@@ -252,6 +257,7 @@ func liveEventStreamConfiguresHeartbeatLiveness() throws {
     #expect(customStream.heartbeatInterval == .seconds(3))
     #expect(customStream.heartbeatTimeout == .seconds(1))
     #expect(customStream.isHeartbeatEnabled)
+    #expect(!disabledStream.isHeartbeatEnabled)
 }
 
 @Test
@@ -290,7 +296,17 @@ func httpClientBuildsQueryRequest() throws {
         ]
     )
 
+    #expect(!request.httpShouldHandleCookies)
+
     #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/system/ping?get_server_status=true&use_rest_semantics=true")
+}
+
+@Test
+func defaultSessionDoesNotPersistOrAcceptCookies() {
+    let configuration = URLSession.mattermost.configuration
+
+    #expect(!configuration.httpShouldSetCookies)
+    #expect(configuration.httpCookieAcceptPolicy == .never)
 }
 
 @Test
@@ -906,7 +922,7 @@ func httpClientBuildsPostRequestWithPropsJSONBody() throws {
         props: [
             "mmswift": .object([
                 "ok": .bool(true),
-                "count": .number(2),
+                "count": .integer(2),
                 "note": .string("roundtrip"),
             ]),
         ]
@@ -1654,7 +1670,7 @@ func decodesPostListAndPostState() throws {
     #expect(post.isFollowing == true)
     #expect(post.props?["mmswift"] == .object([
         "ok": .bool(true),
-        "count": .number(2),
+        "count": .integer(2),
     ]))
     #expect(post.metadata?["priority"] == .object([
         "requested_ack": .bool(false),
@@ -1891,7 +1907,7 @@ func decodingWebSocketLiveEventToleratesUnexpectedBroadcastFieldTypes() throws {
     let event = try mattermostDecoder.decode(MattermostLiveEvent.self, from: json)
 
     #expect(event.event == "custom_plugin_event")
-    #expect(event.data["value"] == .number(1))
+    #expect(event.data["value"] == .integer(1))
     #expect(event.broadcast?.channelId == nil)
     #expect(event.broadcast?.teamId == "team-a")
     #expect(event.broadcast?.omitUsers == ["unexpected"])
@@ -2117,7 +2133,7 @@ func decodesNestedJSONValue() throws {
 
     #expect(value["outer"] == .object([
         "name": .string("value"),
-        "count": .number(2),
+        "count": .integer(2),
         "items": .array([.bool(true), .null]),
     ]))
 }

@@ -428,8 +428,8 @@ func cachedTimelineCanFilterDeletedPosts() throws {
     try store.upsert(post: deleted)
     try store.save()
 
-    let allPosts = try store.cachedTimeline(.channel(id: "channel-1"))
-    let visiblePosts = try store.cachedTimeline(.channel(id: "channel-1"), includeDeleted: false)
+    let allPosts = try store.cachedTimeline(.channel(id: "channel-1"), includeDeleted: true)
+    let visiblePosts = try store.cachedTimeline(.channel(id: "channel-1"))
 
     #expect(allPosts.map(\.id) == ["post-visible", "post-deleted"])
     #expect(visiblePosts.map(\.id) == ["post-visible"])
@@ -517,7 +517,7 @@ func storeDoesNotResurrectDeletedChannelFromOlderPayload() throws {
     try store.upsert(channel: olderActive)
     try store.save()
 
-    let cached = try #require(try store.cachedChannel(id: "channel-1"))
+    let cached = try #require(try store.cachedChannel(id: "channel-1", includeDeleted: true))
 
     #expect(cached.displayName == "Deleted Channel")
     #expect(cached.deleteAt == 40)
@@ -817,7 +817,7 @@ func storeAppliesLiveChannelMemberAndUserEvents() throws {
     try store.apply(liveEvent: channelDeleted)
     try store.save()
 
-    let cachedChannel = try #require(try store.cachedChannel(id: "channel-1"))
+    let cachedChannel = try #require(try store.cachedChannel(id: "channel-1", includeDeleted: true))
     let cachedMember = try #require(try store.cachedChannelMember(channelID: "channel-1", userID: "user-1"))
     let cachedUser = try #require(try store.cachedUser(id: "user-1"))
 
@@ -844,6 +844,30 @@ func reconnectPolicyCalculatesBackoffAndStopsAtLimit() {
     #expect(policy.delay(for: 2) == .seconds(2))
     #expect(policy.delay(for: 3) == .seconds(2))
     #expect(policy.delay(for: 4) == .seconds(2))
+}
+
+@Test
+func reconnectPolicyNormalizesInvalidNumbersAndSaturatesLargeAttempts() {
+    let policy = MattermostLiveEventReconnectPolicy(
+        initialDelaySeconds: .nan,
+        maxDelaySeconds: .infinity,
+        multiplier: -.infinity,
+        maxRetries: -1
+    )
+
+    #expect(policy.initialDelaySeconds == 1)
+    #expect(policy.maxDelaySeconds == 60)
+    #expect(policy.multiplier == 1)
+    #expect(policy.maxRetries == 0)
+    #expect(!policy.canRetry(attempt: 0))
+    #expect(policy.delay(for: .max) == .seconds(1))
+
+    let overflowing = MattermostLiveEventReconnectPolicy(
+        initialDelaySeconds: .greatestFiniteMagnitude,
+        maxDelaySeconds: .greatestFiniteMagnitude,
+        multiplier: .greatestFiniteMagnitude
+    )
+    #expect(overflowing.delay(for: .max) > .zero)
 }
 
 @MainActor
@@ -964,7 +988,7 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
     try store.apply(liveEvent: deletion)
     try store.save()
 
-    let cachedChannel = try #require(try store.cachedChannel(id: "channel-1"))
+    let cachedChannel = try #require(try store.cachedChannel(id: "channel-1", includeDeleted: true))
     let reactionID = MattermostCachedReaction.cacheID(userID: "user-1", postID: "post-1", emojiName: "wave")
     #expect((cachedChannel.deleteAt ?? 0) > 0)
     #expect(try store.cachedPosts(channelID: "channel-1").isEmpty)

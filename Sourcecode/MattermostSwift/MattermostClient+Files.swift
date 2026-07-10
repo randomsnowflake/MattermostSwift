@@ -40,6 +40,45 @@ extension MattermostClient {
         return try await httpClient.multipart("/files", parts: parts)
     }
 
+    /// Uploads a staged local file without loading its contents into memory.
+    /// The caller owns the file and may remove it after this method returns.
+    public func uploadFile(
+        channelID: String,
+        filename: String,
+        fileURL: URL,
+        contentType: String = "application/octet-stream",
+        clientID: String? = nil
+    ) async throws -> MattermostFileUploadResponse {
+        var parts = [
+            MattermostMultipartPart(
+                name: "channel_id",
+                filename: nil,
+                contentType: nil,
+                data: Data(channelID.utf8)
+            ),
+        ]
+        if let clientID, !clientID.isEmpty {
+            parts.append(
+                MattermostMultipartPart(
+                    name: "client_ids",
+                    filename: nil,
+                    contentType: nil,
+                    data: Data(clientID.utf8)
+                )
+            )
+        }
+        return try await httpClient.multipart(
+            "/files",
+            parts: parts,
+            filePart: MattermostMultipartFilePart(
+                name: "files",
+                filename: filename,
+                contentType: contentType,
+                fileURL: fileURL
+            )
+        )
+    }
+
     /// Loads metadata for a file by id.
     public func fileInfo(id: String) async throws -> MattermostFileInfo {
         try await httpClient.get("/files/\(id)/info")

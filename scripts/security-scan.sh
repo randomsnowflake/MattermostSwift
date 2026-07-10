@@ -3,6 +3,16 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
+strict=false
+case "${1:-}" in
+  "") ;;
+  --strict) strict=true ;;
+  *)
+    echo "usage: $0 [--strict]" >&2
+    exit 64
+    ;;
+esac
+
 secret_patterns='(token|secret|password|passwd|authorization|bearer|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|credential|cookie)'
 artifact_patterns='(\.env|\.log|\.png|\.jpe?g|\.gif|\.heic|\.mov|\.mp4|\.zip|\.tar|\.gz|\.sqlite|\.db|\.xcresult|\.build|\.mattermostswift)'
 
@@ -64,3 +74,38 @@ git grep -n -I -E 'AKIA[0-9A-Z]{16}' "${git_revisions[@]}" -- "${scan_pathspec[@
 git grep -n -I -F 'BEGIN PRIVATE KEY' "${git_revisions[@]}" -- "${scan_pathspec[@]}" || true
 git grep -n -I -F 'BEGIN RSA PRIVATE KEY' "${git_revisions[@]}" -- "${scan_pathspec[@]}" || true
 git grep -n -I -F 'BEGIN OPENSSH PRIVATE KEY' "${git_revisions[@]}" -- "${scan_pathspec[@]}" || true
+
+if "$strict"; then
+  echo
+  echo "== Strict mode: blocking artifacts and token signatures =="
+
+  current_artifacts="$(
+    find . \
+      -path ./.git -prune -o \
+      -path ./.build -prune -o \
+      -path ./.swiftpm -prune -o \
+      -path ./.mattermostswift -prune -o \
+      -type f -print \
+      | while IFS= read -r path; do printf '%s\n' "${path#./}"; done \
+      | rg -i "$artifact_patterns" \
+      | filter_expected_artifacts || true
+  )"
+  history_artifacts="$(
+    git log --all --full-history --name-only --pretty=format: \
+      | sort -u \
+      | rg -i "$artifact_patterns" \
+      | filter_expected_artifacts || true
+  )"
+  token_signatures="$(
+    git grep -n -I -E 'xox[baprs]-[A-Za-z0-9-]+|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}' "${git_revisions[@]}" -- "${scan_pathspec[@]}" || true
+    git grep -n -I -F 'BEGIN PRIVATE KEY' "${git_revisions[@]}" -- "${scan_pathspec[@]}" || true
+    git grep -n -I -F 'BEGIN RSA PRIVATE KEY' "${git_revisions[@]}" -- "${scan_pathspec[@]}" || true
+    git grep -n -I -F 'BEGIN OPENSSH PRIVATE KEY' "${git_revisions[@]}" -- "${scan_pathspec[@]}" || true
+  )"
+
+  if [[ -n "$current_artifacts$history_artifacts$token_signatures" ]]; then
+    echo "Strict security scan found a blocked artifact or token signature:" >&2
+    printf '%s\n%s\n%s\n' "$current_artifacts" "$history_artifacts" "$token_signatures" >&2
+    exit 1
+  fi
+fi

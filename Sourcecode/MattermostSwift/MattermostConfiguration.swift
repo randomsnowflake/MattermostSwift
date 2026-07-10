@@ -7,9 +7,13 @@ public struct MattermostConfiguration: Sendable {
     public let webSocketURL: URL
     public let authentication: MattermostAuthentication
 
-    /// - Parameter allowInsecureHTTP: Permits `http://` (and `ws://`) for non-loopback hosts.
-    ///   Loopback hosts (`localhost`, `127.0.0.1`, `::1`) are always allowed for local development.
-    ///   Remote `http://` is rejected by default because it transmits the bearer token in cleartext.
+    /// - Parameters:
+    ///   - serverURL: The root URL of the Mattermost server. An `/api/v4` suffix is normalized away.
+    ///   - authentication: The bearer-token authentication to attach to requests, or `.none` for
+    ///     endpoints such as password login that establish a session.
+    ///   - allowInsecureHTTP: Permits `http://` (and `ws://`) for non-loopback hosts. Loopback
+    ///     hosts (`localhost`, `127.0.0.1`, `::1`) are always allowed for local development.
+    ///     Remote `http://` is rejected by default because it transmits the bearer token in cleartext.
     public init(
         serverURL: URL,
         authentication: MattermostAuthentication,
