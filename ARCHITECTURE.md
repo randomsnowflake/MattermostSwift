@@ -201,7 +201,7 @@ The first endpoints are based on Mattermost API v4:
 - Channel detail resolution: `GET /api/v4/channels/{channel_id}`, `GET /api/v4/teams/{team_id}/channels/name/{channel_name}`, and `GET /api/v4/teams/name/{team_name}/channels/name/{channel_name}`.
 - Channel statistics/timezones: `GET /api/v4/channels/{channel_id}/stats`, `GET /api/v4/channels/{channel_id}/timezones`, and `POST /api/v4/channels/stats/member_count`.
 - Channel membership: `GET /api/v4/channels/{channel_id}/members?page=...&per_page=...`, `GET /api/v4/channels/{channel_id}/members/{user_id}`, `POST /api/v4/channels/{channel_id}/members/ids`, `POST /api/v4/channels/{channel_id}/members`, and `DELETE /api/v4/channels/{channel_id}/members/{user_id}`.
-- Channel post updates: `GET /api/v4/channels/{channel_id}/posts?since={unix_ms}`.
+- Channel post pagination and updates: `GET /api/v4/channels/{channel_id}/posts?page=...&per_page=...&since=...&before=...&after=...&skipFetchThreads=...&collapsedThreads=...&collapsedThreadsExtended=...`.
 - Pinned posts: `GET /api/v4/channels/{channel_id}/pinned`.
 - Posts around oldest unread: `GET /api/v4/users/{user_id}/channels/{channel_id}/posts/unread?limit_before=...&limit_after=...&skipFetchThreads=...&collapsedThreads=...&collapsedThreadsExtended=...`.
 - Thread loading: `GET /api/v4/posts/{post_id}/thread?perPage=...&fromPost=...&fromCreateAt=...&direction=...&skipFetchThreads=...&collapsedThreads=...&collapsedThreadsExtended=...`.

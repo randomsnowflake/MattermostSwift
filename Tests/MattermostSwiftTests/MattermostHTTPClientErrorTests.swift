@@ -440,6 +440,29 @@ struct MattermostHTTPClientErrorTests {
     }
 
     @Test
+    func clientBuildsCollapsedChannelPostsRequest() async throws {
+        let client = try await Self.makeClient { request in
+            #expect(
+                request.url?.absoluteString
+                    == "https://mattermost.example.com/api/v4/channels/channel-id/posts?page=0&per_page=80&before=post-id&skipFetchThreads=true&collapsedThreads=true&collapsedThreadsExtended=true"
+            )
+            return try Self.response(statusCode: 200, body: Data(#"{"order":[],"posts":{}}"#.utf8), request: request)
+        }
+
+        let posts = try await client.posts(
+            channelID: "channel-id",
+            perPage: 80,
+            before: "post-id",
+            skipFetchThreads: true,
+            collapsedThreads: true,
+            collapsedThreadsExtended: true
+        )
+
+        #expect(posts.order.isEmpty)
+        #expect(posts.posts.isEmpty)
+    }
+
+    @Test
     func clientClampsCustomEmojiPagination() async throws {
         let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/emoji?page=0&per_page=1&sort=name")

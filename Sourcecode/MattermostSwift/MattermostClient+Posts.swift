@@ -10,10 +10,19 @@ extension MattermostClient {
         perPage: Int = 60,
         since: Int64? = nil,
         before: String? = nil,
-        after: String? = nil
+        after: String? = nil,
+        skipFetchThreads: Bool? = nil,
+        collapsedThreads: Bool? = nil,
+        collapsedThreadsExtended: Bool? = nil
     ) async throws -> MattermostPostList {
         if let since {
-            return try await postsSince(channelID: channelID, since: since)
+            return try await postsSince(
+                channelID: channelID,
+                since: since,
+                skipFetchThreads: skipFetchThreads,
+                collapsedThreads: collapsedThreads,
+                collapsedThreadsExtended: collapsedThreadsExtended
+            )
         }
 
         var queryItems = Self.pageQueryItems(page: page, perPage: perPage)
@@ -26,6 +35,18 @@ extension MattermostClient {
             queryItems.append(URLQueryItem(name: "after", value: after))
         }
 
+        if let skipFetchThreads {
+            queryItems.append(URLQueryItem(name: "skipFetchThreads", value: String(skipFetchThreads)))
+        }
+
+        if let collapsedThreads {
+            queryItems.append(URLQueryItem(name: "collapsedThreads", value: String(collapsedThreads)))
+        }
+
+        if let collapsedThreadsExtended {
+            queryItems.append(URLQueryItem(name: "collapsedThreadsExtended", value: String(collapsedThreadsExtended)))
+        }
+
         return try await httpClient.get("/channels/\(channelID)/posts", queryItems: queryItems)
     }
 
@@ -35,12 +56,26 @@ extension MattermostClient {
     }
 
     /// Loads posts created or modified after a Unix timestamp in milliseconds.
-    public func postsSince(channelID: String, since: Int64) async throws -> MattermostPostList {
-        try await httpClient.get(
+    public func postsSince(
+        channelID: String,
+        since: Int64,
+        skipFetchThreads: Bool? = nil,
+        collapsedThreads: Bool? = nil,
+        collapsedThreadsExtended: Bool? = nil
+    ) async throws -> MattermostPostList {
+        var queryItems = [URLQueryItem(name: "since", value: String(since))]
+        if let skipFetchThreads {
+            queryItems.append(URLQueryItem(name: "skipFetchThreads", value: String(skipFetchThreads)))
+        }
+        if let collapsedThreads {
+            queryItems.append(URLQueryItem(name: "collapsedThreads", value: String(collapsedThreads)))
+        }
+        if let collapsedThreadsExtended {
+            queryItems.append(URLQueryItem(name: "collapsedThreadsExtended", value: String(collapsedThreadsExtended)))
+        }
+        return try await httpClient.get(
             "/channels/\(channelID)/posts",
-            queryItems: [
-                URLQueryItem(name: "since", value: String(since)),
-            ]
+            queryItems: queryItems
         )
     }
 

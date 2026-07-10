@@ -17,7 +17,10 @@ extension MattermostClient {
                 perPage: request.perPage,
                 since: request.since,
                 before: request.before,
-                after: request.after
+                after: request.after,
+                skipFetchThreads: request.skipFetchThreads,
+                collapsedThreads: request.collapsedThreads,
+                collapsedThreadsExtended: request.collapsedThreadsExtended
             )
         case .thread(let rootPostID):
             postList = try await thread(

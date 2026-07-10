@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Channel post pagination now accepts Mattermost's collapsed-thread options, allowing clients to
+  load recent channel roots without busy thread replies consuming the entire page.
 - Added disk-backed file upload/download APIs, a versioned SwiftData cache schema baseline, and
   scoped authoritative cache reconciliation for channels, memberships, sidebar categories, and unreads.
 - Live streams now use bounded queues and report an explicit reconciliation-required gap instead
