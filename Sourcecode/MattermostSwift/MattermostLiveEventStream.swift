@@ -323,7 +323,7 @@ public struct MattermostLiveEventStream: Sendable {
 /// Bridges URLSessionWebSocketTask.sendPing's callback API to cancellation-aware
 /// async code. Both cancellation and the callback may race; only the first one
 /// resumes the continuation.
-private final class MattermostPingContinuation: @unchecked Sendable {
+final class MattermostPingContinuation: @unchecked Sendable {
     private enum Completion {
         case success
         case failure(Error)
