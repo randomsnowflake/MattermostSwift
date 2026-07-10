@@ -10,6 +10,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
   scoped authoritative cache reconciliation for channels, memberships, sidebar categories, and unreads.
 - Live streams now use bounded queues and report an explicit reconciliation-required gap instead
   of silently dropping events. Incremental post sync refuses to advance a saturated cursor.
+- Added immutable `Sendable` cache snapshots for users, channels, and posts, for safe transfer
+  into background actors without retaining SwiftData-managed objects.
 - Added `MattermostClient.logoutCurrentSession()` for server-side revocation of the authenticated session.
 - Added `MattermostClient.markThreadRead` for Mattermost's per-user thread read endpoint, using Mattermost millisecond server timestamps.
 - Added `MattermostPost.postMetadata` with typed embedded `files` and `reactions`, so clients can skip per-post `fileInfos`/`reactions` lookups when the server delivers them inline. Decoded tolerantly: malformed metadata yields `nil` instead of failing post decoding.

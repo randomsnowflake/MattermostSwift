@@ -228,6 +228,8 @@ The library target also includes a DocC quick-start article at `Sourcecode/Matte
 own main-actor boundary, and perform cache mutations through store APIs. Joined channels,
 memberships, sidebar categories, and unread rows are reconciled only from complete scoped server
 responses, so an empty response can safely remove stale local rows for that scope.
+For work outside that actor, use `cachedUserSnapshots()`, `cachedChannelSnapshots()`, or
+`cachedPostSnapshots(...)`; these immutable `Sendable` values do not retain a SwiftData context.
 
 For production-sized attachments, use the file URL overloads instead of materialising the payload:
 

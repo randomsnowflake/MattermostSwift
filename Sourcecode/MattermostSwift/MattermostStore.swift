@@ -519,6 +519,11 @@ public final class MattermostStore {
         )
     }
 
+    /// Returns immutable user values that can safely be retained or sent to another actor.
+    public func cachedUserSnapshots() throws -> [MattermostCachedUserSnapshot] {
+        try cachedUsers().map(MattermostCachedUserSnapshot.init)
+    }
+
     public func cachedUsersCount() throws -> Int {
         try context.fetchCount(FetchDescriptor<MattermostCachedUser>())
     }
@@ -582,6 +587,14 @@ public final class MattermostStore {
             predicate: #Predicate { $0.deleteAt == nil || $0.deleteAt == 0 },
             sortBy: sort
         ))
+    }
+
+    /// Returns immutable channel values that can safely be retained or sent to another actor.
+    public func cachedChannelSnapshots(
+        teamID: String? = nil,
+        includeDeleted: Bool = false
+    ) throws -> [MattermostCachedChannelSnapshot] {
+        try cachedChannels(teamID: teamID, includeDeleted: includeDeleted).map(MattermostCachedChannelSnapshot.init)
     }
 
     public func cachedChannelsCount() throws -> Int {
@@ -677,6 +690,16 @@ public final class MattermostStore {
             descriptor.fetchLimit = limit
         }
         return try context.fetch(descriptor)
+    }
+
+    /// Returns immutable post values that can safely be retained or sent to another actor.
+    public func cachedPostSnapshots(
+        channelID: String,
+        limit: Int? = nil,
+        includeDeleted: Bool = false
+    ) throws -> [MattermostCachedPostSnapshot] {
+        try cachedPosts(channelID: channelID, limit: limit, includeDeleted: includeDeleted)
+            .map(MattermostCachedPostSnapshot.init)
     }
 
     public func cachedThread(rootID: String, includeDeleted: Bool = false) throws -> [MattermostCachedPost] {
