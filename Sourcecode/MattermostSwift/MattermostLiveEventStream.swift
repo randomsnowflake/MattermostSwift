@@ -7,10 +7,6 @@ public struct MattermostLiveEventStream: Sendable {
     let heartbeatInterval: Duration
     let heartbeatTimeout: Duration
 
-    var heartbeatsEnabled: Bool {
-        heartbeatInterval > .zero && heartbeatTimeout > .zero
-    }
-
     public init(
         configuration: MattermostConfiguration,
         urlSession: URLSession = .mattermost,
@@ -153,8 +149,10 @@ public struct MattermostLiveEventStream: Sendable {
             group.addTask {
                 try await self.receiveEvents(from: webSocketTask, onEvent: onEvent)
             }
-            group.addTask {
-                try await self.keepConnectionAlive(webSocketTask)
+            if isHeartbeatEnabled {
+                group.addTask {
+                    try await self.keepConnectionAlive(webSocketTask)
+                }
             }
 
             do {
@@ -180,6 +178,7 @@ public struct MattermostLiveEventStream: Sendable {
     }
 
     private func keepConnectionAlive(_ webSocketTask: URLSessionWebSocketTask) async throws {
+        guard isHeartbeatEnabled else { return }
         while !Task.isCancelled {
             try await Task.sleep(for: heartbeatInterval)
             try Task.checkCancellation()
@@ -193,6 +192,10 @@ public struct MattermostLiveEventStream: Sendable {
                 try await self.sendPing(to: webSocketTask)
             }
         }
+    }
+
+    var isHeartbeatEnabled: Bool {
+        heartbeatInterval > .zero && heartbeatTimeout > .zero
     }
 
     private func authenticate(_ webSocketTask: URLSessionWebSocketTask) async throws -> [MattermostLiveEvent] {

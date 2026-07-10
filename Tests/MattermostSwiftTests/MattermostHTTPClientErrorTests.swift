@@ -76,7 +76,6 @@ struct MattermostHTTPClientErrorTests {
             postAttempts.append(request.httpMethod ?? "")
             throw URLError(.networkConnectionLost)
         }
-
         await #expect(throws: MattermostError.self) {
             _ = try await postClient.sendPost(channelID: "channel-id", message: "must not replay")
         }

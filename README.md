@@ -148,9 +148,14 @@ let session = try await MattermostClient.login(
 )
 
 let client = try session.client(serverURL: URL(string: "https://mattermost.example.com")!)
+
+// Best-effort remote cleanup before discarding a password-login session locally.
+try await client.logoutCurrentSession()
 ```
 
 Store any returned token in your app's secure storage, such as Keychain on Apple platforms.
+`logoutCurrentSession()` revokes Mattermost server sessions; hosts should still discard their
+local token even if remote cleanup fails. Personal access tokens may not be accepted by this endpoint.
 
 ## Supported APIs
 

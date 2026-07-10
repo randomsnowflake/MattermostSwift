@@ -6,6 +6,7 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Added `MattermostClient.logoutCurrentSession()` for server-side revocation of the authenticated session.
 - Added `MattermostClient.markThreadRead` for Mattermost's per-user thread read endpoint, using Mattermost millisecond server timestamps.
 - Added `MattermostPost.postMetadata` with typed embedded `files` and `reactions`, so clients can skip per-post `fileInfos`/`reactions` lookups when the server delivers them inline. Decoded tolerantly: malformed metadata yields `nil` instead of failing post decoding.
 - Added typed channel mute helpers for notification props so clients can suppress channel delivery while preserving unknown Mattermost fields.
