@@ -1,4 +1,4 @@
-import SwiftData
+@preconcurrency import SwiftData
 
 /// The first released shape of the MattermostSwift cache.
 ///
