@@ -14,6 +14,10 @@ public struct MattermostChannel: Decodable, Equatable, Sendable, Identifiable {
     public let header: String?
     public let purpose: String?
     public let deleteAt: Int64?
+    public let totalMsgCount: Int64?      // total_msg_count      (all posts)
+    public let totalMsgCountRoot: Int64?  // total_msg_count_root (CRT: roots only)
+    public let lastPostAt: Int64?         // last_post_at
+    public let lastRootPostAt: Int64?     // last_root_post_at    (CRT)
 
     public var isDeleted: Bool {
         (deleteAt ?? 0) > 0
@@ -81,6 +85,8 @@ public struct MattermostChannelMember: Decodable, Equatable, Sendable {
     public let lastViewedAt: Int64?
     public let msgCount: Int?
     public let mentionCount: Int?
+    public let msgCountRoot: Int?       // msg_count_root
+    public let mentionCountRoot: Int?   // mention_count_root
     public let notifyProps: [String: String]?
     public let lastUpdateAt: Int64?
 
@@ -218,6 +224,8 @@ public struct MattermostChannelUnread: Decodable, Equatable, Sendable {
     public let channelId: String
     public let msgCount: Int
     public let mentionCount: Int
+    public let msgCountRoot: Int?
+    public let mentionCountRoot: Int?
 }
 
 /// Result of marking a channel as viewed.

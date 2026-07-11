@@ -378,7 +378,9 @@ func liveSyncRefreshesUnreadOnPostUnreadInvalidation() async throws {
                 teamId: "team-1",
                 channelId: channelID,
                 msgCount: 4,
-                mentionCount: 1
+                mentionCount: 1,
+                msgCountRoot: nil,
+                mentionCountRoot: nil
             )
         }
     )
@@ -619,7 +621,11 @@ private func liveSyncChannel(id: String, teamID: String = "team-1") -> Mattermos
         type: "O",
         header: nil,
         purpose: nil,
-        deleteAt: nil
+        deleteAt: nil,
+        totalMsgCount: nil,
+        totalMsgCountRoot: nil,
+        lastPostAt: nil,
+        lastRootPostAt: nil
     )
 }
 

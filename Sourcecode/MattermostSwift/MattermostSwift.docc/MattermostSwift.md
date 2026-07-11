@@ -133,6 +133,8 @@ The timeline target owns the cache scope, so host apps do not need to invent cur
 
 Use `markThreadRead(teamID:threadID:timestamp:)` to clear a followed thread's unread state after presenting it. Pass a Mattermost server timestamp in milliseconds, such as a post `createAt` value or thread `lastReplyAt`; seconds-based Unix timestamps leave the thread unread.
 
+Collapsed-Reply-Threads (CRT) clients compute channel unread from root counts: `MattermostChannel.totalMsgCountRoot` and `MattermostChannelMember.msgCountRoot`/`mentionCountRoot` (also on `MattermostChannelUnread`) surface the server's `_root` counters, so channel unread is `totalMsgCountRoot − msgCountRoot` with `mentionCountRoot` for the channel mention badge. Call `viewChannel(channelID:collapsedThreadsSupported: true)` so marking a channel viewed does not auto-read its threads.
+
 ## Maintain Live State
 
 `MattermostLiveSyncService` combines WebSocket events with REST backfill and applies updates into `MattermostStore`:

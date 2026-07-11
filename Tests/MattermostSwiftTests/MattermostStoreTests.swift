@@ -121,7 +121,11 @@ func storeCachesChannelsPostsAndThreads() throws {
         type: "O",
         header: nil,
         purpose: nil,
-        deleteAt: nil
+        deleteAt: nil,
+        totalMsgCount: nil,
+        totalMsgCountRoot: nil,
+        lastPostAt: nil,
+        lastRootPostAt: nil
     )
     let root = MattermostPost(
         id: "post-root",
@@ -498,7 +502,11 @@ func storeDoesNotResurrectDeletedChannelFromOlderPayload() throws {
         type: "O",
         header: nil,
         purpose: nil,
-        deleteAt: 40
+        deleteAt: 40,
+        totalMsgCount: nil,
+        totalMsgCountRoot: nil,
+        lastPostAt: nil,
+        lastRootPostAt: nil
     )
     let olderActive = MattermostChannel(
         id: "channel-1",
@@ -510,7 +518,11 @@ func storeDoesNotResurrectDeletedChannelFromOlderPayload() throws {
         type: "O",
         header: nil,
         purpose: nil,
-        deleteAt: 0
+        deleteAt: 0,
+        totalMsgCount: nil,
+        totalMsgCountRoot: nil,
+        lastPostAt: nil,
+        lastRootPostAt: nil
     )
 
     try store.upsert(channel: deleted)
@@ -534,6 +546,8 @@ func storeCachesChannelMembersAndUnreadState() throws {
         lastViewedAt: 10,
         msgCount: 20,
         mentionCount: 1,
+        msgCountRoot: nil,
+        mentionCountRoot: nil,
         notifyProps: ["desktop": "mention"],
         lastUpdateAt: 30
     )
@@ -544,6 +558,8 @@ func storeCachesChannelMembersAndUnreadState() throws {
         lastViewedAt: 40,
         msgCount: 22,
         mentionCount: 0,
+        msgCountRoot: nil,
+        mentionCountRoot: nil,
         notifyProps: ["desktop": "all"],
         lastUpdateAt: 50
     )
@@ -551,7 +567,9 @@ func storeCachesChannelMembersAndUnreadState() throws {
         teamId: "team-1",
         channelId: "channel-1",
         msgCount: 3,
-        mentionCount: 2
+        mentionCount: 2,
+        msgCountRoot: nil,
+        mentionCountRoot: nil
     )
 
     try store.upsert(member: member)
@@ -953,7 +971,11 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
         type: "O",
         header: nil,
         purpose: nil,
-        deleteAt: nil
+        deleteAt: nil,
+        totalMsgCount: nil,
+        totalMsgCountRoot: nil,
+        lastPostAt: nil,
+        lastRootPostAt: nil
     )
     let post = storeTestPost(id: "post-1", channelID: "channel-1", message: "hello", createAt: 10)
     let reaction = MattermostReaction(userId: "user-1", postId: "post-1", emojiName: "wave", createAt: 11)
@@ -972,7 +994,7 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
         height: nil,
         hasPreviewImage: false
     )
-    let unread = MattermostChannelUnread(teamId: "team-1", channelId: "channel-1", msgCount: 4, mentionCount: 1)
+    let unread = MattermostChannelUnread(teamId: "team-1", channelId: "channel-1", msgCount: 4, mentionCount: 1, msgCountRoot: nil, mentionCountRoot: nil)
     let deletion = MattermostLiveEvent(
         event: "channel_deleted",
         data: ["channel_id": .string("channel-1")],

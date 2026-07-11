@@ -179,6 +179,52 @@ func decodesMattermostChannelStatsWithServerKeys() throws {
 }
 
 @Test
+func decodesChannelRootUnreadCounters() throws {
+    // Decode via the production snake_case decoder so the test reflects real
+    // wire data from CRT-enabled servers.
+    let payload = """
+    {
+        "id": "chan123",
+        "team_id": "team1",
+        "name": "town-square",
+        "display_name": "Town Square",
+        "type": "O",
+        "total_msg_count": 1000,
+        "total_msg_count_root": 400,
+        "last_post_at": 5000,
+        "last_root_post_at": 4800
+    }
+    """
+    let channel = try mattermostSnakeCaseDecoder.decode(MattermostChannel.self, from: Data(payload.utf8))
+    #expect(channel.id == "chan123")
+    #expect(channel.totalMsgCount == 1000)
+    #expect(channel.totalMsgCountRoot == 400)
+    #expect(channel.lastPostAt == 5000)
+    #expect(channel.lastRootPostAt == 4800)
+}
+
+@Test
+func decodesChannelMemberRootCounters() throws {
+    let payload = """
+    {
+        "channel_id": "chan123",
+        "user_id": "user123",
+        "msg_count": 100,
+        "mention_count": 3,
+        "msg_count_root": 40,
+        "mention_count_root": 1
+    }
+    """
+    let member = try mattermostSnakeCaseDecoder.decode(MattermostChannelMember.self, from: Data(payload.utf8))
+    #expect(member.channelId == "chan123")
+    #expect(member.userId == "user123")
+    #expect(member.msgCount == 100)
+    #expect(member.mentionCount == 3)
+    #expect(member.msgCountRoot == 40)
+    #expect(member.mentionCountRoot == 1)
+}
+
+@Test
 func mattermostUserSessionDescriptionRedactsToken() throws {
     let payload = """
     {

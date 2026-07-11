@@ -102,13 +102,15 @@ extension MattermostClient {
     public func viewChannel(
         channelID: String,
         userID: String = "me",
-        previousChannelID: String? = nil
+        previousChannelID: String? = nil,
+        collapsedThreadsSupported: Bool = false
     ) async throws -> MattermostChannelViewResponse {
         try await httpClient.post(
             "/channels/members/\(userID)/view",
             body: MattermostViewChannelRequest(
                 channelId: channelID,
-                prevChannelId: previousChannelID
+                prevChannelId: previousChannelID,
+                collapsedThreadsSupported: collapsedThreadsSupported
             )
         )
     }
