@@ -337,9 +337,13 @@ struct MattermostHTTPClient: Sendable {
 
     func makeMultipartBody(parts: [MattermostMultipartPart], boundary: String) -> Data {
         var body = Data()
-        let estimatedCapacity = parts.reduce(0) { total, part in
-            total + part.contentDisposition.utf8.count + (part.contentType?.utf8.count ?? 0) + part.data.count + 64
-        } + boundary.utf8.count + 8
+        let partCapacity = parts.reduce(into: 0) { capacity, part in
+            capacity += part.contentDisposition.utf8.count
+            capacity += part.contentType?.utf8.count ?? 0
+            capacity += part.data.count
+            capacity += 64
+        }
+        let estimatedCapacity = partCapacity + boundary.utf8.count + 8
         body.reserveCapacity(estimatedCapacity)
 
         for part in parts {
