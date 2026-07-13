@@ -12,6 +12,7 @@ public struct MattermostCachedUserSnapshot: Equatable, Sendable, Identifiable {
     public let nickname: String?
     public let position: String?
     public let locale: String?
+    public let lastPictureUpdate: Int64?
 
     @MainActor init(_ cached: MattermostCachedUser) {
         id = cached.id
@@ -22,6 +23,7 @@ public struct MattermostCachedUserSnapshot: Equatable, Sendable, Identifiable {
         nickname = cached.nickname
         position = cached.position
         locale = cached.locale
+        lastPictureUpdate = cached.lastPictureUpdate
     }
 }
 

@@ -20,6 +20,7 @@ public final class MattermostCachedUser {
     public var nickname: String?
     public var position: String?
     public var locale: String?
+    public var lastPictureUpdate: Int64?
 
     init(_ user: MattermostUser) {
         self.id = user.id
@@ -30,6 +31,7 @@ public final class MattermostCachedUser {
         nickname = user.nickname
         position = user.position
         locale = user.locale
+        lastPictureUpdate = user.lastPictureUpdate
     }
 
     func apply(_ user: MattermostUser) {
@@ -40,6 +42,7 @@ public final class MattermostCachedUser {
         nickname = user.nickname
         position = user.position
         locale = user.locale
+        lastPictureUpdate = user.lastPictureUpdate
     }
 }
 

@@ -15,7 +15,8 @@ func cachedUserRoundTripsThroughStore() throws {
         nickname: "al",
         position: "Engineer",
         locale: "en",
-        timezone: nil
+        timezone: nil,
+        lastPictureUpdate: 1_700_000_000_000
     )
 
     let cached = try store.upsert(user: user)
@@ -30,6 +31,7 @@ func cachedUserRoundTripsThroughStore() throws {
     #expect(fetched.nickname == "al")
     #expect(fetched.position == "Engineer")
     #expect(fetched.locale == "en")
+    #expect(fetched.lastPictureUpdate == 1_700_000_000_000)
 }
 
 @MainActor

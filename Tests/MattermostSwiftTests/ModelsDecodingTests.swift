@@ -14,7 +14,8 @@ func decodesMattermostUser() throws {
         "username": "jdoe",
         "email": "jdoe@example.com",
         "firstName": "Jane",
-        "timezone": {"useAutomaticTimezone": "true"}
+        "timezone": {"useAutomaticTimezone": "true"},
+        "lastPictureUpdate": 1700000000000
     }
     """
     let user = try JSONDecoder().decode(MattermostUser.self, from: Data(payload.utf8))
@@ -23,6 +24,37 @@ func decodesMattermostUser() throws {
     #expect(user.email == "jdoe@example.com")
     #expect(user.firstName == "Jane")
     #expect(user.timezone?["useAutomaticTimezone"] == "true")
+    #expect(user.lastPictureUpdate == 1_700_000_000_000)
+}
+
+@Test
+func decodesMattermostUserLastPictureUpdateFromSnakeCase() throws {
+    // The production decoder converts the server's `last_picture_update`
+    // snake_case key to `lastPictureUpdate` via `.convertFromSnakeCase`.
+    let payload = """
+    {
+        "id": "user123",
+        "username": "jdoe",
+        "last_picture_update": 1700000000000
+    }
+    """
+    let user = try mattermostSnakeCaseDecoder.decode(MattermostUser.self, from: Data(payload.utf8))
+    #expect(user.id == "user123")
+    #expect(user.lastPictureUpdate == 1_700_000_000_000)
+}
+
+@Test
+func decodesMattermostUserWithoutLastPictureUpdateAsNil() throws {
+    // Servers that omit the field (or older versions) decode as nil because
+    // the optional property uses `decodeIfPresent`.
+    let payload = """
+    {
+        "id": "user123",
+        "username": "jdoe"
+    }
+    """
+    let user = try mattermostSnakeCaseDecoder.decode(MattermostUser.self, from: Data(payload.utf8))
+    #expect(user.lastPictureUpdate == nil)
 }
 
 @Test

@@ -551,7 +551,8 @@ func liveSyncRefreshesThreadStateOnThreadInvalidation() async throws {
                         nickname: nil,
                         position: nil,
                         locale: nil,
-                        timezone: nil
+                        timezone: nil,
+                        lastPictureUpdate: nil
                     ),
                 ],
                 post: MattermostPost(
@@ -651,7 +652,8 @@ private func liveSyncBackfillResult(
             nickname: nil,
             position: nil,
             locale: nil,
-            timezone: nil
+            timezone: nil,
+            lastPictureUpdate: nil
         ),
         teams: [team],
         teamID: teamID,

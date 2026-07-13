@@ -15,7 +15,8 @@ func storeUpsertsUsersAndStatuses() throws {
         nickname: nil,
         position: nil,
         locale: "en",
-        timezone: nil
+        timezone: nil,
+        lastPictureUpdate: nil
     )
     let updatedUser = MattermostUser(
         id: "user-1",
@@ -26,7 +27,8 @@ func storeUpsertsUsersAndStatuses() throws {
         nickname: nil,
         position: nil,
         locale: "de",
-        timezone: nil
+        timezone: nil,
+        lastPictureUpdate: 1_700_000_000_000
     )
     let status = MattermostUserStatus(
         userId: "user-1",
@@ -68,6 +70,7 @@ func storeUpsertsUsersAndStatuses() throws {
     #expect(teams.count == 1)
     #expect(cachedUser.email == "new@example.com")
     #expect(cachedUser.lastName == "Leimbach")
+    #expect(cachedUser.lastPictureUpdate == 1_700_000_000_000)
     #expect(cachedStatus.status == "online")
     #expect(cachedStatus.activeChannel == "channel-1")
     #expect(cachedTeam.displayName == "Engineering Team")
@@ -87,7 +90,8 @@ func storeBatchUpsertsUsersBeyondFetchChunkLimit() throws {
             nickname: nil,
             position: nil,
             locale: nil,
-            timezone: nil
+            timezone: nil,
+            lastPictureUpdate: nil
         )
     }
 
@@ -220,7 +224,8 @@ func storeCachesThreadState() throws {
         nickname: nil,
         position: nil,
         locale: nil,
-        timezone: nil
+        timezone: nil,
+        lastPictureUpdate: nil
     )
     let post = MattermostPost(
         id: "root-1",
