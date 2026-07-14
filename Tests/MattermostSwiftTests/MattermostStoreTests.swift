@@ -126,10 +126,10 @@ func storeCachesChannelsPostsAndThreads() throws {
         header: nil,
         purpose: nil,
         deleteAt: nil,
-        totalMsgCount: nil,
-        totalMsgCountRoot: nil,
-        lastPostAt: nil,
-        lastRootPostAt: nil
+        totalMsgCount: 120,
+        totalMsgCountRoot: 80,
+        lastPostAt: 500,
+        lastRootPostAt: 450
     )
     let root = MattermostPost(
         id: "post-root",
@@ -192,10 +192,17 @@ func storeCachesChannelsPostsAndThreads() throws {
     try store.save()
 
     let cachedChannels = try store.cachedChannels(teamID: "team-1")
+    let channelSnapshots = try store.cachedChannelSnapshots(teamID: "team-1")
     let cachedPosts = try store.cachedPosts(channelID: "channel-1")
     let thread = try store.cachedThread(rootID: "post-root")
 
     #expect(cachedChannels.map(\.id) == ["channel-1"])
+    #expect(cachedChannels.first?.totalMsgCount == 120)
+    #expect(cachedChannels.first?.totalMsgCountRoot == 80)
+    #expect(cachedChannels.first?.lastPostAt == 500)
+    #expect(cachedChannels.first?.lastRootPostAt == 450)
+    #expect(channelSnapshots.first?.totalMsgCountRoot == 80)
+    #expect(channelSnapshots.first?.lastRootPostAt == 450)
     #expect(cachedPosts.map(\.id) == ["post-reply", "post-root"])
     #expect(thread.map(\.id) == ["post-root", "post-reply"])
     #expect(try store.cachedTimeline(.channel(id: "channel-1")).map(\.id) == ["post-reply", "post-root"])
@@ -551,8 +558,8 @@ func storeCachesChannelMembersAndUnreadState() throws {
         lastViewedAt: 10,
         msgCount: 20,
         mentionCount: 1,
-        msgCountRoot: nil,
-        mentionCountRoot: nil,
+        msgCountRoot: 18,
+        mentionCountRoot: 1,
         notifyProps: ["desktop": "mention"],
         lastUpdateAt: 30
     )
@@ -563,8 +570,8 @@ func storeCachesChannelMembersAndUnreadState() throws {
         lastViewedAt: 40,
         msgCount: 22,
         mentionCount: 0,
-        msgCountRoot: nil,
-        mentionCountRoot: nil,
+        msgCountRoot: 21,
+        mentionCountRoot: 0,
         notifyProps: ["desktop": "all"],
         lastUpdateAt: 50
     )
@@ -573,8 +580,8 @@ func storeCachesChannelMembersAndUnreadState() throws {
         channelId: "channel-1",
         msgCount: 3,
         mentionCount: 2,
-        msgCountRoot: nil,
-        mentionCountRoot: nil
+        msgCountRoot: 2,
+        mentionCountRoot: 1
     )
 
     try store.upsert(member: member)
@@ -590,11 +597,15 @@ func storeCachesChannelMembersAndUnreadState() throws {
     #expect(try store.cachedChannelMembers(userID: "user-1").count == 1)
     #expect(cachedMember.roles == "channel_user channel_admin")
     #expect(cachedMember.lastViewedAt == 40)
+    #expect(cachedMember.msgCountRoot == 21)
+    #expect(cachedMember.mentionCountRoot == 0)
     #expect(cachedMember.notifyProps["desktop"] == "all")
     #expect(cachedMember.channelNotifyProps.desktop == "all")
     #expect(cachedUnread.teamId == "team-1")
     #expect(cachedUnread.msgCount == 3)
     #expect(cachedUnread.mentionCount == 2)
+    #expect(cachedUnread.msgCountRoot == 2)
+    #expect(cachedUnread.mentionCountRoot == 1)
 }
 
 @MainActor
