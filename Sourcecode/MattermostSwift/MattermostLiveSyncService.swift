@@ -17,7 +17,8 @@ public struct MattermostLiveSyncOptions: Equatable, Sendable {
     /// Upper bound for joined-channel timeline backfill in a single connect/reconnect pass.
     public var maxBackfillChannels: Int
 
-    /// Refresh unread state when a live `channel_viewed` event includes a channel id.
+    /// Refresh unread state when live `channel_viewed` or `multiple_channels_viewed` events
+    /// include one or more channel ids.
     public var refreshUnreadOnChannelViewed: Bool
 
     /// Refresh unread state when live events such as `post_unread` invalidate channel unread counts.
@@ -287,23 +288,24 @@ public struct MattermostLiveSyncService: Sendable {
                                 try Self.yield(.backfilled(result), to: continuation)
                             }
 
-                            var unreadResult: MattermostChannelUnread?
-                            if let refreshUnread,
-                               let unreadRefresh = typedEvent.unreadRefresh(
-                                   options: options,
-                                   fallbackUserID: activeUserID
-                               ) {
-                                do {
-                                    let unread = try await refreshUnread(
-                                        unreadRefresh.userID,
-                                        unreadRefresh.channelID
-                                    )
-                                    try store.upsert(unread: unread, userID: unreadRefresh.userID)
-                                    unreadResult = unread
-                                } catch is CancellationError {
-                                    throw CancellationError()
-                                } catch {
-                                    unreadResult = nil
+                            var unreadResults: [MattermostChannelUnread] = []
+                            if let refreshUnread {
+                                for unreadRefresh in typedEvent.unreadRefreshes(
+                                    options: options,
+                                    fallbackUserID: activeUserID
+                                ) {
+                                    do {
+                                        let unread = try await refreshUnread(
+                                            unreadRefresh.userID,
+                                            unreadRefresh.channelID
+                                        )
+                                        try store.upsert(unread: unread, userID: unreadRefresh.userID)
+                                        unreadResults.append(unread)
+                                    } catch is CancellationError {
+                                        throw CancellationError()
+                                    } catch {
+                                        continue
+                                    }
                                 }
                             }
 
@@ -357,10 +359,10 @@ public struct MattermostLiveSyncService: Sendable {
                                 }
                             }
 
-                            if unreadResult != nil || categoriesResult != nil || threadResult != nil {
+                            if !unreadResults.isEmpty || categoriesResult != nil || threadResult != nil {
                                 try store.save()
 
-                                if let unreadResult {
+                                for unreadResult in unreadResults {
                                     try Self.yield(.channelUnreadRefreshed(unreadResult), to: continuation)
                                 }
                                 if let categoriesResult {
@@ -530,6 +532,11 @@ private struct MattermostLiveSyncThreadStateRefreshRequest: Equatable {
     let threadID: String
 }
 
+private struct MattermostLiveSyncUnreadRefreshRequest: Equatable {
+    let userID: String
+    let channelID: String
+}
+
 private extension MattermostTypedLiveEvent {
     var requiresAuthoritativeWorkspaceRefresh: Bool {
         if case .cacheInvalidated = self {
@@ -548,27 +555,35 @@ private extension MattermostTypedLiveEvent {
         }
     }
 
-    func unreadRefresh(
+    func unreadRefreshes(
         options: MattermostLiveSyncOptions,
         fallbackUserID: String?
-    ) -> (userID: String, channelID: String)? {
+    ) -> [MattermostLiveSyncUnreadRefreshRequest] {
         switch self {
         case .channelViewed(let channelViewed) where options.refreshUnreadOnChannelViewed:
             guard let channelID = channelViewed.channelID,
                   let userID = channelViewed.userID ?? fallbackUserID else {
-                return nil
+                return []
             }
-            return (userID, channelID)
+            return [MattermostLiveSyncUnreadRefreshRequest(userID: userID, channelID: channelID)]
+
+        case .multipleChannelsViewed(let channelsViewed) where options.refreshUnreadOnChannelViewed:
+            guard let userID = channelsViewed.userID ?? fallbackUserID else {
+                return []
+            }
+            return channelsViewed.channelTimes.keys.sorted().map {
+                MattermostLiveSyncUnreadRefreshRequest(userID: userID, channelID: $0)
+            }
 
         case .postUnread(let invalidation) where options.refreshUnreadOnPostUnread:
             guard let channelID = invalidation.channelID,
                   let userID = invalidation.userID ?? fallbackUserID else {
-                return nil
+                return []
             }
-            return (userID, channelID)
+            return [MattermostLiveSyncUnreadRefreshRequest(userID: userID, channelID: channelID)]
 
         default:
-            return nil
+            return []
         }
     }
 

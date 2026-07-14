@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Added `multiple_channels_viewed` live event decoding (`MattermostMultipleChannelsViewedEvent` with
+  per-channel viewed timestamps). Servers with collapsed reply threads enabled emit this instead of
+  `channel_viewed` when channels are marked read, so clients ignoring it never see cross-device reads.
 - Exposed `last_picture_update` on the user model (`MattermostUser.lastPictureUpdate`)
   so clients can detect whether a user has a custom profile picture (0 = none) and
   cache-bust `/users/{id}/image` bytes.

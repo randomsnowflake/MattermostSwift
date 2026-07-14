@@ -25,7 +25,7 @@ The current unit tests cover:
 - user preference request construction and decoding,
 - WebSocket live event decoding, typed post create/edit/delete/unread and thread update/read/follow event helpers, embedded post/channel/user/member decoding, and tolerant invalidation events,
 - WebSocket reconnect backoff policy,
-- live-sync reconnect orchestration with an injected lifecycle stream, including backfill on each connecting event, cursor-based recovery of posts missed while disconnected, host-visible connection-state projection, backfill failure diagnostics, capped/all-channel backfill selection, live-event application into SwiftData, unread refresh on `post_unread` invalidation, and thread-state refresh on thread invalidation,
+- live-sync reconnect orchestration with an injected lifecycle stream, including backfill on each connecting event, cursor-based recovery of posts missed while disconnected, host-visible connection-state projection, backfill failure diagnostics, capped/all-channel backfill selection, live-event application into SwiftData, unread refresh on `post_unread` and `multiple_channels_viewed` invalidations, and thread-state refresh on thread invalidation,
 - SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, timestamp merge policy, and sync cursors.
 
 ## Live Verification

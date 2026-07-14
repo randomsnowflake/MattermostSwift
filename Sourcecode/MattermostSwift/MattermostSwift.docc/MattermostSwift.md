@@ -173,6 +173,11 @@ func runLiveSync(
 }
 ```
 
+Live sync refreshes every affected channel after `channel_viewed`,
+`multiple_channels_viewed`, and `post_unread` invalidations when the corresponding unread-refresh
+options are enabled. This keeps cached channel badges aligned with reads from other sessions and
+devices, including servers with collapsed reply threads enabled.
+
 For small workspaces or an explicit catch-up action, set `backfillAllJoinedChannelPosts` to `true` to sweep every joined channel during connect and reconnect backfill:
 
 ```swift
