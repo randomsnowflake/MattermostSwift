@@ -130,6 +130,22 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
         )
     }
 
+    /// Returns typed multi-channel-view data for `multiple_channels_viewed` events.
+    public func decodedMultipleChannelsViewed() -> MattermostMultipleChannelsViewedEvent? {
+        guard event == MattermostLiveEventName.multipleChannelsViewed.rawValue else {
+            return nil
+        }
+
+        // Plain decoder: the keys are channel ids and must not be snake-case rewritten.
+        let channelTimes = jsonData("channel_times").flatMap {
+            try? JSONDecoder().decode([String: Int64].self, from: $0)
+        }
+        return MattermostMultipleChannelsViewedEvent(
+            userID: anyString("user_id", "userId", broadcast: \.userId),
+            channelTimes: channelTimes ?? [:]
+        )
+    }
+
     /// Returns generic channel/user invalidation data for events such as `post_unread`.
     public func decodedCacheInvalidation() -> MattermostCacheInvalidationEvent {
         MattermostCacheInvalidationEvent(
@@ -197,6 +213,12 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
             } else {
                 .unknown(self)
             }
+        case .multipleChannelsViewed:
+            if let multipleChannelsViewed = decodedMultipleChannelsViewed() {
+                .multipleChannelsViewed(multipleChannelsViewed)
+            } else {
+                .unknown(self)
+            }
         case .channelCreated:
             .channelCreated(try decodedChannel())
         case .channelUpdated, .channelConverted:
@@ -247,6 +269,7 @@ public enum MattermostLiveEventName: String, Sendable {
     case typing
     case statusChange = "status_change"
     case channelViewed = "channel_viewed"
+    case multipleChannelsViewed = "multiple_channels_viewed"
     case channelCreated = "channel_created"
     case channelUpdated = "channel_updated"
     case channelDeleted = "channel_deleted"
@@ -276,6 +299,7 @@ public enum MattermostTypedLiveEvent: Equatable, Sendable {
     case typing(MattermostTypingEvent)
     case statusChange(MattermostStatusChangeEvent)
     case channelViewed(MattermostChannelViewedEvent)
+    case multipleChannelsViewed(MattermostMultipleChannelsViewedEvent)
     case channelCreated(MattermostChannel?)
     case channelUpdated(MattermostChannel?)
     case channelDeleted(MattermostChannel?, channelID: String?)
@@ -311,6 +335,14 @@ public struct MattermostChannelViewedEvent: Equatable, Sendable {
     public let userID: String?
     public let channelID: String?
     public let previousChannelID: String?
+}
+
+/// Multi-channel viewed payload emitted when the server marks several channels read at once.
+/// Servers with collapsed reply threads enabled emit this instead of `channel_viewed`.
+public struct MattermostMultipleChannelsViewedEvent: Equatable, Sendable {
+    public let userID: String?
+    /// Viewed-at timestamps (Mattermost millisecond epoch) keyed by channel id.
+    public let channelTimes: [String: Int64]
 }
 
 /// Generic cache invalidation payload emitted by channel/user scoped WebSocket events.

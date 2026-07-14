@@ -975,6 +975,7 @@ public final class MattermostStore {
         case .hello,
              .typing,
              .channelViewed,
+             .multipleChannelsViewed,
              .preferencesChanged,
              .preferencesDeleted,
              .postUnread,

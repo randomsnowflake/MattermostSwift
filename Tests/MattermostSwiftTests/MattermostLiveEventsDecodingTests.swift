@@ -231,3 +231,55 @@ func webSocketEnvelopeToleratesWrongTypedFields() throws {
     #expect(event.data == [:])
     #expect(event.broadcast?.channelId == nil)
 }
+
+@Test
+func multipleChannelsViewedDecodesChannelTimes() throws {
+    let json = """
+    {
+      "event": "multiple_channels_viewed",
+      "data": {
+        "channel_times": {
+          "channel-1": 1751234567890,
+          "channel-2": 1751234567891
+        }
+      },
+      "broadcast": {
+        "user_id": "user-1"
+      },
+      "seq": 3
+    }
+    """
+
+    let event = try mattermostSnakeCaseDecoder.decode(
+        MattermostLiveEvent.self,
+        from: Data(json.utf8)
+    )
+
+    #expect(event.name == .multipleChannelsViewed)
+    let viewed = try #require(event.decodedMultipleChannelsViewed())
+    #expect(viewed.userID == "user-1")
+    #expect(viewed.channelTimes == ["channel-1": 1_751_234_567_890, "channel-2": 1_751_234_567_891])
+    #expect(try event.typedEvent() == .multipleChannelsViewed(viewed))
+}
+
+@Test
+func multipleChannelsViewedToleratesMissingChannelTimes() throws {
+    let json = """
+    {
+      "event": "multiple_channels_viewed",
+      "data": {},
+      "broadcast": {
+        "user_id": "user-1"
+      }
+    }
+    """
+
+    let event = try mattermostSnakeCaseDecoder.decode(
+        MattermostLiveEvent.self,
+        from: Data(json.utf8)
+    )
+
+    let viewed = try #require(event.decodedMultipleChannelsViewed())
+    #expect(viewed.channelTimes.isEmpty)
+    #expect(try event.typedEvent() == .multipleChannelsViewed(viewed))
+}

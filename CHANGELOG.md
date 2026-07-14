@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Added `multiple_channels_viewed` live event decoding (`MattermostMultipleChannelsViewedEvent` with
+  per-channel viewed timestamps). Servers with collapsed reply threads enabled emit this instead of
+  `channel_viewed` when channels are marked read, so clients ignoring it never see cross-device reads.
 - Channel post pagination now accepts Mattermost's collapsed-thread options, allowing clients to
   load recent channel roots without busy thread replies consuming the entire page.
 - Added disk-backed file upload/download APIs, a versioned SwiftData cache schema baseline, and
