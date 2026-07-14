@@ -1464,7 +1464,9 @@ func decodesChannelMemberAndUnreadState() throws {
       "team_id": "team-id",
       "channel_id": "channel-id",
       "msg_count": 3,
-      "mention_count": 1
+      "mention_count": 1,
+      "msg_count_root": 2,
+      "mention_count_root": 0
     }
     """.data(using: .utf8)!
 
@@ -1485,6 +1487,21 @@ func decodesChannelMemberAndUnreadState() throws {
     #expect(unread.teamId == "team-id")
     #expect(unread.msgCount == 3)
     #expect(unread.mentionCount == 1)
+    #expect(unread.msgCountRoot == 2)
+    #expect(unread.mentionCountRoot == 0)
+
+    // Pre-CRT servers omit the root variants entirely.
+    let legacyUnreadJSON = """
+    {
+      "team_id": "team-id",
+      "channel_id": "channel-id",
+      "msg_count": 3,
+      "mention_count": 1
+    }
+    """.data(using: .utf8)!
+    let legacyUnread = try mattermostDecoder.decode(MattermostChannelUnread.self, from: legacyUnreadJSON)
+    #expect(legacyUnread.msgCountRoot == nil)
+    #expect(legacyUnread.mentionCountRoot == nil)
 }
 
 @Test

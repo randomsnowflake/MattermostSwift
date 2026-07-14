@@ -6,6 +6,10 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- `MattermostChannelUnread` now decodes the collapsed-reply-threads root variants
+  (`msg_count_root`, `mention_count_root`). On CRT servers the non-root counts include thread
+  replies that channel reads cannot clear, so clients should prefer the root variants for
+  channel badges when present.
 - Channel post pagination now accepts Mattermost's collapsed-thread options, allowing clients to
   load recent channel roots without busy thread replies consuming the entire page.
 - Added disk-backed file upload/download APIs, a versioned SwiftData cache schema baseline, and

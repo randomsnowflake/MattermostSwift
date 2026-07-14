@@ -218,6 +218,28 @@ public struct MattermostChannelUnread: Decodable, Equatable, Sendable {
     public let channelId: String
     public let msgCount: Int
     public let mentionCount: Int
+    /// Root-post-only unread count sent by servers with collapsed reply threads enabled.
+    /// Excludes thread replies — prefer over `msgCount` for channel badges when present,
+    /// since `msgCount` on CRT servers includes replies that channel reads cannot clear.
+    public let msgCountRoot: Int?
+    /// Root-post-only mention count sent by servers with collapsed reply threads enabled.
+    public let mentionCountRoot: Int?
+
+    public init(
+        teamId: String?,
+        channelId: String,
+        msgCount: Int,
+        mentionCount: Int,
+        msgCountRoot: Int? = nil,
+        mentionCountRoot: Int? = nil
+    ) {
+        self.teamId = teamId
+        self.channelId = channelId
+        self.msgCount = msgCount
+        self.mentionCount = mentionCount
+        self.msgCountRoot = msgCountRoot
+        self.mentionCountRoot = mentionCountRoot
+    }
 }
 
 /// Result of marking a channel as viewed.
