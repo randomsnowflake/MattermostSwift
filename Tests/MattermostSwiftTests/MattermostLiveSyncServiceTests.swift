@@ -414,6 +414,81 @@ func liveSyncRefreshesUnreadOnPostUnreadInvalidation() async throws {
 
 @MainActor
 @Test
+func liveSyncRefreshesUnreadForMultipleChannelsViewed() async throws {
+    let service = try MattermostClient(
+        serverURL: try #require(URL(string: "https://mattermost.example.com")),
+        token: "test-token"
+    ).liveSyncService()
+    let store = try MattermostStore(inMemory: true)
+    let channelsViewed = MattermostLiveEvent(
+        event: "multiple_channels_viewed",
+        data: [
+            "channel_times": .object([
+                "channel-2": .integer(200),
+                "channel-1": .integer(100),
+            ]),
+        ],
+        broadcast: MattermostLiveBroadcast(
+            omitUsers: nil,
+            userId: "user-1",
+            channelId: nil,
+            teamId: "team-1"
+        ),
+        seq: 3
+    )
+    var unreadRefreshes: [(userID: String, channelID: String)] = []
+
+    let stream = service.events(
+        to: store,
+        options: MattermostLiveSyncOptions(maxBackfillChannels: 1),
+        lifecycleEvents: {
+            AsyncThrowingStream { continuation in
+                continuation.yield(.connecting(attempt: 0))
+                continuation.yield(.event(channelsViewed))
+                continuation.finish()
+            }
+        },
+        backfill: { _, teamID, _, _ in
+            liveSyncBackfillResult(teamID: teamID ?? "team-1")
+        },
+        refreshUnread: { userID, channelID in
+            unreadRefreshes.append((userID, channelID))
+            return MattermostChannelUnread(
+                teamId: "team-1",
+                channelId: channelID,
+                msgCount: 0,
+                mentionCount: 0,
+                msgCountRoot: 0,
+                mentionCountRoot: 0
+            )
+        }
+    )
+
+    var appliedChannels: [String] = []
+    var refreshedChannels: [String] = []
+    for try await event in stream {
+        switch event {
+        case .eventApplied(_, .multipleChannelsViewed(let viewed)):
+            appliedChannels = viewed.channelTimes.keys.sorted()
+        case .channelUnreadRefreshed(let unread):
+            refreshedChannels.append(unread.channelId)
+        default:
+            break
+        }
+    }
+
+    let firstUnread = try #require(try store.cachedChannelUnread(channelID: "channel-1", userID: "user-1"))
+    let secondUnread = try #require(try store.cachedChannelUnread(channelID: "channel-2", userID: "user-1"))
+    #expect(appliedChannels == ["channel-1", "channel-2"])
+    #expect(unreadRefreshes.map(\.userID) == ["user-1", "user-1"])
+    #expect(unreadRefreshes.map(\.channelID) == ["channel-1", "channel-2"])
+    #expect(refreshedChannels == ["channel-1", "channel-2"])
+    #expect(firstUnread.msgCountRoot == 0)
+    #expect(secondUnread.msgCountRoot == 0)
+}
+
+@MainActor
+@Test
 func liveSyncAppliesEventBeforeRefreshFailureAndContinues() async throws {
     struct RefreshFailure: LocalizedError, Equatable {
         let errorDescription: String? = "refresh failed for test"

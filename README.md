@@ -169,7 +169,8 @@ The SDK currently covers:
 - Preferences, sidebar categories, category order, and channel moves.
 - Custom emoji listing, lookup, search, autocomplete, and image downloads.
 - Server ping and client configuration.
-- WebSocket live events, typed live-event decoding, reconnect handling, live sync, reconnect backfill, and a SwiftData cache/store.
+- WebSocket live events, typed live-event decoding, reconnect handling, live sync, reconnect backfill,
+  cross-session single/multi-channel unread refresh, and a SwiftData cache/store.
 
 ## Package Layout
 
