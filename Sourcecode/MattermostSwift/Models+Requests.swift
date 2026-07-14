@@ -239,6 +239,7 @@ struct MattermostTeamChannelSearchRequest: Encodable, Sendable {
 struct MattermostViewChannelRequest: Encodable, Sendable {
     let channelId: String
     let prevChannelId: String?
+    let collapsedThreadsSupported: Bool   // encodes to collapsed_threads_supported
 }
 
 struct MattermostSidebarCategoryRequest: Encodable, Sendable {

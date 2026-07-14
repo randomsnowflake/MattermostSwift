@@ -20,6 +20,7 @@ public final class MattermostCachedUser {
     public var nickname: String?
     public var position: String?
     public var locale: String?
+    public var lastPictureUpdate: Int64?
 
     init(_ user: MattermostUser) {
         self.id = user.id
@@ -30,6 +31,7 @@ public final class MattermostCachedUser {
         nickname = user.nickname
         position = user.position
         locale = user.locale
+        lastPictureUpdate = user.lastPictureUpdate
     }
 
     func apply(_ user: MattermostUser) {
@@ -40,6 +42,7 @@ public final class MattermostCachedUser {
         nickname = user.nickname
         position = user.position
         locale = user.locale
+        lastPictureUpdate = user.lastPictureUpdate
     }
 }
 
@@ -123,6 +126,10 @@ public final class MattermostCachedChannel {
     public var header: String?
     public var purpose: String?
     public var deleteAt: Int64?
+    public var totalMsgCount: Int64?
+    public var totalMsgCountRoot: Int64?
+    public var lastPostAt: Int64?
+    public var lastRootPostAt: Int64?
 
     init(_ channel: MattermostChannel) {
         id = channel.id
@@ -135,6 +142,10 @@ public final class MattermostCachedChannel {
         header = channel.header
         purpose = channel.purpose
         deleteAt = channel.deleteAt
+        totalMsgCount = channel.totalMsgCount
+        totalMsgCountRoot = channel.totalMsgCountRoot
+        lastPostAt = channel.lastPostAt
+        lastRootPostAt = channel.lastRootPostAt
     }
 
     func apply(_ channel: MattermostChannel) {
@@ -151,6 +162,10 @@ public final class MattermostCachedChannel {
         header = channel.header
         purpose = channel.purpose
         deleteAt = channel.deleteAt
+        totalMsgCount = channel.totalMsgCount
+        totalMsgCountRoot = channel.totalMsgCountRoot
+        lastPostAt = channel.lastPostAt
+        lastRootPostAt = channel.lastRootPostAt
     }
 
     func markDeleted(at deletedAt: Int64) {
@@ -180,6 +195,8 @@ public final class MattermostCachedChannelMember {
     public var lastViewedAt: Int64?
     public var msgCount: Int?
     public var mentionCount: Int?
+    public var msgCountRoot: Int?
+    public var mentionCountRoot: Int?
     public var notifyProps: [String: String] = [:]
     public var lastUpdateAt: Int64?
 
@@ -195,6 +212,8 @@ public final class MattermostCachedChannelMember {
         lastViewedAt = member.lastViewedAt
         msgCount = member.msgCount
         mentionCount = member.mentionCount
+        msgCountRoot = member.msgCountRoot
+        mentionCountRoot = member.mentionCountRoot
         notifyProps = member.notifyProps ?? [:]
         lastUpdateAt = member.lastUpdateAt
     }
@@ -210,6 +229,8 @@ public final class MattermostCachedChannelMember {
         lastViewedAt = member.lastViewedAt
         msgCount = member.msgCount
         mentionCount = member.mentionCount
+        msgCountRoot = member.msgCountRoot
+        mentionCountRoot = member.mentionCountRoot
         notifyProps = member.notifyProps ?? [:]
         lastUpdateAt = member.lastUpdateAt
     }
@@ -224,6 +245,8 @@ public final class MattermostCachedChannelUnread {
     public var userId: String = ""
     public var msgCount: Int = 0
     public var mentionCount: Int = 0
+    public var msgCountRoot: Int?
+    public var mentionCountRoot: Int?
 
     init(_ unread: MattermostChannelUnread, userID: String) {
         id = Self.cacheID(channelID: unread.channelId, userID: userID)
@@ -232,6 +255,8 @@ public final class MattermostCachedChannelUnread {
         self.userId = userID
         msgCount = unread.msgCount
         mentionCount = unread.mentionCount
+        msgCountRoot = unread.msgCountRoot
+        mentionCountRoot = unread.mentionCountRoot
     }
 
     public static func cacheID(channelID: String, userID: String) -> String {
@@ -244,6 +269,8 @@ public final class MattermostCachedChannelUnread {
         self.userId = userID
         msgCount = unread.msgCount
         mentionCount = unread.mentionCount
+        msgCountRoot = unread.msgCountRoot
+        mentionCountRoot = unread.mentionCountRoot
     }
 }
 

@@ -136,6 +136,25 @@ struct MattermostClientRequestTests {
         #expect(thread.lastViewedAt == 1_780_000_000_123)
     }
 
+    @Test
+    func viewChannelSendsCollapsedThreadsSupported() async throws {
+        let client = try await Self.makeClient { request in
+            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/members/me/view")
+            #expect(request.httpMethod == "POST")
+            let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
+            #expect(body?["channel_id"] as? String == "channel-id")
+            #expect(body?["collapsed_threads_supported"] as? Bool == true)
+            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+        }
+
+        let response = try await client.viewChannel(
+            channelID: "channel-id",
+            collapsedThreadsSupported: true
+        )
+
+        #expect(response.isOK)
+    }
+
     // MARK: - Helpers
 
     private static func makeClient(

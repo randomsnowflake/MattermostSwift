@@ -15,7 +15,8 @@ func storeUpsertsUsersAndStatuses() throws {
         nickname: nil,
         position: nil,
         locale: "en",
-        timezone: nil
+        timezone: nil,
+        lastPictureUpdate: nil
     )
     let updatedUser = MattermostUser(
         id: "user-1",
@@ -26,7 +27,8 @@ func storeUpsertsUsersAndStatuses() throws {
         nickname: nil,
         position: nil,
         locale: "de",
-        timezone: nil
+        timezone: nil,
+        lastPictureUpdate: 1_700_000_000_000
     )
     let status = MattermostUserStatus(
         userId: "user-1",
@@ -68,6 +70,7 @@ func storeUpsertsUsersAndStatuses() throws {
     #expect(teams.count == 1)
     #expect(cachedUser.email == "new@example.com")
     #expect(cachedUser.lastName == "Leimbach")
+    #expect(cachedUser.lastPictureUpdate == 1_700_000_000_000)
     #expect(cachedStatus.status == "online")
     #expect(cachedStatus.activeChannel == "channel-1")
     #expect(cachedTeam.displayName == "Engineering Team")
@@ -87,7 +90,8 @@ func storeBatchUpsertsUsersBeyondFetchChunkLimit() throws {
             nickname: nil,
             position: nil,
             locale: nil,
-            timezone: nil
+            timezone: nil,
+            lastPictureUpdate: nil
         )
     }
 
@@ -121,7 +125,11 @@ func storeCachesChannelsPostsAndThreads() throws {
         type: "O",
         header: nil,
         purpose: nil,
-        deleteAt: nil
+        deleteAt: nil,
+        totalMsgCount: 120,
+        totalMsgCountRoot: 80,
+        lastPostAt: 500,
+        lastRootPostAt: 450
     )
     let root = MattermostPost(
         id: "post-root",
@@ -184,10 +192,17 @@ func storeCachesChannelsPostsAndThreads() throws {
     try store.save()
 
     let cachedChannels = try store.cachedChannels(teamID: "team-1")
+    let channelSnapshots = try store.cachedChannelSnapshots(teamID: "team-1")
     let cachedPosts = try store.cachedPosts(channelID: "channel-1")
     let thread = try store.cachedThread(rootID: "post-root")
 
     #expect(cachedChannels.map(\.id) == ["channel-1"])
+    #expect(cachedChannels.first?.totalMsgCount == 120)
+    #expect(cachedChannels.first?.totalMsgCountRoot == 80)
+    #expect(cachedChannels.first?.lastPostAt == 500)
+    #expect(cachedChannels.first?.lastRootPostAt == 450)
+    #expect(channelSnapshots.first?.totalMsgCountRoot == 80)
+    #expect(channelSnapshots.first?.lastRootPostAt == 450)
     #expect(cachedPosts.map(\.id) == ["post-reply", "post-root"])
     #expect(thread.map(\.id) == ["post-root", "post-reply"])
     #expect(try store.cachedTimeline(.channel(id: "channel-1")).map(\.id) == ["post-reply", "post-root"])
@@ -216,7 +231,8 @@ func storeCachesThreadState() throws {
         nickname: nil,
         position: nil,
         locale: nil,
-        timezone: nil
+        timezone: nil,
+        lastPictureUpdate: nil
     )
     let post = MattermostPost(
         id: "root-1",
@@ -498,7 +514,11 @@ func storeDoesNotResurrectDeletedChannelFromOlderPayload() throws {
         type: "O",
         header: nil,
         purpose: nil,
-        deleteAt: 40
+        deleteAt: 40,
+        totalMsgCount: nil,
+        totalMsgCountRoot: nil,
+        lastPostAt: nil,
+        lastRootPostAt: nil
     )
     let olderActive = MattermostChannel(
         id: "channel-1",
@@ -510,7 +530,11 @@ func storeDoesNotResurrectDeletedChannelFromOlderPayload() throws {
         type: "O",
         header: nil,
         purpose: nil,
-        deleteAt: 0
+        deleteAt: 0,
+        totalMsgCount: nil,
+        totalMsgCountRoot: nil,
+        lastPostAt: nil,
+        lastRootPostAt: nil
     )
 
     try store.upsert(channel: deleted)
@@ -534,6 +558,8 @@ func storeCachesChannelMembersAndUnreadState() throws {
         lastViewedAt: 10,
         msgCount: 20,
         mentionCount: 1,
+        msgCountRoot: 18,
+        mentionCountRoot: 1,
         notifyProps: ["desktop": "mention"],
         lastUpdateAt: 30
     )
@@ -544,6 +570,8 @@ func storeCachesChannelMembersAndUnreadState() throws {
         lastViewedAt: 40,
         msgCount: 22,
         mentionCount: 0,
+        msgCountRoot: 21,
+        mentionCountRoot: 0,
         notifyProps: ["desktop": "all"],
         lastUpdateAt: 50
     )
@@ -551,7 +579,9 @@ func storeCachesChannelMembersAndUnreadState() throws {
         teamId: "team-1",
         channelId: "channel-1",
         msgCount: 3,
-        mentionCount: 2
+        mentionCount: 2,
+        msgCountRoot: 2,
+        mentionCountRoot: 1
     )
 
     try store.upsert(member: member)
@@ -567,11 +597,15 @@ func storeCachesChannelMembersAndUnreadState() throws {
     #expect(try store.cachedChannelMembers(userID: "user-1").count == 1)
     #expect(cachedMember.roles == "channel_user channel_admin")
     #expect(cachedMember.lastViewedAt == 40)
+    #expect(cachedMember.msgCountRoot == 21)
+    #expect(cachedMember.mentionCountRoot == 0)
     #expect(cachedMember.notifyProps["desktop"] == "all")
     #expect(cachedMember.channelNotifyProps.desktop == "all")
     #expect(cachedUnread.teamId == "team-1")
     #expect(cachedUnread.msgCount == 3)
     #expect(cachedUnread.mentionCount == 2)
+    #expect(cachedUnread.msgCountRoot == 2)
+    #expect(cachedUnread.mentionCountRoot == 1)
 }
 
 @MainActor
@@ -953,7 +987,11 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
         type: "O",
         header: nil,
         purpose: nil,
-        deleteAt: nil
+        deleteAt: nil,
+        totalMsgCount: nil,
+        totalMsgCountRoot: nil,
+        lastPostAt: nil,
+        lastRootPostAt: nil
     )
     let post = storeTestPost(id: "post-1", channelID: "channel-1", message: "hello", createAt: 10)
     let reaction = MattermostReaction(userId: "user-1", postId: "post-1", emojiName: "wave", createAt: 11)
@@ -972,7 +1010,7 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
         height: nil,
         hasPreviewImage: false
     )
-    let unread = MattermostChannelUnread(teamId: "team-1", channelId: "channel-1", msgCount: 4, mentionCount: 1)
+    let unread = MattermostChannelUnread(teamId: "team-1", channelId: "channel-1", msgCount: 4, mentionCount: 1, msgCountRoot: nil, mentionCountRoot: nil)
     let deletion = MattermostLiveEvent(
         event: "channel_deleted",
         data: ["channel_id": .string("channel-1")],

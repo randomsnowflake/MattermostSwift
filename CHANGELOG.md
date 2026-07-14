@@ -6,6 +6,10 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Exposed `last_picture_update` on the user model (`MattermostUser.lastPictureUpdate`)
+  so clients can detect whether a user has a custom profile picture (0 = none) and
+  cache-bust `/users/{id}/image` bytes.
+- Exposed and cached Mattermost collapsed-reply-thread channel unread counters (`total_msg_count`/`total_msg_count_root`, `last_post_at`/`last_root_post_at` on channels; `msg_count_root`/`mention_count_root` on channel members and unread) and added `collapsed_threads_supported` to the view-channel request, so CRT-aware clients can compute channel unread from root counts and mark a channel viewed without auto-reading its threads.
 - Channel post pagination now accepts Mattermost's collapsed-thread options, allowing clients to
   load recent channel roots without busy thread replies consuming the entire page.
 - Added disk-backed file upload/download APIs, a versioned SwiftData cache schema baseline, and

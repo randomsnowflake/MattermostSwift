@@ -378,7 +378,9 @@ func liveSyncRefreshesUnreadOnPostUnreadInvalidation() async throws {
                 teamId: "team-1",
                 channelId: channelID,
                 msgCount: 4,
-                mentionCount: 1
+                mentionCount: 1,
+                msgCountRoot: nil,
+                mentionCountRoot: nil
             )
         }
     )
@@ -549,7 +551,8 @@ func liveSyncRefreshesThreadStateOnThreadInvalidation() async throws {
                         nickname: nil,
                         position: nil,
                         locale: nil,
-                        timezone: nil
+                        timezone: nil,
+                        lastPictureUpdate: nil
                     ),
                 ],
                 post: MattermostPost(
@@ -619,7 +622,11 @@ private func liveSyncChannel(id: String, teamID: String = "team-1") -> Mattermos
         type: "O",
         header: nil,
         purpose: nil,
-        deleteAt: nil
+        deleteAt: nil,
+        totalMsgCount: nil,
+        totalMsgCountRoot: nil,
+        lastPostAt: nil,
+        lastRootPostAt: nil
     )
 }
 
@@ -645,7 +652,8 @@ private func liveSyncBackfillResult(
             nickname: nil,
             position: nil,
             locale: nil,
-            timezone: nil
+            timezone: nil,
+            lastPictureUpdate: nil
         ),
         teams: [team],
         teamID: teamID,

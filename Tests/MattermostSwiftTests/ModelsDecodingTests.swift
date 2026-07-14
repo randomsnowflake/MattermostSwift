@@ -14,7 +14,8 @@ func decodesMattermostUser() throws {
         "username": "jdoe",
         "email": "jdoe@example.com",
         "firstName": "Jane",
-        "timezone": {"useAutomaticTimezone": "true"}
+        "timezone": {"useAutomaticTimezone": "true"},
+        "lastPictureUpdate": 1700000000000
     }
     """
     let user = try JSONDecoder().decode(MattermostUser.self, from: Data(payload.utf8))
@@ -23,6 +24,37 @@ func decodesMattermostUser() throws {
     #expect(user.email == "jdoe@example.com")
     #expect(user.firstName == "Jane")
     #expect(user.timezone?["useAutomaticTimezone"] == "true")
+    #expect(user.lastPictureUpdate == 1_700_000_000_000)
+}
+
+@Test
+func decodesMattermostUserLastPictureUpdateFromSnakeCase() throws {
+    // The production decoder converts the server's `last_picture_update`
+    // snake_case key to `lastPictureUpdate` via `.convertFromSnakeCase`.
+    let payload = """
+    {
+        "id": "user123",
+        "username": "jdoe",
+        "last_picture_update": 1700000000000
+    }
+    """
+    let user = try mattermostSnakeCaseDecoder.decode(MattermostUser.self, from: Data(payload.utf8))
+    #expect(user.id == "user123")
+    #expect(user.lastPictureUpdate == 1_700_000_000_000)
+}
+
+@Test
+func decodesMattermostUserWithoutLastPictureUpdateAsNil() throws {
+    // Servers that omit the field (or older versions) decode as nil because
+    // the optional property uses `decodeIfPresent`.
+    let payload = """
+    {
+        "id": "user123",
+        "username": "jdoe"
+    }
+    """
+    let user = try mattermostSnakeCaseDecoder.decode(MattermostUser.self, from: Data(payload.utf8))
+    #expect(user.lastPictureUpdate == nil)
 }
 
 @Test
@@ -176,6 +208,52 @@ func decodesMattermostChannelStatsWithServerKeys() throws {
     #expect(stats.guestCount == 3)
     #expect(stats.pinnedPostCount == 5)
     #expect(stats.totalMessageCount == 1000)
+}
+
+@Test
+func decodesChannelRootUnreadCounters() throws {
+    // Decode via the production snake_case decoder so the test reflects real
+    // wire data from CRT-enabled servers.
+    let payload = """
+    {
+        "id": "chan123",
+        "team_id": "team1",
+        "name": "town-square",
+        "display_name": "Town Square",
+        "type": "O",
+        "total_msg_count": 1000,
+        "total_msg_count_root": 400,
+        "last_post_at": 5000,
+        "last_root_post_at": 4800
+    }
+    """
+    let channel = try mattermostSnakeCaseDecoder.decode(MattermostChannel.self, from: Data(payload.utf8))
+    #expect(channel.id == "chan123")
+    #expect(channel.totalMsgCount == 1000)
+    #expect(channel.totalMsgCountRoot == 400)
+    #expect(channel.lastPostAt == 5000)
+    #expect(channel.lastRootPostAt == 4800)
+}
+
+@Test
+func decodesChannelMemberRootCounters() throws {
+    let payload = """
+    {
+        "channel_id": "chan123",
+        "user_id": "user123",
+        "msg_count": 100,
+        "mention_count": 3,
+        "msg_count_root": 40,
+        "mention_count_root": 1
+    }
+    """
+    let member = try mattermostSnakeCaseDecoder.decode(MattermostChannelMember.self, from: Data(payload.utf8))
+    #expect(member.channelId == "chan123")
+    #expect(member.userId == "user123")
+    #expect(member.msgCount == 100)
+    #expect(member.mentionCount == 3)
+    #expect(member.msgCountRoot == 40)
+    #expect(member.mentionCountRoot == 1)
 }
 
 @Test
