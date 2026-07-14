@@ -692,7 +692,7 @@ func httpClientBuildsViewChannelRequestWithJSONBody() throws {
         authentication: .bearerToken("token")
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
-    let view = MattermostViewChannelRequest(channelId: "channel-id", prevChannelId: "previous-id")
+    let view = MattermostViewChannelRequest(channelId: "channel-id", prevChannelId: "previous-id", collapsedThreadsSupported: false)
 
     let request: URLRequest = try httpClient.makeJSONRequest(
         endpoint: "/channels/members/me/view",

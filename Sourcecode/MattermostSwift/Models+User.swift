@@ -13,6 +13,11 @@ public struct MattermostUser: Decodable, Equatable, Sendable, Identifiable {
     public let position: String?
     public let locale: String?
     public let timezone: [String: String]?
+    /// Epoch **milliseconds** of the user's last profile-picture upload.
+    /// `0` (or `nil`) means no custom picture — clients should render a
+    /// generated fallback. Changes act as a cache-busting token for the
+    /// `/users/{id}/image` bytes.
+    public let lastPictureUpdate: Int64?
 }
 
 /// Source used to extract a session token from a successful Mattermost login response.

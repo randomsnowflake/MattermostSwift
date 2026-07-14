@@ -537,7 +537,8 @@ struct MattermostHTTPClientErrorTests {
                 nickname: nil,
                 position: nil,
                 locale: nil,
-                timezone: nil
+                timezone: nil,
+                lastPictureUpdate: nil
             ),
             token: "session-token"
         )

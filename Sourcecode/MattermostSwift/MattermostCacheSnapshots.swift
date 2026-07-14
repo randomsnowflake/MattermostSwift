@@ -12,6 +12,7 @@ public struct MattermostCachedUserSnapshot: Equatable, Sendable, Identifiable {
     public let nickname: String?
     public let position: String?
     public let locale: String?
+    public let lastPictureUpdate: Int64?
 
     @MainActor init(_ cached: MattermostCachedUser) {
         id = cached.id
@@ -22,6 +23,7 @@ public struct MattermostCachedUserSnapshot: Equatable, Sendable, Identifiable {
         nickname = cached.nickname
         position = cached.position
         locale = cached.locale
+        lastPictureUpdate = cached.lastPictureUpdate
     }
 }
 
@@ -37,6 +39,10 @@ public struct MattermostCachedChannelSnapshot: Equatable, Sendable, Identifiable
     public let header: String?
     public let purpose: String?
     public let deleteAt: Int64?
+    public let totalMsgCount: Int64?
+    public let totalMsgCountRoot: Int64?
+    public let lastPostAt: Int64?
+    public let lastRootPostAt: Int64?
 
     @MainActor init(_ cached: MattermostCachedChannel) {
         id = cached.id
@@ -49,6 +55,10 @@ public struct MattermostCachedChannelSnapshot: Equatable, Sendable, Identifiable
         header = cached.header
         purpose = cached.purpose
         deleteAt = cached.deleteAt
+        totalMsgCount = cached.totalMsgCount
+        totalMsgCountRoot = cached.totalMsgCountRoot
+        lastPostAt = cached.lastPostAt
+        lastRootPostAt = cached.lastRootPostAt
     }
 }
 
