@@ -63,3 +63,19 @@ func timeoutRunsTeardownAfterTimerWins() async throws {
 
     #expect(calls.values == ["timeout"])
 }
+
+@Test("WebSocket heartbeat accepts only a running URLSession task", arguments: [
+    URLSessionTask.State.suspended,
+    .canceling,
+    .completed,
+])
+func webSocketHeartbeatRejectsUnavailableTaskStates(_ state: URLSessionTask.State) {
+    #expect(throws: MattermostError.self) {
+        try MattermostLiveEventStream.validateWebSocketTaskState(state)
+    }
+}
+
+@Test
+func webSocketHeartbeatAcceptsRunningTaskState() throws {
+    try MattermostLiveEventStream.validateWebSocketTaskState(.running)
+}

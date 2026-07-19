@@ -186,6 +186,11 @@ public struct MattermostLiveEventStream: Sendable {
         while !Task.isCancelled {
             try await Task.sleep(for: heartbeatInterval)
             try Task.checkCancellation()
+            // CFNetwork can mark a WebSocket task cancelled after route loss without
+            // promptly resuming an outstanding receive or ping callback. Checking the
+            // URLSession task state on every heartbeat turns that silent half-dead
+            // connection into the normal reconnect path.
+            try Self.validateWebSocketTaskState(webSocketTask.state)
             try await Self.withTimeout(
                 heartbeatTimeout,
                 timeoutMessage: "Mattermost WebSocket ping timed out.",
@@ -195,11 +200,20 @@ public struct MattermostLiveEventStream: Sendable {
             ) {
                 try await self.sendPing(to: webSocketTask)
             }
+            try Self.validateWebSocketTaskState(webSocketTask.state)
         }
     }
 
     var isHeartbeatEnabled: Bool {
         heartbeatInterval > .zero && heartbeatTimeout > .zero
+    }
+
+    static func validateWebSocketTaskState(_ state: URLSessionTask.State) throws {
+        guard state == .running else {
+            throw MattermostError.transportFailure(
+                "Mattermost WebSocket task became unavailable (state \(state.rawValue))."
+            )
+        }
     }
 
     private static func yield<Element: Sendable>(
