@@ -234,6 +234,32 @@ func liveEventStreamBuildsUnauthenticatedWebSocketRequestWithBrowserUserAgent() 
 }
 
 @Test
+func defaultClientSeparatesBoundedHTTPAndLongLivedWebSocketSessions() throws {
+    let client = try MattermostClient(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        token: "token"
+    )
+
+    let stream = client.liveEventStream()
+
+    #expect(URLSession.mattermost.configuration.timeoutIntervalForResource == 300)
+    #expect(URLSession.mattermostLiveEvents.configuration.timeoutIntervalForResource == 604_800)
+    #expect(stream.urlSession === URLSession.mattermostLiveEvents)
+}
+
+@Test
+func customClientSessionRemainsSharedWithLiveEventsByDefault() throws {
+    let customSession = URLSession(configuration: .ephemeral)
+    let client = try MattermostClient(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        token: "token",
+        urlSession: customSession
+    )
+
+    #expect(client.liveEventStream().urlSession === customSession)
+}
+
+@Test
 func liveEventStreamConfiguresHeartbeatLiveness() throws {
     let configuration = try MattermostConfiguration(
         serverURL: #require(URL(string: "https://mattermost.example.com")),

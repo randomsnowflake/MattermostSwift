@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Default live-event streams now use a dedicated long-lived URL session, preventing the
+  bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,
   ensuring a silently dead socket enters the normal reconnect and backfill path.
 - Added `multiple_channels_viewed` live event decoding (`MattermostMultipleChannelsViewedEvent` with
