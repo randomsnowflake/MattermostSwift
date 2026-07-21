@@ -137,6 +137,10 @@ Collapsed-Reply-Threads (CRT) clients compute channel unread from root counts: `
 
 ## Maintain Live State
 
+Default live-event streams use a dedicated long-lived `URLSession` so the bounded HTTP
+resource timeout does not recycle healthy WebSockets. If you inject a custom REST session,
+provide `webSocketURLSession` to `MattermostClient` when live events need a different policy.
+
 `MattermostLiveSyncService` combines WebSocket events with REST backfill and applies updates into `MattermostStore`:
 
 ```swift

@@ -9,7 +9,7 @@ public struct MattermostLiveEventStream: Sendable {
 
     public init(
         configuration: MattermostConfiguration,
-        urlSession: URLSession = .mattermost,
+        urlSession: URLSession = .mattermostLiveEvents,
         heartbeatInterval: Duration = .seconds(25),
         heartbeatTimeout: Duration = .seconds(10)
     ) {
