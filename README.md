@@ -116,6 +116,11 @@ for try await event in client.liveEventStream().events() {
 }
 ```
 
+Default live-event streams use a dedicated long-lived `URLSession` so the bounded HTTP
+resource timeout does not recycle healthy WebSockets. Apps that inject transport sessions can
+pass a separate `webSocketURLSession` to `MattermostClient` when REST and live events need
+different policies.
+
 ## Authentication
 
 Use a Mattermost personal access token when possible:

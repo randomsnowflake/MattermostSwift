@@ -5,11 +5,19 @@ public struct MattermostClient: Sendable {
     let configuration: MattermostConfiguration
     let httpClient: MattermostHTTPClient
     let urlSession: URLSession
+    let webSocketURLSession: URLSession
 
     /// Creates a client from an explicit configuration.
-    public init(configuration: MattermostConfiguration, urlSession: URLSession = .mattermost) {
+    public init(
+        configuration: MattermostConfiguration,
+        urlSession: URLSession = .mattermost,
+        webSocketURLSession: URLSession? = nil
+    ) {
         self.configuration = configuration
         self.urlSession = urlSession
+        self.webSocketURLSession = webSocketURLSession ?? (
+            urlSession === URLSession.mattermost ? .mattermostLiveEvents : urlSession
+        )
         httpClient = MattermostHTTPClient(configuration: configuration, urlSession: urlSession)
     }
 
@@ -18,19 +26,24 @@ public struct MattermostClient: Sendable {
         serverURL: URL,
         token: String,
         urlSession: URLSession = .mattermost,
-        allowInsecureHTTP: Bool = false
+        allowInsecureHTTP: Bool = false,
+        webSocketURLSession: URLSession? = nil
     ) throws {
         let configuration = try MattermostConfiguration(
             serverURL: serverURL,
             authentication: .bearerToken(token),
             allowInsecureHTTP: allowInsecureHTTP
         )
-        self.init(configuration: configuration, urlSession: urlSession)
+        self.init(
+            configuration: configuration,
+            urlSession: urlSession,
+            webSocketURLSession: webSocketURLSession
+        )
     }
 
     /// Creates a WebSocket live-event stream for this client.
     public func liveEventStream() -> MattermostLiveEventStream {
-        MattermostLiveEventStream(configuration: configuration, urlSession: urlSession)
+        MattermostLiveEventStream(configuration: configuration, urlSession: webSocketURLSession)
     }
 
     static func clampedPage(_ page: Int) -> Int {
@@ -211,6 +224,20 @@ public extension URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 300
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieAcceptPolicy = .never
+        return URLSession(configuration: configuration)
+    }()
+
+    /// URLSession configured for a long-lived Mattermost WebSocket connection.
+    ///
+    /// The bounded HTTP session above has a five-minute resource deadline that also applies
+    /// to WebSocket tasks and completes a healthy socket on that cadence. Live events keep
+    /// Foundation's seven-day resource default instead; heartbeat liveness still detects a
+    /// dead socket within seconds and reconnects it through the normal stream policy.
+    static let mattermostLiveEvents: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 30
         configuration.httpShouldSetCookies = false
         configuration.httpCookieAcceptPolicy = .never
         return URLSession(configuration: configuration)

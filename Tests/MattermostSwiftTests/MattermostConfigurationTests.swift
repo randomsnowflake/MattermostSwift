@@ -234,6 +234,53 @@ func liveEventStreamBuildsUnauthenticatedWebSocketRequestWithBrowserUserAgent() 
 }
 
 @Test
+func defaultClientSeparatesBoundedHTTPAndLongLivedWebSocketSessions() throws {
+    let configuration = try MattermostConfiguration(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        authentication: .bearerToken("token")
+    )
+    let client = try MattermostClient(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        token: "token"
+    )
+
+    let directStream = MattermostLiveEventStream(configuration: configuration)
+    let stream = client.liveEventStream()
+
+    #expect(URLSession.mattermost.configuration.timeoutIntervalForResource == 300)
+    #expect(URLSession.mattermostLiveEvents.configuration.timeoutIntervalForResource == 604_800)
+    #expect(directStream.urlSession === URLSession.mattermostLiveEvents)
+    #expect(stream.urlSession === URLSession.mattermostLiveEvents)
+}
+
+@Test
+func customClientSessionRemainsSharedWithLiveEventsByDefault() throws {
+    let customSession = URLSession(configuration: .ephemeral)
+    let client = try MattermostClient(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        token: "token",
+        urlSession: customSession
+    )
+
+    #expect(client.liveEventStream().urlSession === customSession)
+}
+
+@Test
+func clientUsesExplicitLiveEventSessionWhenProvided() throws {
+    let httpSession = URLSession(configuration: .ephemeral)
+    let liveEventSession = URLSession(configuration: .ephemeral)
+    let client = try MattermostClient(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        token: "token",
+        urlSession: httpSession,
+        webSocketURLSession: liveEventSession
+    )
+
+    #expect(client.urlSession === httpSession)
+    #expect(client.liveEventStream().urlSession === liveEventSession)
+}
+
+@Test
 func liveEventStreamConfiguresHeartbeatLiveness() throws {
     let configuration = try MattermostConfiguration(
         serverURL: #require(URL(string: "https://mattermost.example.com")),

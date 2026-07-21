@@ -3,13 +3,13 @@ import Foundation
 /// A Mattermost WebSocket event stream for one authenticated client.
 public struct MattermostLiveEventStream: Sendable {
     private let configuration: MattermostConfiguration
-    private let urlSession: URLSession
+    let urlSession: URLSession
     let heartbeatInterval: Duration
     let heartbeatTimeout: Duration
 
     public init(
         configuration: MattermostConfiguration,
-        urlSession: URLSession = .mattermost,
+        urlSession: URLSession = .mattermostLiveEvents,
         heartbeatInterval: Duration = .seconds(25),
         heartbeatTimeout: Duration = .seconds(10)
     ) {
