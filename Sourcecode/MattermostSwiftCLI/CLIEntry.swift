@@ -6,7 +6,7 @@ import MattermostSwift
 struct MattermostSwiftCLI {
     static func main() async {
         do {
-            var command = try await RootCommand.asyncParseAsRoot()
+            var command = try RootCommand.parseAsRoot()
             if var asyncCommand = command as? AsyncParsableCommand {
                 try await asyncCommand.run()
             } else {
