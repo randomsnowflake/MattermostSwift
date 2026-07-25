@@ -17,6 +17,11 @@ public struct MattermostLiveSyncOptions: Equatable, Sendable {
     /// Upper bound for joined-channel timeline backfill in a single connect/reconnect pass.
     public var maxBackfillChannels: Int
 
+    /// Minimum time the socket must be disconnected before a reconnect runs REST backfill.
+    ///
+    /// The first connection always backfills. Set this to `nil` to backfill on every reconnect.
+    public var minimumBackfillGap: Duration?
+
     /// Refresh unread state when live `channel_viewed` or `multiple_channels_viewed` events
     /// include one or more channel ids.
     public var refreshUnreadOnChannelViewed: Bool
@@ -36,6 +41,7 @@ public struct MattermostLiveSyncOptions: Equatable, Sendable {
         backfillJoinedChannelPosts: Bool = true,
         backfillAllJoinedChannelPosts: Bool = false,
         maxBackfillChannels: Int = 25,
+        minimumBackfillGap: Duration? = .seconds(10),
         refreshUnreadOnChannelViewed: Bool = true,
         refreshUnreadOnPostUnread: Bool = true,
         refreshSidebarCategoriesOnPreferenceChange: Bool = true,
@@ -46,6 +52,7 @@ public struct MattermostLiveSyncOptions: Equatable, Sendable {
         self.backfillJoinedChannelPosts = backfillJoinedChannelPosts
         self.backfillAllJoinedChannelPosts = backfillAllJoinedChannelPosts
         self.maxBackfillChannels = max(0, maxBackfillChannels)
+        self.minimumBackfillGap = minimumBackfillGap.map { max(.zero, $0) }
         self.refreshUnreadOnChannelViewed = refreshUnreadOnChannelViewed
         self.refreshUnreadOnPostUnread = refreshUnreadOnPostUnread
         self.refreshSidebarCategoriesOnPreferenceChange = refreshSidebarCategoriesOnPreferenceChange
@@ -95,6 +102,8 @@ public struct MattermostLiveSyncFailure: Equatable, Sendable {
 /// Events emitted by `MattermostLiveSyncService`.
 public enum MattermostLiveSyncEvent: Sendable {
     case connecting(attempt: Int)
+    /// The socket connected without a successful backfill for this connection attempt.
+    case connected(teamID: String?)
     case backfilled(MattermostLiveBackfillResult)
     case eventApplied(MattermostLiveEvent, MattermostTypedLiveEvent)
     case channelUnreadRefreshed(MattermostChannelUnread)
@@ -110,6 +119,8 @@ public extension MattermostLiveSyncEvent {
         switch self {
         case .connecting(let attempt):
             .connecting(attempt: attempt)
+        case .connected(let teamID):
+            .connected(teamID: teamID, backfilledChannelCount: 0)
         case .backfilled(let result):
             .connected(
                 teamID: result.sync.teamID,
@@ -147,6 +158,7 @@ typealias MattermostLiveSyncThreadStateRefresh = @MainActor @Sendable (
     _ teamID: String,
     _ threadID: String
 ) async throws -> MattermostThreadResponse
+typealias MattermostLiveSyncNow = @MainActor @Sendable () -> ContinuousClock.Instant
 
 /// Keeps a `MattermostStore` updated from WebSocket events with bounded REST backfill.
 public struct MattermostLiveSyncService: Sendable {
@@ -158,9 +170,9 @@ public struct MattermostLiveSyncService: Sendable {
 
     /// Starts live cache maintenance.
     ///
-    /// The returned sequence performs a bounded REST sync before each socket connection attempt,
-    /// then applies typed live events into `store` as they arrive. Cancelling iteration shuts down
-    /// the underlying WebSocket task.
+    /// The returned sequence performs a bounded REST sync before the first socket connection and
+    /// after reconnect gaps that meet `options.minimumBackfillGap`, then applies typed live events
+    /// into `store` as they arrive. Cancelling iteration shuts down the underlying WebSocket task.
     @MainActor
     public func events(
         to store: MattermostStore,
@@ -232,7 +244,8 @@ public struct MattermostLiveSyncService: Sendable {
         backfill: @escaping MattermostLiveSyncBackfill,
         refreshUnread: MattermostLiveSyncUnreadRefresh? = nil,
         refreshSidebarCategories: MattermostLiveSyncSidebarRefresh? = nil,
-        refreshThreadState: MattermostLiveSyncThreadStateRefresh? = nil
+        refreshThreadState: MattermostLiveSyncThreadStateRefresh? = nil,
+        now: @escaping MattermostLiveSyncNow = { ContinuousClock.now }
     ) -> AsyncThrowingStream<MattermostLiveSyncEvent, Error> {
         // Host output is bounded independently from socket ingress. A lagging host gets an
         // explicit gap error instead of a silently stale event history; the store itself has
@@ -242,12 +255,35 @@ public struct MattermostLiveSyncService: Sendable {
                 do {
                     var activeTeamID = teamID
                     var activeUserID: String?
+                    var completedInitialBackfill = false
+                    var disconnectedAt: ContinuousClock.Instant?
+                    var backfilledDuringCurrentDisconnect = false
+                    var backfilledForCurrentConnectionAttempt = false
                     for try await lifecycleEvent in lifecycleEvents() {
                         try Task.checkCancellation()
 
                         switch lifecycleEvent {
                         case .connecting(let attempt):
                             try Self.yield(.connecting(attempt: attempt), to: continuation)
+                            backfilledForCurrentConnectionAttempt = false
+                            let shouldBackfill: Bool
+                            if !completedInitialBackfill || options.minimumBackfillGap == nil {
+                                shouldBackfill = true
+                            } else if backfilledDuringCurrentDisconnect {
+                                shouldBackfill = false
+                            } else if let minimumBackfillGap = options.minimumBackfillGap,
+                                      let disconnectedAt {
+                                shouldBackfill = now() - disconnectedAt >= minimumBackfillGap
+                            } else {
+                                // A missing disconnect timestamp means the gap cannot be proven
+                                // trivial, so prefer the authoritative recovery path.
+                                shouldBackfill = true
+                            }
+
+                            guard shouldBackfill else {
+                                break
+                            }
+
                             // A backfill failure is reported but no longer terminates the stream:
                             // the lifecycle loop keeps running so the socket can connect and a later
                             // reconnect can retry the backfill. Only cancellation tears the stream down.
@@ -260,6 +296,11 @@ public struct MattermostLiveSyncService: Sendable {
                                 )
                                 activeTeamID = backfillResult.sync.teamID ?? activeTeamID
                                 activeUserID = backfillResult.sync.user.id
+                                completedInitialBackfill = true
+                                if disconnectedAt != nil {
+                                    backfilledDuringCurrentDisconnect = true
+                                }
+                                backfilledForCurrentConnectionAttempt = true
                                 try Self.yield(.backfilled(backfillResult), to: continuation)
                             } catch is CancellationError {
                                 throw CancellationError()
@@ -271,7 +312,11 @@ public struct MattermostLiveSyncService: Sendable {
                             }
 
                         case .connected:
-                            break
+                            if !backfilledForCurrentConnectionAttempt {
+                                try Self.yield(.connected(teamID: activeTeamID), to: continuation)
+                            }
+                            disconnectedAt = nil
+                            backfilledDuringCurrentDisconnect = false
 
                         case .event(let event):
                             let typedEvent = try store.apply(liveEvent: event)
@@ -374,6 +419,10 @@ public struct MattermostLiveSyncService: Sendable {
                             }
 
                         case .reconnecting(let attempt, let delay, _):
+                            if disconnectedAt == nil {
+                                disconnectedAt = now()
+                                backfilledDuringCurrentDisconnect = false
+                            }
                             try Self.yield(.reconnecting(attempt: attempt, delay: delay), to: continuation)
                         }
                     }

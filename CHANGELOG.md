@@ -6,6 +6,10 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Live sync now skips the full REST backfill after reconnect gaps shorter than 10 seconds by
+  default, while always backfilling the first connection. Hosts can tune
+  `MattermostLiveSyncOptions.minimumBackfillGap` or set it to `nil` to backfill every reconnect;
+  skipped backfills emit `.connected` once the socket connection succeeds.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,

@@ -177,6 +177,23 @@ func runLiveSync(
 }
 ```
 
+The first connection always runs the REST backfill. By default, a reconnect only runs it when the
+socket was disconnected for at least 10 seconds, so a brief radio or network flap does not trigger
+the full request fan-out. Hosts can tune the threshold or disable reconnect filtering:
+
+```swift
+let tuned = MattermostLiveSyncOptions(
+    minimumBackfillGap: .seconds(30)
+)
+
+let alwaysBackfill = MattermostLiveSyncOptions(
+    minimumBackfillGap: nil
+)
+```
+
+When a reconnect skips backfill, live sync emits `.connected` after the socket confirms the
+connection so `connectionState` still leaves its recovering phase.
+
 Live sync refreshes every affected channel after `channel_viewed`,
 `multiple_channels_viewed`, and `post_unread` invalidations when the corresponding unread-refresh
 options are enabled. This keeps cached channel badges aligned with reads from other sessions and

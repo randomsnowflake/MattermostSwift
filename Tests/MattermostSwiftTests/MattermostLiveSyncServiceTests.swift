@@ -39,17 +39,133 @@ func liveEventStreamFailureCapturesNSErrorAndUnderlyingNSErrorDetails() {
 
 @MainActor
 @Test
-func liveSyncRunsBackfillForEveryConnectingLifecycleEvent() async throws {
+func liveSyncSkipsRapidReconnectBackfillButRunsItAfterLongGap() async throws {
     let service = try MattermostClient(
         serverURL: try #require(URL(string: "https://mattermost.example.com")),
         token: "test-token"
     ).liveSyncService()
     let store = try MattermostStore(inMemory: true)
     var requestedTeamIDs: [String?] = []
+    let start = ContinuousClock.now
+    var times = [
+        start,
+        start.advanced(by: .seconds(1)),
+        start.advanced(by: .seconds(2)),
+        start.advanced(by: .seconds(13)),
+    ]
 
     let stream = service.events(
         to: store,
-        options: MattermostLiveSyncOptions(maxBackfillChannels: 1),
+        options: MattermostLiveSyncOptions(
+            maxBackfillChannels: 1,
+            minimumBackfillGap: .seconds(10)
+        ),
+        lifecycleEvents: {
+            AsyncThrowingStream { continuation in
+                continuation.yield(.connecting(attempt: 0))
+                continuation.yield(.connected(attempt: 0))
+                continuation.yield(.reconnecting(attempt: 0, delay: .milliseconds(1)))
+                continuation.yield(.connecting(attempt: 1))
+                continuation.yield(.connected(attempt: 1))
+                continuation.yield(.reconnecting(attempt: 1, delay: .milliseconds(1)))
+                continuation.yield(.connecting(attempt: 2))
+                continuation.finish()
+            }
+        },
+        backfill: { _, teamID, _, _ in
+            requestedTeamIDs.append(teamID)
+            return liveSyncBackfillResult(teamID: teamID ?? "team-1")
+        },
+        now: {
+            times.removeFirst()
+        }
+    )
+
+    var connectingAttempts: [Int] = []
+    var backfillCount = 0
+    var connectedWithoutBackfillCount = 0
+    var reconnectingAttempts: [Int] = []
+
+    for try await event in stream {
+        switch event {
+        case .connecting(let attempt):
+            connectingAttempts.append(attempt)
+        case .backfilled:
+            backfillCount += 1
+        case .connected:
+            connectedWithoutBackfillCount += 1
+        case .reconnecting(let attempt, _):
+            reconnectingAttempts.append(attempt)
+        default:
+            break
+        }
+    }
+
+    #expect(connectingAttempts == [0, 1, 2])
+    #expect(backfillCount == 2)
+    #expect(connectedWithoutBackfillCount == 1)
+    #expect(reconnectingAttempts == [0, 1])
+    #expect(requestedTeamIDs == [nil, "team-1"])
+    #expect(times.isEmpty)
+}
+
+@MainActor
+@Test
+func liveSyncFirstConnectAlwaysBackfillsRegardlessOfAttemptNumber() async throws {
+    let service = try MattermostClient(
+        serverURL: try #require(URL(string: "https://mattermost.example.com")),
+        token: "test-token"
+    ).liveSyncService()
+    let store = try MattermostStore(inMemory: true)
+    var backfillCount = 0
+    var nowCallCount = 0
+
+    let stream = service.events(
+        to: store,
+        options: MattermostLiveSyncOptions(
+            maxBackfillChannels: 1,
+            minimumBackfillGap: .seconds(86_400)
+        ),
+        lifecycleEvents: {
+            AsyncThrowingStream { continuation in
+                continuation.yield(.connecting(attempt: 7))
+                continuation.finish()
+            }
+        },
+        backfill: { _, teamID, _, _ in
+            backfillCount += 1
+            return liveSyncBackfillResult(teamID: teamID ?? "team-1")
+        },
+        now: {
+            nowCallCount += 1
+            return ContinuousClock.now
+        }
+    )
+
+    for try await _ in stream {}
+
+    #expect(backfillCount == 1)
+    #expect(nowCallCount == 0)
+}
+
+@MainActor
+@Test
+func liveSyncNilMinimumBackfillGapDisablesReconnectFiltering() async throws {
+    let service = try MattermostClient(
+        serverURL: try #require(URL(string: "https://mattermost.example.com")),
+        token: "test-token"
+    ).liveSyncService()
+    let store = try MattermostStore(inMemory: true)
+    var backfillCount = 0
+    let start = ContinuousClock.now
+    var times = [start]
+
+    let stream = service.events(
+        to: store,
+        options: MattermostLiveSyncOptions(
+            maxBackfillChannels: 1,
+            minimumBackfillGap: nil
+        ),
         lifecycleEvents: {
             AsyncThrowingStream { continuation in
                 continuation.yield(.connecting(attempt: 0))
@@ -59,32 +175,18 @@ func liveSyncRunsBackfillForEveryConnectingLifecycleEvent() async throws {
             }
         },
         backfill: { _, teamID, _, _ in
-            requestedTeamIDs.append(teamID)
+            backfillCount += 1
             return liveSyncBackfillResult(teamID: teamID ?? "team-1")
+        },
+        now: {
+            times.removeFirst()
         }
     )
 
-    var connectingAttempts: [Int] = []
-    var backfillCount = 0
-    var reconnectingAttempts: [Int] = []
+    for try await _ in stream {}
 
-    for try await event in stream {
-        switch event {
-        case .connecting(let attempt):
-            connectingAttempts.append(attempt)
-        case .backfilled:
-            backfillCount += 1
-        case .reconnecting(let attempt, _):
-            reconnectingAttempts.append(attempt)
-        default:
-            break
-        }
-    }
-
-    #expect(connectingAttempts == [0, 1])
     #expect(backfillCount == 2)
-    #expect(reconnectingAttempts == [0])
-    #expect(requestedTeamIDs == [nil, "team-1"])
+    #expect(times.isEmpty)
 }
 
 @MainActor
@@ -98,7 +200,10 @@ func liveSyncEventsExposeConnectionStateForHostUI() async throws {
 
     let stream = service.events(
         to: store,
-        options: MattermostLiveSyncOptions(maxBackfillChannels: 1),
+        options: MattermostLiveSyncOptions(
+            maxBackfillChannels: 1,
+            minimumBackfillGap: nil
+        ),
         lifecycleEvents: {
             AsyncThrowingStream { continuation in
                 continuation.yield(.connecting(attempt: 0))
@@ -192,7 +297,11 @@ func liveSyncReconnectBackfillMergesPostsMissedWhileDisconnected() async throws 
 
     let stream = service.events(
         to: store,
-        options: MattermostLiveSyncOptions(channelIDs: ["channel-1"], maxBackfillChannels: 1),
+        options: MattermostLiveSyncOptions(
+            channelIDs: ["channel-1"],
+            maxBackfillChannels: 1,
+            minimumBackfillGap: nil
+        ),
         lifecycleEvents: {
             AsyncThrowingStream { continuation in
                 continuation.yield(.connecting(attempt: 0))
