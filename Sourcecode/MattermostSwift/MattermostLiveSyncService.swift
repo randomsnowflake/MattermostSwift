@@ -294,7 +294,7 @@ public struct MattermostLiveSyncService: Sendable {
                                     options: options,
                                     fallbackUserID: activeUserID
                                 )
-                                let refreshResults = try await mattermostBoundedConcurrentMap(
+                                let refreshResults: [MattermostChannelUnread?] = try await mattermostBoundedConcurrentMap(
                                     unreadRefreshes
                                 ) { unreadRefresh in
                                     do {
