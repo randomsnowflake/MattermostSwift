@@ -202,14 +202,21 @@ public final class MattermostStore {
         let existing = try context.fetch(FetchDescriptor<MattermostCachedChannel>(
             predicate: #Predicate { $0.teamId == teamID }
         ))
-        for channel in existing where !retained.contains(channel.id) {
-            let channelID = channel.id
+        let removedChannels = existing.filter { !retained.contains($0.id) }
+        guard !removedChannels.isEmpty else { return }
+
+        let removedChannelIDs = removedChannels.map(\.id)
+        for channelID in removedChannelIDs {
             try deleteChannelContent(channelID: channelID)
-            for member in try context.fetch(FetchDescriptor<MattermostCachedChannelMember>(
-                predicate: #Predicate { $0.channelId == channelID }
-            )) {
-                context.delete(member)
-            }
+        }
+
+        for member in try fetchInBatches(ids: removedChannelIDs, descriptor: { chunkIDs in
+            FetchDescriptor<MattermostCachedChannelMember>(predicate: #Predicate { chunkIDs.contains($0.channelId) })
+        }) {
+            context.delete(member)
+        }
+
+        for channel in removedChannels {
             context.delete(channel)
         }
     }

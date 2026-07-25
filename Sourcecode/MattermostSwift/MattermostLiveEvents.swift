@@ -1,5 +1,7 @@
 import Foundation
 
+private let mattermostPlainDecoder = JSONDecoder()
+
 /// A decoded Mattermost WebSocket event.
 public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
     public let event: String
@@ -138,7 +140,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
 
         // Plain decoder: the keys are channel ids and must not be snake-case rewritten.
         let channelTimes = jsonData("channel_times").flatMap {
-            try? JSONDecoder().decode([String: Int64].self, from: $0)
+            try? mattermostPlainDecoder.decode([String: Int64].self, from: $0)
         }
         return MattermostMultipleChannelsViewedEvent(
             userID: anyString("user_id", "userId", broadcast: \.userId),
