@@ -48,7 +48,9 @@ The library target has no SwiftUI or Combine dependency.
 
 ## Documentation
 
-The package includes DocC documentation for the library target. Swift Package Index builds and hosts the latest documentation from the package page:
+The package includes curated DocC guides for authentication, pagination, caching, live sync, and
+error handling alongside the symbol reference. Swift Package Index builds and hosts the latest
+documentation from the package page:
 
 `https://swiftpackageindex.com/randomsnowflake/MattermostSwift`
 
@@ -95,16 +97,25 @@ for post in page.posts {
 Keep an app cache warm with SwiftData:
 
 ```swift
-let store = try MattermostStore(inMemory: false)
+@MainActor
+func hydrateCache(
+    client: MattermostClient,
+    channelID: String
+) async throws {
+    let store = try MattermostStore(inMemory: false)
 
-let result = try await client.syncService().sync(
-    to: store,
-    channelID: "channel-id"
-)
+    let result = try await client.syncService().sync(
+        to: store,
+        channelID: channelID
+    )
 
-try store.save()
-print("cached \(result.cachedChannelsCount) channels")
+    print("cached \(result.cachedChannelsCount) channels")
+}
 ```
+
+`MattermostStore` and the sync methods that mutate it are main-actor isolated. The high-level sync
+service saves before returning; when calling store mutation methods directly, call `store.save()`
+after staging the related changes.
 
 Listen for live events:
 

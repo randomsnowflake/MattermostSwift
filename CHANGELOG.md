@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Added curated DocC guides for authentication, pagination, caching, live sync, and error handling;
+  documented the complete main-actor `MattermostStore` API and public SwiftData cache-model
+  contracts; and corrected the README cache example for Swift 6 strict concurrency.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,
