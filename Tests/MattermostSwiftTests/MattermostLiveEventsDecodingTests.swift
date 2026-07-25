@@ -233,6 +233,37 @@ func webSocketEnvelopeToleratesWrongTypedFields() throws {
 }
 
 @Test
+func webSocketHandshakePendingEventsAreBounded() throws {
+    var pendingEvents: [MattermostLiveEvent] = []
+
+    for sequence in 0..<MattermostLiveEventStream.maximumPendingHandshakeEvents {
+        try MattermostLiveEventStream.appendPendingHandshakeEvent(
+            MattermostLiveEvent(
+                event: "posted",
+                data: [:],
+                broadcast: nil,
+                seq: sequence
+            ),
+            to: &pendingEvents
+        )
+    }
+
+    #expect(pendingEvents.count == 256)
+    #expect(throws: MattermostError.liveEventGap) {
+        try MattermostLiveEventStream.appendPendingHandshakeEvent(
+            MattermostLiveEvent(
+                event: "posted",
+                data: [:],
+                broadcast: nil,
+                seq: 256
+            ),
+            to: &pendingEvents
+        )
+    }
+    #expect(pendingEvents.count == 256)
+}
+
+@Test
 func multipleChannelsViewedDecodesChannelTimes() throws {
     let json = """
     {

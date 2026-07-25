@@ -68,8 +68,15 @@ The library never stores credentials and never logs token values.
 - Factory methods for concept-specific facades: `MattermostUserService`, `MattermostTeamService`, `MattermostChannelService`, `MattermostPostService`, `MattermostThreadService`, `MattermostTimelineService`, `MattermostFileService`, `MattermostReactionService`, `MattermostSearchService`, `MattermostNotificationService`, `MattermostSidebarCategoryService`, `MattermostTypingService`, `MattermostPreferenceService`, `MattermostEmojiService`, `MattermostSyncService`, and `MattermostLiveSyncService`.
 
 HTTP and WebSocket requests set a browser-shaped macOS Safari `User-Agent`, matching the deployment reality that Mattermost's official desktop app is an Electron/browser wrapper and reducing the chance that a fronting edge layer classifies compiled SDK traffic as unusual automation. Transport uses native `URLSession` and `URLSessionWebSocketTask` only.
+Hosts that require certificate pinning can provide a `URLSessionDelegate`; SDK-created REST and
+WebSocket sessions both retain and use it for authentication challenges while preserving their
+different resource-timeout policies. Explicitly injected sessions remain responsible for their own
+delegates.
 
 `MattermostLiveEventStream` uses `URLSessionWebSocketTask`. `events()` is a single authenticated connection, while `lifecycleEvents(policy:)` reconnects with exponential backoff and emits connecting/reconnecting notices for sync orchestration.
+Events received before `hello` or the authentication reply are capped at 256; overflow reports
+`MattermostError.liveEventGap` so reconnect/backfill can reconcile instead of allowing handshake
+memory growth.
 
 Public models are intentionally small and stable while the first flow hardens:
 

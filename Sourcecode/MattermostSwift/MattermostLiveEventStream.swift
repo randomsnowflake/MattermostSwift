@@ -263,7 +263,7 @@ public struct MattermostLiveEventStream: Sendable {
                 let envelope = try await self.receiveEnvelope(from: webSocketTask)
 
                 if let event = envelope.liveEvent {
-                    pendingEvents.append(event)
+                    try Self.appendPendingHandshakeEvent(event, to: &pendingEvents)
                     if event.event == "hello" {
                         return pendingEvents
                     }
@@ -281,6 +281,18 @@ public struct MattermostLiveEventStream: Sendable {
 
             throw CancellationError()
         }
+    }
+
+    static let maximumPendingHandshakeEvents = 256
+
+    static func appendPendingHandshakeEvent(
+        _ event: MattermostLiveEvent,
+        to pendingEvents: inout [MattermostLiveEvent]
+    ) throws {
+        guard pendingEvents.count < maximumPendingHandshakeEvents else {
+            throw MattermostError.liveEventGap
+        }
+        pendingEvents.append(event)
     }
 
     private static let connectionStabilityWindow: Duration = .seconds(30)

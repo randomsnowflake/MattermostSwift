@@ -22,6 +22,8 @@
 - User lookup, channel users, and presence status lookup.
 - File upload, attach-to-post, metadata, and download.
 - WebSocket connection, authentication, tolerant event decoding, and a live posted/edit/delete event e2e check.
+- Host-provided URLSession trust delegates for both SDK-created REST and WebSocket sessions, plus
+  a bounded 256-event pre-authentication WebSocket queue.
 - Reconnecting WebSocket event stream wrapper with configurable exponential backoff.
 - Typed WebSocket event helpers for posts, thread update/read/follow signals, unread invalidation, reactions, typing, presence, and channel-viewed events.
 - Channel detail lookup by id/name, public team channel discovery, channel statistics/timezone/member-count lookup, channel membership read/list/by-ids/add/remove, unread counts, view/read marking, typed notify props read/update, create, rename, and archive APIs.
@@ -54,6 +56,8 @@
 - Forced-failure cleanup CLI check that creates temporary e2e resources, simulates an intermediate failure, proves the shared cleanup helper deletes the post/category/channel and restores sidebar order, and runs in `scripts/test-e2e.sh`.
 - Read-only e2e residue audit that fails if active `MattermostSwift` temporary channels or sidebar categories remain on the live server after mutating checks.
 - DocC quick-start article covering token auth, password login token source, cache hydration, unified timelines, live sync, all-channel reconnect backfill, and credential ownership.
+- DocC Keychain guidance with a device-bound token example and an explicit warning against
+  `UserDefaults`/`@AppStorage` credential storage.
 - Expanded symbol-level DocC comments across the public service facades so host apps can discover the intended high-level API without reading endpoint wrappers first.
 - Library force-unwrap audit: the reusable `MattermostSwift` target has no `try!`, `as!`, or forced optional unwraps in production code.
 - Pagination hardening: post/channel search, channel users, channel posts, and custom emoji list requests clamp invalid page and per-page inputs before hitting the REST API.

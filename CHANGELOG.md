@@ -6,6 +6,12 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Added a host-provided `URLSessionDelegate` hook for server-trust evaluation on both default REST
+  and WebSocket sessions, with matching session factories for direct URLSession construction.
+- Bounded WebSocket events buffered during authentication to 256; overflow now reports
+  `MattermostError.liveEventGap` and requires normal reconnect reconciliation.
+- Added concrete Keychain token-storage guidance using
+  `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` and warned against `UserDefaults`/`@AppStorage`.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,

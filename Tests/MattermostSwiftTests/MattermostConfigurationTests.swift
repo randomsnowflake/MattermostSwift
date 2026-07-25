@@ -2,6 +2,8 @@ import Foundation
 import Testing
 @testable import MattermostSwift
 
+private final class MattermostTestURLSessionDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {}
+
 @Test
 func configurationNormalizesServerURL() throws {
     let configuration = try MattermostConfiguration(
@@ -278,6 +280,27 @@ func clientUsesExplicitLiveEventSessionWhenProvided() throws {
 
     #expect(client.urlSession === httpSession)
     #expect(client.liveEventStream().urlSession === liveEventSession)
+}
+
+@Test
+func clientRetainsTrustDelegateForDefaultRESTAndWebSocketSessions() throws {
+    var delegate: MattermostTestURLSessionDelegate? = MattermostTestURLSessionDelegate()
+    weak var retainedDelegate = delegate
+    let client = try MattermostClient(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        token: "token",
+        urlSessionDelegate: #require(delegate)
+    )
+    delegate = nil
+
+    #expect(retainedDelegate != nil)
+    #expect(client.urlSession.delegate === retainedDelegate)
+    #expect(client.liveEventStream().urlSession.delegate === retainedDelegate)
+    #expect(client.urlSession.configuration.timeoutIntervalForResource == 300)
+    #expect(client.liveEventStream().urlSession.configuration.timeoutIntervalForResource == 604_800)
+
+    client.urlSession.invalidateAndCancel()
+    client.liveEventStream().urlSession.invalidateAndCancel()
 }
 
 @Test
