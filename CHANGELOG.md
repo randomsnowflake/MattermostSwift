@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Disk-backed `MattermostStore` caches and CLI cache directories now use owner-only permissions
+  by default. iOS stores apply configurable file protection to the directory and SQLite files,
+  while macOS hosts retain responsibility for volume-level encryption.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,

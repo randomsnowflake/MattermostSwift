@@ -22,7 +22,22 @@ public final class MattermostStore {
         context = container.mainContext
     }
 
-    public convenience init(inMemory: Bool = false, url: URL? = nil) throws {
+    /// Creates a SwiftData-backed Mattermost cache.
+    ///
+    /// Disk-backed stores default to owner-only directory permissions. On iOS they
+    /// also use complete-until-first-user-authentication file protection. Hosts can
+    /// choose a stricter policy, or preserve a shared directory's existing policy,
+    /// through `security`.
+    ///
+    /// - Parameters:
+    ///   - inMemory: Whether to create a non-persistent store. Ignored when `url` is supplied.
+    ///   - url: Explicit SQLite store URL, or `nil` for SwiftData's default location.
+    ///   - security: Filesystem security for disk-backed stores.
+    public convenience init(
+        inMemory: Bool = false,
+        url: URL? = nil,
+        security: MattermostStoreSecurityOptions = .init()
+    ) throws {
         let schema = Self.schema
         let configuration: ModelConfiguration
         if let url {
@@ -44,11 +59,25 @@ public final class MattermostStore {
             )
         }
 
+        if !configuration.isStoredInMemoryOnly {
+            try MattermostStoreFilesystemSecurity.prepareStoreDirectory(
+                for: configuration.url,
+                options: security
+            )
+        }
+
         let container = try ModelContainer(
             for: schema,
             migrationPlan: MattermostCacheMigrationPlan.self,
             configurations: [configuration]
         )
+
+        if !configuration.isStoredInMemoryOnly {
+            try MattermostStoreFilesystemSecurity.secureStoreFiles(
+                at: configuration.url,
+                options: security
+            )
+        }
         self.init(container: container)
     }
 
