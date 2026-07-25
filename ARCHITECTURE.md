@@ -115,6 +115,40 @@ The cache merge policy is server timestamp last-write-wins where Mattermost expo
 
 `MattermostLiveSyncService` builds on the raw stream and sync service. Before each socket connection attempt it runs REST backfill, optionally across joined channel timelines, then applies typed live events into `MattermostStore` as they arrive. Reconnect backfill uses each channel's stored post cursor, so posts created or modified while the socket was down can be fetched through Mattermost's `since` query and merged before live event consumption resumes. It emits `MattermostLiveSyncEvent` values so host apps can show connecting, backfilled, event-applied, unread-refreshed, sidebar-refreshed, thread-state-refreshed, reconnecting, and backfill-failed states; each lifecycle event also exposes a derived `connectionState` for host UI indicators. A non-cancellation REST-backfill failure yields a non-secret diagnostic and the lifecycle continues, allowing a later reconnect to retry; cancellation terminates the stream. `channel_viewed`, `multiple_channels_viewed`, and `post_unread` events refresh channel unread counts when configured, using the current synced user as a fallback when the WebSocket payload omits a user id and refreshing every channel named by a multi-channel event. Thread events such as `response`, `thread_updated`, `thread_follow_changed`, and `thread_read_changed` trigger a targeted `GET /api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}` refresh when enough user/team/thread context is available, then upsert the returned per-user thread state and root post/participants. Replies themselves continue to enter the cache through normal `posted` events. Preference events trigger a sidebar category refresh for the active team when configured. The current policy is still intentionally simple: backfill is page/channel bounded by default, but hosts can opt into `backfillAllJoinedChannelPosts` for a full joined-channel missed-event sweep on connect/reconnect. Conflict handling remains server-timestamp last-write-wins through normal cache upserts. Its reconnect orchestration, missed-post cursor recovery, connection-state projection, backfill failure diagnostics, channel-selection policy, unread invalidation refresh, and thread-state invalidation refresh are unit-tested with an injected lifecycle stream so backfill-on-each-connect behavior can be proven without forcing a real network drop.
 
+### Host app lifecycle contract
+
+Live stream lifetime belongs to the host rather than to UIKit, AppKit, or SwiftUI inside the
+package. Hosts must run `MattermostLiveEventStream` or `MattermostLiveSyncService` iteration only
+while the owning scene is active. On background transition, cancel and discard the consuming
+task. Async-stream termination propagates cancellation through live-sync refresh/backfill work and
+the reconnect loop to `MattermostLiveEventStream`, whose connection scope closes the
+`URLSessionWebSocketTask` with `.goingAway`. On activation, create a new sequence and consuming
+task. For live sync, the first `.connecting` lifecycle event runs authoritative REST backfill
+before socket event delivery, which reconciles the cache for the period spent backgrounded.
+
+This teardown/reconnect contract is intentionally explicit instead of maintaining a reduced
+heartbeat in an iOS background task. iOS normally suspends backgrounded processes, and keeping a
+stream alive with `beginBackgroundTask` would spend a finite background window on heartbeats,
+reconnect attempts, and potentially full backfills. Multi-scene hosts should apply the policy per
+owning scene or centralize ownership and keep the stream only while at least one relevant scene is
+active.
+
+### Network-cost policy
+
+The default REST and WebSocket configurations allow constrained and expensive network access.
+Bulk post history and live-sync backfill therefore continue on Low Data Mode and personal-hotspot
+paths. This is a deliberate reliability choice for the current transport boundary: all REST
+operations share the client's injected `URLSession`, so applying
+`allowsConstrainedNetworkAccess = false` only at that session would also block authentication,
+message sends, and small unread/thread/sidebar refreshes. It would surface a transport failure on
+a constrained path; it does not by itself provide a resumable bulk-transfer scheduler.
+
+A host may impose a whole-REST network-cost policy by injecting a constrained-disallowing REST
+session into `MattermostClient` and supplying a separate, unconstrained
+`webSocketURLSession`. A future bulk-history transport would require explicit request
+classification plus retry/resume semantics before the SDK can safely constrain only pagination
+and reconnect backfill.
+
 The internal REST layer decodes Mattermost snake_case payloads and maps errors into `MattermostError`.
 
 ## Expansion Rules

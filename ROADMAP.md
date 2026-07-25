@@ -23,6 +23,8 @@
 - File upload, attach-to-post, metadata, and download.
 - WebSocket connection, authentication, tolerant event decoding, and a live posted/edit/delete event e2e check.
 - Reconnecting WebSocket event stream wrapper with configurable exponential backoff.
+- Explicit host lifecycle contract: cancel live-stream consumption while backgrounded and create a
+  fresh stream on activation so reconnect backfill reconciles missed events.
 - Typed WebSocket event helpers for posts, thread update/read/follow signals, unread invalidation, reactions, typing, presence, and channel-viewed events.
 - Channel detail lookup by id/name, public team channel discovery, channel statistics/timezone/member-count lookup, channel membership read/list/by-ids/add/remove, unread counts, view/read marking, typed notify props read/update, create, rename, and archive APIs.
 - Direct message channel open, group message channel open, and read-only group message channel search APIs.

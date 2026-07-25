@@ -226,6 +226,11 @@ public extension URLSession {
         configuration.timeoutIntervalForResource = 300
         configuration.httpShouldSetCookies = false
         configuration.httpCookieAcceptPolicy = .never
+        // REST currently shares one session across interactive requests and bulk history.
+        // Keep both path classes available until bulk requests have a separately injectable,
+        // resumable transport policy.
+        configuration.allowsConstrainedNetworkAccess = true
+        configuration.allowsExpensiveNetworkAccess = true
         return URLSession(configuration: configuration)
     }()
 
@@ -240,6 +245,8 @@ public extension URLSession {
         configuration.timeoutIntervalForRequest = 30
         configuration.httpShouldSetCookies = false
         configuration.httpCookieAcceptPolicy = .never
+        configuration.allowsConstrainedNetworkAccess = true
+        configuration.allowsExpensiveNetworkAccess = true
         return URLSession(configuration: configuration)
     }()
 }

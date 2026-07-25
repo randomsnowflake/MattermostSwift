@@ -89,6 +89,51 @@ func liveSyncRunsBackfillForEveryConnectingLifecycleEvent() async throws {
 
 @MainActor
 @Test
+func cancellingHostTaskTerminatesLiveSyncLifecycle() async throws {
+    let service = try MattermostClient(
+        serverURL: try #require(URL(string: "https://mattermost.example.com")),
+        token: "test-token"
+    ).liveSyncService()
+    let store = try MattermostStore(inMemory: true)
+    let lifecycleLog = MattermostRequestLog()
+
+    let stream = service.events(
+        to: store,
+        options: MattermostLiveSyncOptions(maxBackfillChannels: 1),
+        lifecycleEvents: {
+            AsyncThrowingStream { continuation in
+                continuation.onTermination = { @Sendable _ in
+                    lifecycleLog.append("terminated")
+                }
+                continuation.yield(.connecting(attempt: 0))
+            }
+        },
+        backfill: { _, teamID, _, _ in
+            lifecycleLog.append("backfilled")
+            return liveSyncBackfillResult(teamID: teamID ?? "team-1")
+        }
+    )
+
+    let hostTask = Task { @MainActor in
+        do {
+            for try await _ in stream {}
+        } catch is CancellationError {
+            // Host lifecycle cancellation is the expected teardown path.
+        } catch {
+            Issue.record("Unexpected live-sync error during host teardown: \(error)")
+        }
+    }
+
+    try await waitForLiveSyncLog("backfilled", in: lifecycleLog)
+    hostTask.cancel()
+    await hostTask.value
+    try await waitForLiveSyncLog("terminated", in: lifecycleLog)
+
+    #expect(lifecycleLog.values == ["backfilled", "terminated"])
+}
+
+@MainActor
+@Test
 func liveSyncEventsExposeConnectionStateForHostUI() async throws {
     let service = try MattermostClient(
         serverURL: try #require(URL(string: "https://mattermost.example.com")),
@@ -127,6 +172,23 @@ func liveSyncEventsExposeConnectionStateForHostUI() async throws {
         .connected(teamID: "team-1", backfilledChannelCount: 0),
     ])
     #expect(states.map(\.isRecovering) == [true, false, true, true, false])
+}
+
+private func waitForLiveSyncLog(
+    _ value: String,
+    in log: MattermostRequestLog,
+    timeout: Duration = .seconds(1)
+) async throws {
+    let clock = ContinuousClock()
+    let deadline = clock.now + timeout
+
+    while !log.values.contains(value) {
+        guard clock.now < deadline else {
+            Issue.record("Timed out waiting for live-sync log value '\(value)'.")
+            return
+        }
+        try await Task.sleep(for: .milliseconds(1))
+    }
 }
 
 @MainActor

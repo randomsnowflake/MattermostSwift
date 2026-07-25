@@ -20,6 +20,8 @@ public struct MattermostLiveEventStream: Sendable {
     }
 
     /// Connects, authenticates, and yields server events until cancelled or the socket fails.
+    /// Hosts should cancel the consuming task when its owning scene enters the background and
+    /// create a new stream when the scene becomes active.
     /// The queue holds at most 256 events; a slow consumer receives `MattermostError.liveEventGap`
     /// rather than silently observing an incomplete sequence.
     public func events() -> AsyncThrowingStream<MattermostLiveEvent, Error> {
@@ -56,6 +58,8 @@ public struct MattermostLiveEventStream: Sendable {
     /// Yields connection lifecycle notifications and live events, reconnecting with exponential backoff.
     /// Its queue holds at most 512 lifecycle records. Ingress overflow aborts the current socket
     /// generation and follows the normal reconnect/backfill path instead of hiding a gap.
+    /// Cancelling the consuming task stops pending reconnect work and closes the current socket;
+    /// hosts should use that teardown path while backgrounded.
     public func lifecycleEvents(
         policy: MattermostLiveEventReconnectPolicy = .default
     ) -> AsyncThrowingStream<MattermostLiveEventStreamLifecycleEvent, Error> {
