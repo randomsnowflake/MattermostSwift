@@ -1,23 +1,8 @@
 import Foundation
-@_spi(Testing) import MattermostSwift
+import MattermostSwift
 
 extension MattermostSwiftCLI {
-    static func main() async {
-        do {
-            try await run()
-        } catch let error as CLIError {
-            // Usage/argument errors exit with a distinct code so CI and scripts can tell
-            // "you called it wrong" (2) apart from a runtime/server failure (1).
-            FileHandle.standardError.write(Data("error: \(error.localizedDescription)\n".utf8))
-            Foundation.exit(2)
-        } catch {
-            FileHandle.standardError.write(Data("error: \(error.localizedDescription)\n".utf8))
-            Foundation.exit(1)
-        }
-    }
-
-    static func run() async throws {
-        let command = Command(arguments: Array(CommandLine.arguments.dropFirst()))
+    static func run(command: Command) async throws {
         if case .loginTest = command {
             try await runLoginTest()
             return
@@ -62,14 +47,11 @@ extension MattermostSwiftCLI {
             printUserAutocomplete(autocomplete)
         case .knownUsers(let includeProfiles):
             let userIDs = try await client.knownUserIDs()
-            print("known-users: \(userIDs.count)")
             if includeProfiles {
                 let users = try await client.users(ids: userIDs)
-                printUsers(users)
+                printKnownUsers(userIDs: userIDs, profiles: users)
             } else {
-                for userID in userIDs.sorted() {
-                    print(userID)
-                }
+                printKnownUsers(userIDs: userIDs, profiles: nil)
             }
         case .status(let userID):
             let resolvedUserID = try await resolvedUserID(userID, client: client)
@@ -170,7 +152,7 @@ extension MattermostSwiftCLI {
                 channelID: resolvedChannelID(channelID),
                 userID: userID
             )
-            print("status: \(status.status)")
+            printStatusOK(status)
         case .channelUnread(let channelID):
             let unread = try await client.channelUnread(channelID: resolvedChannelID(channelID))
             printChannelUnread(unread)
@@ -187,10 +169,12 @@ extension MattermostSwiftCLI {
             printPosts(postList.orderedPosts)
         case .viewChannel(let channelID):
             let response = try await client.viewChannel(channelID: resolvedChannelID(channelID))
-            print("status: \(response.status)")
+            if !writeJSONIfRequested(response) {
+                print("status: \(response.status)")
+            }
         case .sendTyping(let channelID):
             let status = try await client.sendTyping(channelID: resolvedChannelID(channelID))
-            print("status: \(status.status)")
+            printStatusOK(status)
         case .listCategories:
             let categories = try await loadCategories(client: client)
             printCategories(categories)
@@ -238,7 +222,7 @@ extension MattermostSwiftCLI {
             printPost(post)
         case .deleteMessage(let postID):
             let status = try await client.deletePost(id: postID)
-            print("status: \(status.status)")
+            printStatusOK(status)
         case .threadTest:
             try await runThreadTest(client: client)
         case .timelineTest:
@@ -307,10 +291,7 @@ extension MattermostSwiftCLI {
         case .check:
             let user = try await client.currentUser()
             let channels = try await loadChannels(client: client)
-            print("Authenticated as \(user.username) (\(user.id))")
-            print("Loaded \(channels.count) channel\(channels.count == 1 ? "" : "s")")
-        case .help:
-            printHelp()
+            printCheck(user: user, channels: channels)
         }
     }
 

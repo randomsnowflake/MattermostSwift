@@ -47,7 +47,7 @@ public struct MattermostThreadListRequest: Equatable, Sendable {
 }
 
 /// Per-user state for a root post in Mattermost's thread inbox.
-public struct MattermostThreadResponse: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostThreadResponse: Codable, Equatable, Sendable, Identifiable {
     public let id: String
     public let replyCount: Int64
     public let lastReplyAt: Int64
@@ -121,7 +121,7 @@ public struct MattermostThreadResponse: Decodable, Equatable, Sendable, Identifi
 }
 
 /// Thread inbox results for one user/team pair.
-public struct MattermostThreadList: Decodable, Equatable, Sendable {
+public struct MattermostThreadList: Codable, Equatable, Sendable {
     public let total: Int64
     public let totalUnreadThreads: Int64
     public let totalUnreadMentions: Int64

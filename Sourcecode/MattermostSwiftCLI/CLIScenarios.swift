@@ -941,6 +941,7 @@ extension MattermostSwiftCLI {
     @MainActor
     static func runAllChannelBackfillTest(client: MattermostClient) async throws {
         let teamName = ProcessInfo.processInfo.environment["MATTERMOST_TEAM_NAME"]
+        progress("Loading joined channels for the all-channel backfill…")
         let channels = try await loadChannels(client: client)
         guard !channels.isEmpty else {
             throw CLIError.usage("No joined channels are available for all-channel backfill verification.")
@@ -948,6 +949,7 @@ extension MattermostSwiftCLI {
 
         let store = try MattermostStore(inMemory: true)
         let recorder = LiveSyncRecorder()
+        progress("Starting a one-page backfill across \(channels.count) joined channel(s)…")
         let stream = client.liveSyncService().events(
             to: store,
             teamName: teamName,
@@ -983,6 +985,7 @@ extension MattermostSwiftCLI {
             eventTask.cancel()
         }
 
+        progress("Waiting for the all-channel backfill to finish…")
         let backfill = try await waitForLiveSyncBackfill(recorder: recorder, timeoutSeconds: 30)
         guard backfill.postSyncs.count == channels.count else {
             throw CLIError.usage(
@@ -993,6 +996,7 @@ extension MattermostSwiftCLI {
         let backfilledPosts = backfill.postSyncs.reduce(0) { count, sync in
             count + sync.posts.count
         }
+        progress("All-channel backfill finished.")
 
         print("store: in-memory")
         print("team: \(backfill.sync.teamID ?? "-")")
@@ -1006,6 +1010,7 @@ extension MattermostSwiftCLI {
     static func runAllChannelReconnectTest(client: MattermostClient) async throws {
         let channelID = try resolvedChannelID(nil)
         let teamName = ProcessInfo.processInfo.environment["MATTERMOST_TEAM_NAME"]
+        progress("Loading joined channels for the all-channel reconnect test…")
         let channels = try await loadChannels(client: client)
         guard !channels.isEmpty else {
             throw CLIError.usage("No joined channels are available for all-channel reconnect verification.")
@@ -1055,6 +1060,7 @@ extension MattermostSwiftCLI {
             eventTask.cancel()
         }
 
+        progress("Waiting for the initial \(channels.count)-channel backfill…")
         await lifecycle.yield(.connecting(attempt: 0))
         let firstBackfill = try await waitForLiveSyncBackfillCount(
             recorder: recorder,
@@ -1077,6 +1083,7 @@ extension MattermostSwiftCLI {
             post = createdPost
             await lifecycle.yield(.connecting(attempt: 1))
 
+            progress("Waiting for the reconnect backfill across all joined channels…")
             let backfills = try await waitForLiveSyncBackfillCount(
                 recorder: recorder,
                 count: 2,
@@ -1107,6 +1114,7 @@ extension MattermostSwiftCLI {
             let deleteStatus = try await client.deletePost(id: createdPost.id)
             post = nil
             await lifecycle.finish()
+            progress("All-channel reconnect backfill finished.")
 
             print("store: in-memory")
             print("channel: \(channelID)")

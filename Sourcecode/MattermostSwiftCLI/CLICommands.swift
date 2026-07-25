@@ -1,7 +1,66 @@
 import Foundation
-@_spi(Testing) import MattermostSwift
+import MattermostSwift
+
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
+
+private struct CLIDownloadResult: Encodable {
+    let fileID: String
+    let path: String?
+    let byteCount: Int
+    let dataBase64: String?
+}
+
+private struct CLISyncOutput: Encodable {
+    let store: String
+    let result: MattermostSyncResult
+}
+
+private struct CLICacheCheckOutput: Encodable {
+    let store: String
+    let cachedTeams: Int
+    let cachedUsers: Int
+    let cachedChannels: Int
+    let cachedMembers: Int
+    let cachedUnreads: Int
+    let cachedCategories: Int
+    let channelID: String?
+    let cachedPosts: Int?
+    let cursorLastSyncAt: Int64?
+}
 
 extension MattermostSwiftCLI {
+    static func isTerminal(_ fileHandle: FileHandle) -> Bool {
+        isatty(fileHandle.fileDescriptor) == 1
+    }
+
+    static func progress(
+        _ message: String,
+        stderrIsTTY: Bool = isTerminal(.standardError)
+    ) {
+        guard let line = progressLine(message, stderrIsTTY: stderrIsTTY) else { return }
+        writeStandardError(line)
+    }
+
+    static func progressLine(_ message: String, stderrIsTTY: Bool) -> String? {
+        stderrIsTTY ? "\(message)\n" : nil
+    }
+
+    static func validateBinaryStandardOutput(
+        path: String?,
+        json: Bool = CLIOutputMode.json,
+        stdoutIsTTY: Bool = isTerminal(.standardOutput)
+    ) throws {
+        guard path?.isEmpty != false else { return }
+        guard !json, stdoutIsTTY else { return }
+        throw CLIError.usage(
+            "Refusing to write binary file data to a terminal. Provide a destination path or pipe standard output."
+        )
+    }
+
     static func uploadFile(
         client: MattermostClient,
         channelID: String?,
@@ -29,11 +88,29 @@ extension MattermostSwiftCLI {
         fileID: String,
         path: String?
     ) async throws {
+        try validateBinaryStandardOutput(path: path)
         let data = try await client.downloadFile(id: fileID)
         if let path, !path.isEmpty {
             try data.write(to: URL(fileURLWithPath: path), options: .atomic)
-            print("downloaded-bytes: \(data.count)")
-            print("path: \(path)")
+            let result = CLIDownloadResult(
+                fileID: fileID,
+                path: path,
+                byteCount: data.count,
+                dataBase64: nil
+            )
+            if !writeJSONIfRequested(result) {
+                print("downloaded-bytes: \(data.count)")
+                print("path: \(path)")
+            }
+        } else if CLIOutputMode.json {
+            writeJSON(
+                CLIDownloadResult(
+                    fileID: fileID,
+                    path: nil,
+                    byteCount: data.count,
+                    dataBase64: data.base64EncodedString()
+                )
+            )
         } else {
             FileHandle.standardOutput.write(data)
         }
@@ -41,12 +118,14 @@ extension MattermostSwiftCLI {
 
     static func streamEvents(client: MattermostClient, limit: Int) async throws {
         var count = 0
+        progress("Waiting for WebSocket event 1 of \(limit)…")
         for try await event in client.liveEventStream().events() {
             printLiveEvent(event)
             count += 1
             if count >= limit {
                 break
             }
+            progress("Waiting for WebSocket event \(count + 1) of \(limit)…")
         }
     }
 
@@ -62,6 +141,7 @@ extension MattermostSwiftCLI {
             purpose: "Created by MattermostSwiftCLI test-channel verification."
         )
 
+        guard !writeJSONIfRequested(channel) else { return }
         print("channel: \(channel.id)")
         print("team: \(teamID)")
         print("name: \(channel.name)")
@@ -117,10 +197,12 @@ extension MattermostSwiftCLI {
 
     @MainActor
     static func runSync(client: MattermostClient, channelID: String?) async throws {
+        progress("Opening the local cache…")
         let storeURL = try resolvedStoreURL()
         let store = try MattermostStore(url: storeURL)
         let resolvedPostChannelID = try? resolvedChannelID(channelID)
         let teamName = ProcessInfo.processInfo.environment["MATTERMOST_TEAM_NAME"]
+        progress("Syncing account, teams, channels, memberships, unreads, and sidebar state…")
         let result = try await client.syncService().sync(
             to: store,
             teamName: teamName,
@@ -133,6 +215,11 @@ extension MattermostSwiftCLI {
                 refreshUnreadForAllJoinedChannels: true
             )
         )
+        progress("Saving and summarizing the synchronized cache…")
+
+        if writeJSONIfRequested(CLISyncOutput(store: storeURL.path, result: result)) {
+            return
+        }
 
         print("store: \(storeURL.path)")
         print("synced-user: \(result.user.username)")
@@ -170,6 +257,31 @@ extension MattermostSwiftCLI {
             throw CLIError.usage("Cache is empty. Run `swift run MattermostSwiftCLI sync` first.")
         }
 
+        var postChannelID: String?
+        var postCount: Int?
+        var cursorLastSyncAt: Int64?
+        if let resolvedPostChannelID = try? resolvedChannelID(channelID) {
+            let posts = try store.cachedPosts(channelID: resolvedPostChannelID, limit: 60)
+            let cursor = try store.cachedSyncCursor(scope: "channel-posts:\(resolvedPostChannelID)")
+            postChannelID = resolvedPostChannelID
+            postCount = posts.count
+            cursorLastSyncAt = cursor?.lastSyncAt
+        }
+
+        let output = CLICacheCheckOutput(
+            store: storeURL.path,
+            cachedTeams: teams.count,
+            cachedUsers: users.count,
+            cachedChannels: channels.count,
+            cachedMembers: members.count,
+            cachedUnreads: unreads.count,
+            cachedCategories: categories.count,
+            channelID: postChannelID,
+            cachedPosts: postCount,
+            cursorLastSyncAt: cursorLastSyncAt
+        )
+        guard !writeJSONIfRequested(output) else { return }
+
         print("store: \(storeURL.path)")
         print("cached-teams: \(teams.count)")
         print("cached-users: \(users.count)")
@@ -178,13 +290,11 @@ extension MattermostSwiftCLI {
         print("cached-unreads: \(unreads.count)")
         print("cached-categories: \(categories.count)")
 
-        if let resolvedPostChannelID = try? resolvedChannelID(channelID) {
-            let posts = try store.cachedPosts(channelID: resolvedPostChannelID, limit: 60)
-            let cursor = try store.cachedSyncCursor(scope: "channel-posts:\(resolvedPostChannelID)")
-            print("cached-post-channel: \(resolvedPostChannelID)")
-            print("cached-posts: \(posts.count)")
-            if let cursor {
-                print("cached-post-cursor: \(cursor.lastSyncAt)")
+        if let postChannelID, let postCount {
+            print("cached-post-channel: \(postChannelID)")
+            print("cached-posts: \(postCount)")
+            if let cursorLastSyncAt {
+                print("cached-post-cursor: \(cursorLastSyncAt)")
             }
         }
     }

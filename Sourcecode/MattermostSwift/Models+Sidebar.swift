@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Sidebar category models
 
 /// Sidebar categories and server-provided ordering for a user's team sidebar.
-public struct MattermostSidebarCategoryList: Decodable, Equatable, Sendable {
+public struct MattermostSidebarCategoryList: Codable, Equatable, Sendable {
     public let categories: [MattermostSidebarCategory]
     public let order: [String]
 
@@ -20,7 +20,7 @@ public struct MattermostSidebarCategoryList: Decodable, Equatable, Sendable {
 }
 
 /// Sidebar category metadata for a user's team sidebar.
-public struct MattermostSidebarCategory: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostSidebarCategory: Codable, Equatable, Sendable, Identifiable {
     public let id: String
     public let userId: String?
     public let teamId: String?

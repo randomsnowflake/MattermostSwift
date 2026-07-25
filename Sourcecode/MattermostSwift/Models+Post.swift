@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Post, post list, search results, reaction, and status-OK models
 
 /// A page of posts for a channel or thread.
-public struct MattermostPostList: Decodable, Equatable, Sendable {
+public struct MattermostPostList: Codable, Equatable, Sendable {
     public let order: [String]
     public let posts: [String: MattermostPost]
     public let nextPostId: String?
@@ -16,7 +16,7 @@ public struct MattermostPostList: Decodable, Equatable, Sendable {
 }
 
 /// Search results for team post search.
-public struct MattermostPostSearchResults: Decodable, Equatable, Sendable {
+public struct MattermostPostSearchResults: Codable, Equatable, Sendable {
     public let order: [String]
     public let posts: [String: MattermostPost]
     public let matches: [String: [String]]?
@@ -32,7 +32,7 @@ public struct MattermostPostSearchResults: Decodable, Equatable, Sendable {
 /// Typed subset of the `metadata` payload the server embeds with each post
 /// (files and reactions). Lets clients skip the per-post `fileInfos`/`reactions`
 /// lookups when the server already delivered them inline.
-public struct MattermostPostMetadata: Decodable, Equatable, Sendable {
+public struct MattermostPostMetadata: Codable, Equatable, Sendable {
     public let files: [MattermostFileInfo]?
     public let reactions: [MattermostReaction]?
 
@@ -43,7 +43,7 @@ public struct MattermostPostMetadata: Decodable, Equatable, Sendable {
 }
 
 /// Mattermost post/message metadata.
-public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostPost: Codable, Equatable, Sendable, Identifiable {
     public let id: String
     public let createAt: Int64
     public let updateAt: Int64
@@ -185,7 +185,7 @@ public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
 }
 
 /// Standard Mattermost status response.
-public struct MattermostStatusOK: Decodable, Equatable, Sendable {
+public struct MattermostStatusOK: Codable, Equatable, Sendable {
     public let status: String
 
     public var isOK: Bool {

@@ -3,13 +3,13 @@ import Foundation
 // MARK: - File upload response, file info, and custom emoji models
 
 /// Response returned after uploading one or more files.
-public struct MattermostFileUploadResponse: Decodable, Equatable, Sendable {
+public struct MattermostFileUploadResponse: Codable, Equatable, Sendable {
     public let fileInfos: [MattermostFileInfo]
     public let clientIds: [String]?
 }
 
 /// Metadata for an uploaded Mattermost file.
-public struct MattermostFileInfo: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostFileInfo: Codable, Equatable, Sendable, Identifiable {
     public let id: String
     public let userId: String?
     public let postId: String?
@@ -42,7 +42,7 @@ public struct MattermostFileInfo: Decodable, Equatable, Sendable, Identifiable {
 }
 
 /// Metadata for a Mattermost custom emoji.
-public struct MattermostCustomEmoji: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostCustomEmoji: Codable, Equatable, Sendable, Identifiable {
     public let id: String
     public let creatorId: String?
     public let name: String

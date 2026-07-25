@@ -1,7 +1,7 @@
 import Foundation
 
 /// A decoded Mattermost WebSocket event.
-public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
+public struct MattermostLiveEvent: Codable, Equatable, Sendable {
     public let event: String
     public let data: [String: MattermostJSONValue]
     public let broadcast: MattermostLiveBroadcast?
@@ -366,7 +366,7 @@ public struct MattermostThreadEvent: Equatable, Sendable {
 }
 
 /// Broadcast metadata attached to a Mattermost WebSocket event.
-public struct MattermostLiveBroadcast: Decodable, Equatable, Sendable {
+public struct MattermostLiveBroadcast: Codable, Equatable, Sendable {
     public let omitUsers: [String]?
     public let userId: String?
     public let channelId: String?

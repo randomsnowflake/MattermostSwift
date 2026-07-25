@@ -1,114 +1,7 @@
+import ArgumentParser
 import Foundation
-@_spi(Testing) import MattermostSwift
 
-extension MattermostSwiftCLI {
-    static func printHelp() {
-        print(
-            """
-            MattermostSwiftCLI
-
-            Usage:
-              swift run MattermostSwiftCLI me
-              swift run MattermostSwiftCLI get-user [user-id]
-              swift run MattermostSwiftCLI profile-image [user-id]
-              swift run MattermostSwiftCLI default-profile-image [user-id]
-              swift run MattermostSwiftCLI get-users user-id [user-id...]
-              swift run MattermostSwiftCLI get-users-by-username username [username...]
-              swift run MattermostSwiftCLI list-channel-users [channel-id]
-              swift run MattermostSwiftCLI search-users terms
-              swift run MattermostSwiftCLI autocomplete-users name
-              swift run MattermostSwiftCLI known-users [--profiles]
-              swift run MattermostSwiftCLI status [user-id]
-              swift run MattermostSwiftCLI server-info
-              swift run MattermostSwiftCLI list-teams
-              swift run MattermostSwiftCLI team-info [team-id]
-              swift run MattermostSwiftCLI list-team-members [team-id]
-              swift run MattermostSwiftCLI list-channels
-              swift run MattermostSwiftCLI list-public-channels [team-id]
-              swift run MattermostSwiftCLI channel-info [channel-id]
-              swift run MattermostSwiftCLI channel-by-name [--team team-id] channel-name
-              swift run MattermostSwiftCLI channel-by-team-name team-name channel-name
-              swift run MattermostSwiftCLI channel-stats [channel-id]
-              swift run MattermostSwiftCLI channel-timezones [channel-id]
-              swift run MattermostSwiftCLI channel-member-counts [channel-id...]
-              swift run MattermostSwiftCLI search-channels terms
-              swift run MattermostSwiftCLI search-group-channels terms
-              swift run MattermostSwiftCLI direct-channel-test [user-id]
-              swift run MattermostSwiftCLI create-group-channel user-id user-id [user-id...]
-              swift run MattermostSwiftCLI channel-member [channel-id]
-              swift run MattermostSwiftCLI list-channel-members [channel-id]
-              swift run MattermostSwiftCLI channel-members-by-id [--channel channel-id] user-id [user-id...]
-              swift run MattermostSwiftCLI add-channel-member [--channel channel-id] user-id
-              swift run MattermostSwiftCLI remove-channel-member [--channel channel-id] user-id
-              swift run MattermostSwiftCLI channel-unread [channel-id]
-              swift run MattermostSwiftCLI notify-props-test
-              swift run MattermostSwiftCLI list-unread-posts [channel-id]
-              swift run MattermostSwiftCLI view-channel [channel-id]
-              swift run MattermostSwiftCLI send-typing [channel-id]
-              swift run MattermostSwiftCLI list-categories
-              swift run MattermostSwiftCLI list-threads [team-id]
-              swift run MattermostSwiftCLI list-preferences [category]
-              swift run MattermostSwiftCLI preferences-test
-              swift run MattermostSwiftCLI preference-roundtrip-test
-              swift run MattermostSwiftCLI sidebar-category-test
-              swift run MattermostSwiftCLI sidebar-move-test
-              swift run MattermostSwiftCLI create-test-channel
-              swift run MattermostSwiftCLI rename-test-channel channel-id [new-name]
-              swift run MattermostSwiftCLI archive-channel channel-id
-              swift run MattermostSwiftCLI list-posts [channel-id]
-              swift run MattermostSwiftCLI pinned-posts [channel-id]
-              swift run MattermostSwiftCLI list-post-updates since-ms [channel-id]
-              swift run MattermostSwiftCLI send-message [--channel channel-id] message
-              swift run MattermostSwiftCLI edit-message post-id message
-              swift run MattermostSwiftCLI delete-message post-id
-              swift run MattermostSwiftCLI thread-test
-              swift run MattermostSwiftCLI timeline-test
-              swift run MattermostSwiftCLI since-test
-              swift run MattermostSwiftCLI unread-posts-test
-              swift run MattermostSwiftCLI threads-test
-              swift run MattermostSwiftCLI props-test
-              swift run MattermostSwiftCLI reaction-test
-              swift run MattermostSwiftCLI search terms
-              swift run MattermostSwiftCLI search-test
-              swift run MattermostSwiftCLI upload-file [--channel channel-id] path
-              swift run MattermostSwiftCLI download-file file-id [path]
-              swift run MattermostSwiftCLI file-test
-              swift run MattermostSwiftCLI list-emoji
-              swift run MattermostSwiftCLI search-emoji term
-              swift run MattermostSwiftCLI stream-events [limit]
-              swift run MattermostSwiftCLI websocket-test
-              swift run MattermostSwiftCLI live-sync-test
-              swift run MattermostSwiftCLI reconnect-backfill-test
-              swift run MattermostSwiftCLI deletion-backfill-test
-              swift run MattermostSwiftCLI live-sync-reconnect-test
-              swift run MattermostSwiftCLI all-channel-backfill-test
-              swift run MattermostSwiftCLI all-channel-reconnect-test
-              swift run MattermostSwiftCLI failure-cleanup-test
-              swift run MattermostSwiftCLI residue-audit
-              swift run MattermostSwiftCLI typing-test
-              swift run MattermostSwiftCLI channel-test
-              swift run MattermostSwiftCLI e2e-test
-              swift run MattermostSwiftCLI sync [channel-id]
-              swift run MattermostSwiftCLI cache-check [channel-id]
-              swift run MattermostSwiftCLI login-test
-              swift run MattermostSwiftCLI check
-
-            Commands ending in -test are live-server diagnostics that use the configured Mattermost environment.
-
-            Environment:
-              MATTERMOST_URL       Required. Server base URL.
-              MATTERMOST_TOKEN     Required. Personal access token.
-              MATTERMOST_CHANNEL_ID Optional. Channel id for post commands.
-              MATTERMOST_TEAM_NAME Optional. Team name for team-scoped channel listing.
-              MATTERMOST_STORE_PATH Optional. SQLite path for CLI cache probes.
-              MATTERMOST_USERNAME  Optional. Username/email for login-test.
-              MATTERMOST_PASSWORD  Optional. Password for login-test.
-            """
-        )
-    }
-}
-
-enum Command: Equatable {
+enum Command: Equatable, Sendable {
     case me
     case getUser(userID: String)
     case profileImage(userID: String?)
@@ -193,313 +86,756 @@ enum Command: Equatable {
     case cacheCheck(channelID: String?)
     case loginTest
     case check
-    case help
+}
 
-    init(arguments: [String]) {
-        switch arguments.first {
-        case "me":
-            self = .me
-        case "get-user":
-            self = .getUser(userID: arguments.dropFirst().first ?? "me")
-        case "profile-image":
-            self = .profileImage(userID: arguments.dropFirst().first)
-        case "default-profile-image":
-            self = .defaultProfileImage(userID: arguments.dropFirst().first)
-        case "get-users":
-            let userIDs = Array(arguments.dropFirst())
-            self = userIDs.isEmpty ? .help : .getUsers(userIDs: userIDs)
-        case "get-users-by-username":
-            let usernames = Array(arguments.dropFirst())
-            self = usernames.isEmpty ? .help : .getUsersByUsername(usernames: usernames)
-        case "list-channel-users":
-            self = .listChannelUsers(channelID: arguments.dropFirst().first)
-        case "search-users":
-            let terms = arguments.dropFirst().joined(separator: " ")
-            self = terms.isEmpty ? .help : .searchUsers(terms: terms)
-        case "autocomplete-users":
-            let name = arguments.dropFirst().joined(separator: " ")
-            self = name.isEmpty ? .help : .autocompleteUsers(name: name)
-        case "known-users":
-            self = .knownUsers(includeProfiles: arguments.dropFirst().contains("--profiles"))
-        case "status":
-            self = .status(userID: arguments.dropFirst().first)
-        case "server-info":
-            self = .serverInfo
-        case "list-teams":
-            self = .listTeams
-        case "team-info":
-            self = .teamInfo(teamID: arguments.dropFirst().first)
-        case "list-team-members":
-            self = .listTeamMembers(teamID: arguments.dropFirst().first)
-        case "list-channels":
-            self = .listChannels
-        case "list-public-channels":
-            self = .listPublicChannels(teamID: arguments.dropFirst().first)
-        case "channel-info":
-            self = .channelInfo(channelID: arguments.dropFirst().first)
-        case "channel-by-name":
-            self = Command.parseChannelByName(Array(arguments.dropFirst()))
-        case "channel-by-team-name":
-            let tail = Array(arguments.dropFirst())
-            if tail.count == 2 {
-                self = .channelByTeamName(teamName: tail[0], channelName: tail[1])
-            } else {
-                self = .help
-            }
-        case "channel-stats":
-            self = .channelStats(channelID: arguments.dropFirst().first)
-        case "channel-timezones":
-            self = .channelTimezones(channelID: arguments.dropFirst().first)
-        case "channel-member-counts":
-            self = .channelMemberCounts(channelIDs: Array(arguments.dropFirst()))
-        case "search-channels":
-            let terms = arguments.dropFirst().joined(separator: " ")
-            self = terms.isEmpty ? .help : .searchChannels(terms: terms)
-        case "search-group-channels":
-            let terms = arguments.dropFirst().joined(separator: " ")
-            self = terms.isEmpty ? .help : .searchGroupChannels(terms: terms)
-        case "direct-channel-test":
-            self = .directChannelTest(userID: arguments.dropFirst().first)
-        case "create-group-channel":
-            let userIDs = Array(arguments.dropFirst())
-            self = userIDs.count >= 2 ? .createGroupChannel(userIDs: userIDs) : .help
-        case "channel-member":
-            self = .channelMember(channelID: arguments.dropFirst().first)
-        case "list-channel-members":
-            self = .listChannelMembers(channelID: arguments.dropFirst().first)
-        case "channel-members-by-id":
-            self = Command.parseChannelMembersByID(Array(arguments.dropFirst()))
-        case "add-channel-member":
-            self = Command.parseChannelMemberMutation(Array(arguments.dropFirst()), mutation: .add)
-        case "remove-channel-member":
-            self = Command.parseChannelMemberMutation(Array(arguments.dropFirst()), mutation: .remove)
-        case "channel-unread":
-            self = .channelUnread(channelID: arguments.dropFirst().first)
-        case "notify-props-test":
-            self = .notifyPropsTest
-        case "list-unread-posts":
-            self = .listUnreadPosts(channelID: arguments.dropFirst().first)
-        case "view-channel":
-            self = .viewChannel(channelID: arguments.dropFirst().first)
-        case "send-typing":
-            self = .sendTyping(channelID: arguments.dropFirst().first)
-        case "list-categories":
-            self = .listCategories
-        case "list-threads":
-            self = .listThreads(teamID: arguments.dropFirst().first)
-        case "list-preferences":
-            self = .listPreferences(category: arguments.dropFirst().first)
-        case "preferences-test":
-            self = .preferencesTest
-        case "preference-roundtrip-test":
-            self = .preferenceRoundTripTest
-        case "sidebar-category-test":
-            self = .sidebarCategoryTest
-        case "sidebar-move-test":
-            self = .sidebarMoveTest
-        case "create-test-channel":
-            self = .createTestChannel
-        case "rename-test-channel":
-            let tail = Array(arguments.dropFirst())
-            self = .renameTestChannel(channelID: tail.first, name: tail.dropFirst().first)
-        case "archive-channel":
-            self = .archiveChannel(channelID: arguments.dropFirst().first)
-        case "list-posts":
-            self = .listPosts(channelID: arguments.dropFirst().first)
-        case "pinned-posts":
-            self = .pinnedPosts(channelID: arguments.dropFirst().first)
-        case "list-post-updates":
-            self = Command.parseListPostUpdates(Array(arguments.dropFirst()))
-        case "send-message":
-            self = Command.parseSendMessage(Array(arguments.dropFirst()))
-        case "edit-message":
-            self = Command.parseEditMessage(Array(arguments.dropFirst()))
-        case "delete-message":
-            if let postID = arguments.dropFirst().first {
-                self = .deleteMessage(postID: postID)
-            } else {
-                self = .help
-            }
-        case "thread-test":
-            self = .threadTest
-        case "timeline-test":
-            self = .timelineTest
-        case "since-test":
-            self = .sinceTest
-        case "unread-posts-test":
-            self = .unreadPostsTest
-        case "threads-test":
-            self = .threadsTest
-        case "props-test":
-            self = .propsTest
-        case "reaction-test":
-            self = .reactionTest
-        case "search":
-            let terms = arguments.dropFirst().joined(separator: " ")
-            self = terms.isEmpty ? .help : .search(terms: terms)
-        case "search-test":
-            self = .searchTest
-        case "upload-file":
-            self = Command.parseUploadFile(Array(arguments.dropFirst()))
-        case "download-file":
-            let tail = Array(arguments.dropFirst())
-            if let fileID = tail.first {
-                self = .downloadFile(fileID: fileID, path: tail.dropFirst().first)
-            } else {
-                self = .help
-            }
-        case "file-test":
-            self = .fileTest
-        case "list-emoji":
-            self = .listEmoji
-        case "search-emoji":
-            let term = arguments.dropFirst().joined(separator: " ")
-            self = term.isEmpty ? .help : .searchEmoji(term: term)
-        case "stream-events":
-            let limit = arguments.dropFirst().first.flatMap(Int.init) ?? 1
-            self = .streamEvents(limit: max(1, limit))
-        case "websocket-test":
-            self = .webSocketTest
-        case "live-sync-test":
-            self = .liveSyncTest
-        case "reconnect-backfill-test":
-            self = .reconnectBackfillTest
-        case "deletion-backfill-test":
-            self = .deletionBackfillTest
-        case "live-sync-reconnect-test":
-            self = .liveSyncReconnectTest
-        case "all-channel-backfill-test":
-            self = .allChannelBackfillTest
-        case "all-channel-reconnect-test":
-            self = .allChannelReconnectTest
-        case "failure-cleanup-test":
-            self = .failureCleanupTest
-        case "residue-audit":
-            self = .residueAudit
-        case "typing-test":
-            self = .typingTest
-        case "channel-test":
-            self = .channelTest
-        case "e2e-test":
-            self = .e2eTest
-        case "sync":
-            self = .sync(channelID: arguments.dropFirst().first)
-        case "cache-check":
-            self = .cacheCheck(channelID: arguments.dropFirst().first)
-        case "login-test":
-            self = .loginTest
-        case "check":
-            self = .check
-        default:
-            self = .help
+struct ParsedCLIInvocation: Equatable, Sendable {
+    let command: Command
+    let json: Bool
+}
+
+struct RootCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "MattermostSwiftCLI",
+        abstract: "A command-line harness for the MattermostSwift SDK.",
+        discussion: """
+            Authentication and defaults are read from MATTERMOST_URL, MATTERMOST_TOKEN, \
+            MATTERMOST_CHANNEL_ID, MATTERMOST_TEAM_NAME, and MATTERMOST_STORE_PATH.
+            """,
+        version: "0.1.0",
+        subcommands: [
+            Me.self,
+            GetUser.self,
+            ProfileImage.self,
+            DefaultProfileImage.self,
+            GetUsers.self,
+            GetUsersByUsername.self,
+            ListChannelUsers.self,
+            SearchUsers.self,
+            AutocompleteUsers.self,
+            KnownUsers.self,
+            UserStatus.self,
+            ServerInfo.self,
+            ListTeams.self,
+            TeamInfo.self,
+            ListTeamMembers.self,
+            ListChannels.self,
+            ListPublicChannels.self,
+            ChannelInfo.self,
+            ChannelByName.self,
+            ChannelByTeamName.self,
+            ChannelStats.self,
+            ChannelTimezones.self,
+            ChannelMemberCounts.self,
+            SearchChannels.self,
+            SearchGroupChannels.self,
+            CreateGroupChannel.self,
+            ChannelMember.self,
+            ListChannelMembers.self,
+            ChannelMembersByID.self,
+            AddChannelMember.self,
+            RemoveChannelMember.self,
+            ChannelUnread.self,
+            ListUnreadPosts.self,
+            ViewChannel.self,
+            SendTyping.self,
+            ListCategories.self,
+            ListThreads.self,
+            ListPreferences.self,
+            ListPosts.self,
+            PinnedPosts.self,
+            ListPostUpdates.self,
+            SendMessage.self,
+            EditMessage.self,
+            DeleteMessage.self,
+            SearchPosts.self,
+            UploadFile.self,
+            DownloadFile.self,
+            ListEmoji.self,
+            SearchEmoji.self,
+            StreamEvents.self,
+            Sync.self,
+            CacheCheck.self,
+            Check.self,
+            Diagnostics.self,
+        ]
+    )
+
+    @Flag(help: "Emit stable, lossless JSON to standard output.")
+    var json = false
+}
+
+extension MattermostSwiftCLI {
+    static func parseInvocation(_ arguments: [String]) throws -> ParsedCLIInvocation {
+        let parsed = try RootCommand.parseAsRoot(arguments)
+        if let command = parsed as? any RootCLICommand {
+            return ParsedCLIInvocation(command: command.command, json: command.parent.json)
+        }
+        if let command = parsed as? any DiagnosticCLICommand {
+            return ParsedCLIInvocation(
+                command: command.command,
+                json: command.parent.parent.json
+            )
+        }
+        throw ValidationError("Expected a MattermostSwiftCLI subcommand.")
+    }
+}
+
+protocol RootCLICommand: AsyncParsableCommand {
+    var parent: RootCommand { get }
+    var command: Command { get }
+}
+
+extension RootCLICommand {
+    mutating func run() async throws {
+        try await CLIOutputMode.$json.withValue(parent.json) {
+            try await MattermostSwiftCLI.run(command: command)
+        }
+    }
+}
+
+private func joined(_ values: [String]) -> String {
+    values.joined(separator: " ")
+}
+
+struct Me: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Show the current authenticated user.")
+    @ParentCommand var parent: RootCommand
+    var command: Command { .me }
+}
+
+struct GetUser: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Show a user by id, defaulting to the current user.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Mattermost user id.") var userID = "me"
+    var command: Command { .getUser(userID: userID) }
+}
+
+struct ProfileImage: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Inspect a user's profile image download.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Mattermost user id. Defaults to the current user.") var userID: String?
+    var command: Command { .profileImage(userID: userID) }
+}
+
+struct DefaultProfileImage: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Inspect a user's generated default profile image.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Mattermost user id. Defaults to the current user.") var userID: String?
+    var command: Command { .defaultProfileImage(userID: userID) }
+}
+
+struct GetUsers: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Load users by id.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "One or more Mattermost user ids.") var userIDs: [String]
+    var command: Command { .getUsers(userIDs: userIDs) }
+}
+
+struct GetUsersByUsername: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Load users by username.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "One or more Mattermost usernames.") var usernames: [String]
+    var command: Command { .getUsersByUsername(usernames: usernames) }
+}
+
+struct ListChannelUsers: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List users in a channel.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .listChannelUsers(channelID: channelID) }
+}
+
+struct SearchUsers: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Search users.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Search terms.") var terms: [String]
+    var command: Command { .searchUsers(terms: joined(terms)) }
+}
+
+struct AutocompleteUsers: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Autocomplete users.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Name fragment.") var name: [String]
+    var command: Command { .autocompleteUsers(name: joined(name)) }
+}
+
+struct KnownUsers: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List known user ids.")
+    @ParentCommand var parent: RootCommand
+    @Flag(help: "Load and output profiles instead of ids only.") var profiles = false
+    var command: Command { .knownUsers(includeProfiles: profiles) }
+}
+
+struct UserStatus: RootCLICommand {
+    static let configuration = CommandConfiguration(commandName: "status", abstract: "Show a user's presence status.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "User id. Defaults to the current user.") var userID: String?
+    var command: Command { .status(userID: userID) }
+}
+
+struct ServerInfo: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Probe server health and client configuration.")
+    @ParentCommand var parent: RootCommand
+    var command: Command { .serverInfo }
+}
+
+struct ListTeams: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List joined teams.")
+    @ParentCommand var parent: RootCommand
+    var command: Command { .listTeams }
+}
+
+struct TeamInfo: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Show team metadata.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Team id. Defaults to the configured or first joined team.") var teamID: String?
+    var command: Command { .teamInfo(teamID: teamID) }
+}
+
+struct ListTeamMembers: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List members of a team.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Team id. Defaults to the configured or first joined team.") var teamID: String?
+    var command: Command { .listTeamMembers(teamID: teamID) }
+}
+
+struct ListChannels: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List joined channels.")
+    @ParentCommand var parent: RootCommand
+    var command: Command { .listChannels }
+}
+
+struct ListPublicChannels: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List public channels in a team.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Team id. Defaults to the configured or first joined team.") var teamID: String?
+    var command: Command { .listPublicChannels(teamID: teamID) }
+}
+
+struct ChannelInfo: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Show channel metadata.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .channelInfo(channelID: channelID) }
+}
+
+struct ChannelByName: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Resolve a channel by team id and channel name.")
+    @ParentCommand var parent: RootCommand
+    @Option(help: "Team id. Defaults to the configured or first joined team.") var team: String?
+    @Argument(help: "Channel name.") var name: String
+    var command: Command { .channelByName(teamID: team, name: name) }
+}
+
+struct ChannelByTeamName: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Resolve a channel by team name and channel name.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Team name.") var teamName: String
+    @Argument(help: "Channel name.") var channelName: String
+    var command: Command { .channelByTeamName(teamName: teamName, channelName: channelName) }
+}
+
+struct ChannelStats: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Show aggregate channel statistics.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .channelStats(channelID: channelID) }
+}
+
+struct ChannelTimezones: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List member timezones for a channel.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .channelTimezones(channelID: channelID) }
+}
+
+struct ChannelMemberCounts: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Show member counts for one or more channels.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel ids. Defaults to MATTERMOST_CHANNEL_ID.") var channelIDs: [String] = []
+    var command: Command { .channelMemberCounts(channelIDs: channelIDs) }
+}
+
+struct SearchChannels: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Search channels.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Search terms.") var terms: [String]
+    var command: Command { .searchChannels(terms: joined(terms)) }
+}
+
+struct SearchGroupChannels: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Search existing group-message channels.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Search terms.") var terms: [String]
+    var command: Command { .searchGroupChannels(terms: joined(terms)) }
+}
+
+struct CreateGroupChannel: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Open a group-message channel.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "At least two user ids.") var userIDs: [String]
+
+    mutating func validate() throws {
+        guard userIDs.count >= 2 else {
+            throw ValidationError("Provide at least two user ids.")
         }
     }
 
-    private static func parseSendMessage(_ arguments: [String]) -> Command {
-        if arguments.first == "--channel" {
-            let remaining = Array(arguments.dropFirst(2))
-            guard let channelID = arguments.dropFirst().first, !remaining.isEmpty else {
-                return .help
-            }
-            return .sendMessage(channelID: channelID, message: remaining.joined(separator: " "))
-        }
+    var command: Command { .createGroupChannel(userIDs: userIDs) }
+}
 
-        guard !arguments.isEmpty else {
-            return .help
-        }
+struct ChannelMember: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Show current-user membership in a channel.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .channelMember(channelID: channelID) }
+}
 
-        return .sendMessage(channelID: nil, message: arguments.joined(separator: " "))
+struct ListChannelMembers: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List channel memberships.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .listChannelMembers(channelID: channelID) }
+}
+
+struct ChannelMembersByID: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Load channel memberships by user id.")
+    @ParentCommand var parent: RootCommand
+    @Option(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channel: String?
+    @Argument(help: "One or more user ids.") var userIDs: [String]
+    var command: Command { .channelMembersByID(channelID: channel, userIDs: userIDs) }
+}
+
+struct AddChannelMember: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Add a user to a channel.")
+    @ParentCommand var parent: RootCommand
+    @Option(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channel: String?
+    @Argument(help: "User id.") var userID: String
+    var command: Command { .addChannelMember(channelID: channel, userID: userID) }
+}
+
+struct RemoveChannelMember: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Remove a user from a channel.")
+    @ParentCommand var parent: RootCommand
+    @Option(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channel: String?
+    @Argument(help: "User id.") var userID: String
+    var command: Command { .removeChannelMember(channelID: channel, userID: userID) }
+}
+
+struct ChannelUnread: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Show unread counts for a channel.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .channelUnread(channelID: channelID) }
+}
+
+struct ListUnreadPosts: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List posts around the oldest unread post.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .listUnreadPosts(channelID: channelID) }
+}
+
+struct ViewChannel: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Mark a channel viewed.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .viewChannel(channelID: channelID) }
+}
+
+struct SendTyping: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Publish a typing event.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .sendTyping(channelID: channelID) }
+}
+
+struct ListCategories: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List sidebar categories.")
+    @ParentCommand var parent: RootCommand
+    var command: Command { .listCategories }
+}
+
+struct ListThreads: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List the current user's thread inbox.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Team id. Defaults to the configured or first joined team.") var teamID: String?
+    var command: Command { .listThreads(teamID: teamID) }
+}
+
+struct ListPreferences: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List user preferences without exposing values in human output.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Optional preference category.") var category: String?
+    var command: Command { .listPreferences(category: category) }
+}
+
+struct ListPosts: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List recent channel posts.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .listPosts(channelID: channelID) }
+}
+
+struct PinnedPosts: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List pinned channel posts.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .pinnedPosts(channelID: channelID) }
+}
+
+struct ListPostUpdates: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List posts created or updated since a millisecond timestamp.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Mattermost millisecond timestamp.") var since: Int64
+    @Argument(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channelID: String?
+    var command: Command { .listPostUpdates(channelID: channelID, since: since) }
+}
+
+struct SendMessage: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Send a message to a channel.")
+    @ParentCommand var parent: RootCommand
+    @Option(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channel: String?
+    @Argument(help: "Message text.") var message: [String]
+    var command: Command { .sendMessage(channelID: channel, message: joined(message)) }
+}
+
+struct EditMessage: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Edit an existing post.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Post id.") var postID: String
+    @Argument(help: "Replacement message text.") var message: [String]
+    var command: Command { .editMessage(postID: postID, message: joined(message)) }
+}
+
+struct DeleteMessage: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Delete a post.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Post id.") var postID: String
+    var command: Command { .deleteMessage(postID: postID) }
+}
+
+struct SearchPosts: RootCLICommand {
+    static let configuration = CommandConfiguration(commandName: "search", abstract: "Search posts in the configured team.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Search terms.") var terms: [String]
+    var command: Command { .search(terms: joined(terms)) }
+}
+
+struct UploadFile: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Upload a file.")
+    @ParentCommand var parent: RootCommand
+    @Option(help: "Channel id. Defaults to MATTERMOST_CHANNEL_ID.") var channel: String?
+    @Argument(help: "Local file path.") var path: String
+    var command: Command { .uploadFile(channelID: channel, path: path) }
+}
+
+struct DownloadFile: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Download a file to a path or, when piped, standard output.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Mattermost file id.") var fileID: String
+    @Argument(help: "Optional destination path.") var path: String?
+    var command: Command { .downloadFile(fileID: fileID, path: path) }
+}
+
+struct ListEmoji: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List custom emoji.")
+    @ParentCommand var parent: RootCommand
+    var command: Command { .listEmoji }
+}
+
+struct SearchEmoji: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Search custom emoji.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Search term.") var term: [String]
+    var command: Command { .searchEmoji(term: joined(term)) }
+}
+
+struct StreamEvents: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Stream a bounded number of WebSocket events.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Number of events to receive.") var limit = 1
+
+    mutating func validate() throws {
+        guard limit > 0 else {
+            throw ValidationError("The event limit must be greater than zero.")
+        }
     }
 
-    private static func parseChannelByName(_ arguments: [String]) -> Command {
-        if arguments.first == "--team" {
-            let tail = Array(arguments.dropFirst(2))
-            guard let teamID = arguments.dropFirst().first, let name = tail.first, tail.count == 1 else {
-                return .help
-            }
-            return .channelByName(teamID: teamID, name: name)
-        }
+    var command: Command { .streamEvents(limit: limit) }
+}
 
-        guard let name = arguments.first, arguments.count == 1 else {
-            return .help
-        }
-        return .channelByName(teamID: nil, name: name)
-    }
+struct Sync: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Hydrate the local SwiftData cache.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Optional channel id whose posts should also be synced.") var channelID: String?
+    var command: Command { .sync(channelID: channelID) }
+}
 
-    private static func parseEditMessage(_ arguments: [String]) -> Command {
-        guard let postID = arguments.first else {
-            return .help
-        }
+struct CacheCheck: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Inspect the local cache without network access.")
+    @ParentCommand var parent: RootCommand
+    @Argument(help: "Optional channel id whose cached posts should be counted.") var channelID: String?
+    var command: Command { .cacheCheck(channelID: channelID) }
+}
 
-        let messageParts = arguments.dropFirst()
-        guard !messageParts.isEmpty else {
-            return .help
-        }
+struct Check: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify authentication and joined-channel loading.")
+    @ParentCommand var parent: RootCommand
+    var command: Command { .check }
+}
 
-        return .editMessage(postID: postID, message: messageParts.joined(separator: " "))
-    }
+struct Diagnostics: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "diag",
+        abstract: "Run live-server and mutating verification diagnostics.",
+        discussion: "These commands may require extra credentials and some mutate the configured workspace.",
+        subcommands: [
+            DirectChannelTest.self,
+            NotifyPropsTest.self,
+            PreferencesTest.self,
+            PreferenceRoundTripTest.self,
+            SidebarCategoryTest.self,
+            SidebarMoveTest.self,
+            CreateTestChannel.self,
+            RenameTestChannel.self,
+            ArchiveChannel.self,
+            ThreadTest.self,
+            TimelineTest.self,
+            SinceTest.self,
+            UnreadPostsTest.self,
+            ThreadsTest.self,
+            PropsTest.self,
+            ReactionTest.self,
+            SearchTest.self,
+            FileTest.self,
+            WebSocketTest.self,
+            LiveSyncTest.self,
+            ReconnectBackfillTest.self,
+            DeletionBackfillTest.self,
+            LiveSyncReconnectTest.self,
+            AllChannelBackfillTest.self,
+            AllChannelReconnectTest.self,
+            FailureCleanupTest.self,
+            ResidueAudit.self,
+            TypingTest.self,
+            ChannelTest.self,
+            E2ETest.self,
+            LoginTest.self,
+        ]
+    )
 
-    private static func parseListPostUpdates(_ arguments: [String]) -> Command {
-        if let since = arguments.first.flatMap(Int64.init) {
-            return .listPostUpdates(channelID: arguments.dropFirst().first, since: since)
-        }
+    @ParentCommand var parent: RootCommand
+}
 
-        if arguments.count >= 2, let since = Int64(arguments[1]) {
-            return .listPostUpdates(channelID: arguments[0], since: since)
-        }
+protocol DiagnosticCLICommand: AsyncParsableCommand {
+    var parent: Diagnostics { get }
+    var command: Command { get }
+}
 
-        return .help
-    }
-
-    private static func parseUploadFile(_ arguments: [String]) -> Command {
-        if arguments.first == "--channel" {
-            let tail = Array(arguments.dropFirst(2))
-            guard let channelID = arguments.dropFirst().first, let path = tail.first else {
-                return .help
-            }
-            return .uploadFile(channelID: channelID, path: path)
-        }
-
-        guard let path = arguments.first else {
-            return .help
-        }
-        return .uploadFile(channelID: nil, path: path)
-    }
-
-    private static func parseChannelMembersByID(_ arguments: [String]) -> Command {
-        let parsed = parseOptionalChannelArguments(arguments)
-        guard !parsed.values.isEmpty else {
-            return .help
-        }
-        return .channelMembersByID(channelID: parsed.channelID, userIDs: parsed.values)
-    }
-
-    private static func parseChannelMemberMutation(
-        _ arguments: [String],
-        mutation: ChannelMemberMutation
-    ) -> Command {
-        let parsed = parseOptionalChannelArguments(arguments)
-        guard let userID = parsed.values.first, parsed.values.count == 1 else {
-            return .help
-        }
-
-        switch mutation {
-        case .add:
-            return .addChannelMember(channelID: parsed.channelID, userID: userID)
-        case .remove:
-            return .removeChannelMember(channelID: parsed.channelID, userID: userID)
+extension DiagnosticCLICommand {
+    mutating func run() async throws {
+        try await CLIOutputMode.$json.withValue(parent.parent.json) {
+            try await MattermostSwiftCLI.run(command: command)
         }
     }
+}
 
-    private static func parseOptionalChannelArguments(_ arguments: [String]) -> (channelID: String?, values: [String]) {
-        if arguments.first == "--channel" {
-            return (arguments.dropFirst().first, Array(arguments.dropFirst(2)))
-        }
-        return (nil, arguments)
-    }
+struct DirectChannelTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify direct-channel opening.")
+    @ParentCommand var parent: Diagnostics
+    @Argument(help: "Other user id. Defaults to another known user.") var userID: String?
+    var command: Command { .directChannelTest(userID: userID) }
+}
 
-    private enum ChannelMemberMutation {
-        case add
-        case remove
-    }
+struct NotifyPropsTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify typed channel notification properties.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .notifyPropsTest }
+}
+
+struct PreferencesTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify preference decoding.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .preferencesTest }
+}
+
+struct PreferenceRoundTripTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(
+        commandName: "preference-roundtrip-test",
+        abstract: "Verify temporary preference save/load/delete."
+    )
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .preferenceRoundTripTest }
+}
+
+struct SidebarCategoryTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify sidebar category lifecycle.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .sidebarCategoryTest }
+}
+
+struct SidebarMoveTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify moving a channel in sidebar categories.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .sidebarMoveTest }
+}
+
+struct CreateTestChannel: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Create a guarded MattermostSwift test channel.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .createTestChannel }
+}
+
+struct RenameTestChannel: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Rename a guarded MattermostSwift test channel.")
+    @ParentCommand var parent: Diagnostics
+    @Argument(help: "Test channel id.") var channelID: String
+    @Argument(help: "Optional new mmswift-test-* channel name.") var name: String?
+    var command: Command { .renameTestChannel(channelID: channelID, name: name) }
+}
+
+struct ArchiveChannel: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Archive a guarded MattermostSwift test channel.")
+    @ParentCommand var parent: Diagnostics
+    @Argument(help: "Test channel id.") var channelID: String
+    var command: Command { .archiveChannel(channelID: channelID) }
+}
+
+struct ThreadTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify root/reply thread behavior.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .threadTest }
+}
+
+struct TimelineTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify channel/thread timeline behavior.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .timelineTest }
+}
+
+struct SinceTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify post-update fetching by timestamp.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .sinceTest }
+}
+
+struct UnreadPostsTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify unread-context post loading.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .unreadPostsTest }
+}
+
+struct ThreadsTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify thread inbox decoding and caching.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .threadsTest }
+}
+
+struct PropsTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify post props round-trip and caching.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .propsTest }
+}
+
+struct ReactionTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify reaction add/list/remove.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .reactionTest }
+}
+
+struct SearchTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify post search against a temporary post.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .searchTest }
+}
+
+struct FileTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify file upload/attach/download.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .fileTest }
+}
+
+struct WebSocketTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(
+        commandName: "websocket-test",
+        abstract: "Verify posted/edit/delete WebSocket events."
+    )
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .webSocketTest }
+}
+
+struct LiveSyncTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify live-sync event application.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .liveSyncTest }
+}
+
+struct ReconnectBackfillTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify cursor-based reconnect backfill.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .reconnectBackfillTest }
+}
+
+struct DeletionBackfillTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify deletion reconciliation during backfill.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .deletionBackfillTest }
+}
+
+struct LiveSyncReconnectTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify deterministic live-sync reconnect behavior.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .liveSyncReconnectTest }
+}
+
+struct AllChannelBackfillTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify an all-joined-channel backfill sweep.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .allChannelBackfillTest }
+}
+
+struct AllChannelReconnectTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify all-channel reconnect backfill.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .allChannelReconnectTest }
+}
+
+struct FailureCleanupTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify cleanup after a forced intermediate failure.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .failureCleanupTest }
+}
+
+struct ResidueAudit: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Audit for active MattermostSwift test residue.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .residueAudit }
+}
+
+struct TypingTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify typing publication and opportunistic receive.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .typingTest }
+}
+
+struct ChannelTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify channel create/rename/view/archive.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .channelTest }
+}
+
+struct E2ETest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(
+        commandName: "e2e-test",
+        abstract: "Run the isolated full end-to-end verification flow."
+    )
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .e2eTest }
+}
+
+struct LoginTest: DiagnosticCLICommand {
+    static let configuration = CommandConfiguration(abstract: "Verify username/password login and logout.")
+    @ParentCommand var parent: Diagnostics
+    var command: Command { .loginTest }
 }

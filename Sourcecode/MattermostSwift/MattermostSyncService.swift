@@ -33,7 +33,7 @@ public struct MattermostSyncOptions: Equatable, Sendable {
 }
 
 /// Summary of posts fetched for a channel during a sync pass.
-public struct MattermostChannelPostSyncResult: Equatable, Sendable {
+public struct MattermostChannelPostSyncResult: Encodable, Equatable, Sendable {
     public let channelID: String
     public let posts: [MattermostPost]
     public let pageCount: Int
@@ -56,7 +56,7 @@ public struct MattermostChannelPostSyncResult: Equatable, Sendable {
 }
 
 /// Summary of a workspace sync pass.
-public struct MattermostSyncResult: Equatable, Sendable {
+public struct MattermostSyncResult: Encodable, Equatable, Sendable {
     public let user: MattermostUser
     public let teams: [MattermostTeam]
     public let teamID: String?

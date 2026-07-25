@@ -1,8 +1,70 @@
 import Foundation
-@_spi(Testing) import MattermostSwift
+import MattermostSwift
+
+enum CLIOutputMode {
+    @TaskLocal static var json = false
+}
+
+private struct CLITextRecord: Encodable {
+    let text: String
+}
+
+private struct CLIImageResult: Encodable {
+    let kind: String
+    let userID: String
+    let byteCount: Int
+    let signature: String
+    let dataBase64: String
+}
+
+private struct CLIKnownUsersResult: Encodable {
+    let userIDs: [String]
+    let profiles: [MattermostUser]?
+}
+
+private struct CLICheckResult: Encodable {
+    let user: MattermostUser
+    let channels: [MattermostChannel]
+}
 
 extension MattermostSwiftCLI {
+    static func encodedJSON<Value: Encodable>(_ value: Value) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return try encoder.encode(value)
+    }
+
+    static func writeJSON<Value: Encodable>(_ value: Value) {
+        do {
+            var data = try encodedJSON(value)
+            data.append(0x0A)
+            FileHandle.standardOutput.write(data)
+        } catch {
+            writeStandardError("error: could not encode CLI JSON output: \(error.localizedDescription)\n")
+            Foundation.exit(1)
+        }
+    }
+
+    @discardableResult
+    static func writeJSONIfRequested<Value: Encodable>(_ value: Value) -> Bool {
+        guard CLIOutputMode.json else { return false }
+        writeJSON(value)
+        return true
+    }
+
+    /// Human-oriented scenario output falls back to lossless NDJSON text records.
+    ///
+    /// Model-backed commands use their concrete `Encodable` values instead.
+    static func print(_ line: String) {
+        if CLIOutputMode.json {
+            writeJSON(CLITextRecord(text: line))
+        } else {
+            Swift.print(line)
+        }
+    }
+
     static func printServerInfo(_ serverInfo: MattermostServerInfo) {
+        guard !writeJSONIfRequested(serverInfo) else { return }
         print("status: \(serverInfo.ping.status)")
 
         if let databaseStatus = serverInfo.ping.databaseStatus, !databaseStatus.isEmpty {
@@ -31,6 +93,7 @@ extension MattermostSwiftCLI {
     }
 
     static func printUser(_ user: MattermostUser) {
+        guard !writeJSONIfRequested(user) else { return }
         print("id: \(user.id)")
         print("username: \(user.username)")
 
@@ -53,12 +116,22 @@ extension MattermostSwiftCLI {
     }
 
     static func printUsers(_ users: [MattermostUser]) {
-        for user in users.sorted(by: userSort) {
+        let sortedUsers = users.sorted(by: userSort)
+        guard !writeJSONIfRequested(sortedUsers) else { return }
+        for user in sortedUsers {
             print("\(user.id)\t\(user.username)")
         }
     }
 
     static func printImageDownload(label: String, userID: String, data: Data) {
+        let result = CLIImageResult(
+            kind: label,
+            userID: userID,
+            byteCount: data.count,
+            signature: imageSignature(for: data),
+            dataBase64: data.base64EncodedString()
+        )
+        guard !writeJSONIfRequested(result) else { return }
         print("\(label): \(userID)")
         print("bytes: \(data.count)")
         print("signature: \(imageSignature(for: data))")
@@ -81,6 +154,7 @@ extension MattermostSwiftCLI {
     }
 
     static func printUserAutocomplete(_ autocomplete: MattermostUserAutocomplete) {
+        guard !writeJSONIfRequested(autocomplete) else { return }
         print("users: \(autocomplete.users.count)")
         print("in-channel: \(autocomplete.inChannel.count)")
         print("out-of-channel: \(autocomplete.outOfChannel.count)")
@@ -92,10 +166,40 @@ extension MattermostSwiftCLI {
     }
 
     static func printStatus(_ status: MattermostUserStatus) {
+        guard !writeJSONIfRequested(status) else { return }
         print("\(status.userId)\t\(status.status)")
     }
 
+    static func printStatusOK(_ status: MattermostStatusOK) {
+        guard !writeJSONIfRequested(status) else { return }
+        print("status: \(status.status)")
+    }
+
+    static func printKnownUsers(userIDs: [String], profiles: [MattermostUser]?) {
+        let sortedIDs = userIDs.sorted()
+        let sortedProfiles = profiles?.sorted(by: userSort)
+        guard !writeJSONIfRequested(
+            CLIKnownUsersResult(userIDs: sortedIDs, profiles: sortedProfiles)
+        ) else { return }
+
+        print("known-users: \(sortedIDs.count)")
+        if let sortedProfiles {
+            printUsers(sortedProfiles)
+        } else {
+            for userID in sortedIDs {
+                print(userID)
+            }
+        }
+    }
+
+    static func printCheck(user: MattermostUser, channels: [MattermostChannel]) {
+        guard !writeJSONIfRequested(CLICheckResult(user: user, channels: channels)) else { return }
+        print("Authenticated as \(user.username) (\(user.id))")
+        print("Loaded \(channels.count) channel\(channels.count == 1 ? "" : "s")")
+    }
+
     static func printTeam(_ team: MattermostTeam) {
+        guard !writeJSONIfRequested(team) else { return }
         print("id: \(team.id)")
         print("name: \(team.name)")
         print("display-name: \(team.displayName)")
@@ -110,13 +214,17 @@ extension MattermostSwiftCLI {
     }
 
     static func printTeams(_ teams: [MattermostTeam]) {
-        for team in teams.sorted(by: teamSort) {
+        let sortedTeams = teams.sorted(by: teamSort)
+        guard !writeJSONIfRequested(sortedTeams) else { return }
+        for team in sortedTeams {
             print("\(team.id)\t\(team.name)\t\(team.displayName)")
         }
     }
 
     static func printTeamMembers(_ members: [MattermostTeamMember]) {
-        for member in members.sorted(by: teamMemberSort) {
+        let sortedMembers = members.sorted(by: teamMemberSort)
+        guard !writeJSONIfRequested(sortedMembers) else { return }
+        for member in sortedMembers {
             print("\(member.teamId)\t\(member.userId)\t\(member.roles ?? "")")
         }
     }
@@ -133,13 +241,16 @@ extension MattermostSwiftCLI {
     }
 
     static func printCategories(_ categories: [MattermostSidebarCategory]) {
+        guard !writeJSONIfRequested(categories) else { return }
         for category in categories {
             print("\(category.id)\t\(category.type)\t\(category.displayName)\t\(category.channelIds.count) channels")
         }
     }
 
     static func printPreferences(_ preferences: [MattermostPreference]) {
-        for preference in preferences.sorted(by: preferenceSort) {
+        let sortedPreferences = preferences.sorted(by: preferenceSort)
+        guard !writeJSONIfRequested(sortedPreferences) else { return }
+        for preference in sortedPreferences {
             print("\(preference.category)\t\(preference.name)\tvalue-bytes:\(preference.value.utf8.count)")
         }
     }
@@ -153,6 +264,7 @@ extension MattermostSwiftCLI {
     }
 
     static func printChannelMember(_ member: MattermostChannelMember) {
+        guard !writeJSONIfRequested(member) else { return }
         print("channel: \(member.channelId)")
         print("user: \(member.userId)")
         if let msgCount = member.msgCount {
@@ -165,7 +277,9 @@ extension MattermostSwiftCLI {
     }
 
     static func printChannelMembers(_ members: [MattermostChannelMember]) {
-        for member in members.sorted(by: channelMemberSort) {
+        let sortedMembers = members.sorted(by: channelMemberSort)
+        guard !writeJSONIfRequested(sortedMembers) else { return }
+        for member in sortedMembers {
             print("\(member.channelId)\t\(member.userId)\t\(member.roles ?? "")")
         }
     }
@@ -181,12 +295,14 @@ extension MattermostSwiftCLI {
     }
 
     static func printNotifyProps(_ props: MattermostChannelNotifyProps) {
+        guard !writeJSONIfRequested(props) else { return }
         for (name, value) in props.rawValues.sorted(by: { $0.key < $1.key }) {
             print("notify.\(name): \(value)")
         }
     }
 
     static func printChannelUnread(_ unread: MattermostChannelUnread) {
+        guard !writeJSONIfRequested(unread) else { return }
         print("channel: \(unread.channelId)")
         if let teamID = unread.teamId, !teamID.isEmpty {
             print("team: \(teamID)")
@@ -196,33 +312,40 @@ extension MattermostSwiftCLI {
     }
 
     static func printPosts(_ posts: [MattermostPost]) {
+        guard !writeJSONIfRequested(posts) else { return }
         for post in posts {
             printPost(post)
         }
     }
 
     static func printSearchResults(_ results: MattermostPostSearchResults) {
+        guard !writeJSONIfRequested(results) else { return }
         for post in results.orderedPosts.prefix(20) {
             printPost(post)
         }
     }
 
     static func printPost(_ post: MattermostPost) {
+        guard !writeJSONIfRequested(post) else { return }
         let message = post.message.replacing("\n", with: " ")
         print("\(post.id)\t\(post.channelId)\t\(post.userId)\t\(message)")
     }
 
     static func printFileInfo(_ fileInfo: MattermostFileInfo) {
+        guard !writeJSONIfRequested(fileInfo) else { return }
         print("\(fileInfo.id)\t\(fileInfo.name)\t\(fileInfo.size ?? 0)")
     }
 
     static func printEmoji(_ emoji: [MattermostCustomEmoji]) {
-        for item in emoji.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending }) {
+        let sortedEmoji = emoji.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending })
+        guard !writeJSONIfRequested(sortedEmoji) else { return }
+        for item in sortedEmoji {
             print("\(item.id)\t\(item.name)")
         }
     }
 
     static func printLiveEvent(_ event: MattermostLiveEvent) {
+        guard !writeJSONIfRequested(event) else { return }
         let channelID = event.broadcast?.channelId ?? "-"
         let postID = (try? event.decodedPost()?.id) ?? "-"
         print("\(event.event)\t\(channelID)\t\(postID)")
@@ -248,13 +371,16 @@ extension MattermostSwiftCLI {
     }
 
     static func printChannels(_ channels: [MattermostChannel]) {
-        for channel in channels.sorted(by: channelSort) {
+        let sortedChannels = channels.sorted(by: channelSort)
+        guard !writeJSONIfRequested(sortedChannels) else { return }
+        for channel in sortedChannels {
             let displayName = channel.displayName.isEmpty ? channel.name : channel.displayName
             print("\(channel.id)\t\(channel.type)\t\(displayName)")
         }
     }
 
     static func printChannel(_ channel: MattermostChannel) {
+        guard !writeJSONIfRequested(channel) else { return }
         print("channel: \(channel.id)")
         if let teamID = channel.teamId, !teamID.isEmpty {
             print("team: \(teamID)")
@@ -265,6 +391,7 @@ extension MattermostSwiftCLI {
     }
 
     static func printChannelStats(_ stats: MattermostChannelStats) {
+        guard !writeJSONIfRequested(stats) else { return }
         if let channelID = stats.channelId, !channelID.isEmpty {
             print("channel: \(channelID)")
         }
@@ -283,18 +410,22 @@ extension MattermostSwiftCLI {
     }
 
     static func printTimezones(_ timezones: [String]) {
-        for timezone in timezones.sorted() {
+        let sortedTimezones = timezones.sorted()
+        guard !writeJSONIfRequested(sortedTimezones) else { return }
+        for timezone in sortedTimezones {
             print(timezone)
         }
     }
 
     static func printChannelMemberCounts(_ counts: [String: Int64]) {
+        guard !writeJSONIfRequested(counts) else { return }
         for channelID in counts.keys.sorted() {
             print("\(channelID)\t\(counts[channelID] ?? 0)")
         }
     }
 
     static func printThreads(_ threadList: MattermostThreadList) {
+        guard !writeJSONIfRequested(threadList) else { return }
         print("total: \(threadList.total)")
         print("unread-threads: \(threadList.totalUnreadThreads)")
         print("unread-mentions: \(threadList.totalUnreadMentions)")

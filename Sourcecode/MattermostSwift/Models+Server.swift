@@ -3,13 +3,13 @@ import Foundation
 // MARK: - Server info, ping, and client configuration models
 
 /// Basic server health and client capability metadata.
-public struct MattermostServerInfo: Equatable, Sendable {
+public struct MattermostServerInfo: Codable, Equatable, Sendable {
     public let ping: MattermostServerPing
     public let clientConfig: MattermostClientConfig
 }
 
 /// Mattermost server health response.
-public struct MattermostServerPing: Decodable, Equatable, Sendable {
+public struct MattermostServerPing: Codable, Equatable, Sendable {
     public let status: String
     public let activeSearchBackend: String?
     public let databaseStatus: String?
@@ -32,7 +32,7 @@ public struct MattermostServerPing: Decodable, Equatable, Sendable {
 }
 
 /// Public client configuration values useful for SDK capability checks.
-public struct MattermostClientConfig: Decodable, Equatable, Sendable {
+public struct MattermostClientConfig: Codable, Equatable, Sendable {
     public let buildNumber: String?
     public let buildHash: String?
     public let buildDate: String?

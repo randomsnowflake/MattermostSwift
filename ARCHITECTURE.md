@@ -57,6 +57,15 @@ The CLI reads credentials from environment variables:
 
 The library never stores credentials and never logs token values.
 
+The executable uses `swift-argument-parser`, scoped only to the executable target, to
+define its complete command tree. Operational commands remain at the root while
+live/mutating verification commands live under `diag`. Generated help, per-command help,
+version output, completions, typed validation, and position-independent flags all derive
+from that tree. A task-local output mode keeps execution pipe-safe: model-backed results
+use sorted-key JSON encoding, multi-record diagnostic output uses NDJSON, and progress is
+written only to terminal-backed standard error. Raw file downloads are rejected when
+standard output is a terminal.
+
 ## Layers
 
 `MattermostClient` is the root public entry point. It owns:
@@ -142,47 +151,47 @@ swift run MattermostSwiftCLI channel-timezones
 swift run MattermostSwiftCLI channel-member-counts
 swift run MattermostSwiftCLI search-channels town
 swift run MattermostSwiftCLI search-group-channels USERNAME
-swift run MattermostSwiftCLI direct-channel-test USER_ID
+swift run MattermostSwiftCLI diag direct-channel-test USER_ID
 swift run MattermostSwiftCLI channel-member
 swift run MattermostSwiftCLI list-channel-members
 swift run MattermostSwiftCLI channel-members-by-id USER_ID
 swift run MattermostSwiftCLI channel-unread
-swift run MattermostSwiftCLI unread-posts-test
-swift run MattermostSwiftCLI threads-test
+swift run MattermostSwiftCLI diag unread-posts-test
+swift run MattermostSwiftCLI diag threads-test
 swift run MattermostSwiftCLI check
 swift run MattermostSwiftCLI list-posts
 swift run MattermostSwiftCLI pinned-posts
-swift run MattermostSwiftCLI e2e-test
-swift run MattermostSwiftCLI thread-test
-swift run MattermostSwiftCLI timeline-test
-swift run MattermostSwiftCLI since-test
-swift run MattermostSwiftCLI props-test
-swift run MattermostSwiftCLI reaction-test
-swift run MattermostSwiftCLI search-test
-swift run MattermostSwiftCLI file-test
+swift run MattermostSwiftCLI diag e2e-test
+swift run MattermostSwiftCLI diag thread-test
+swift run MattermostSwiftCLI diag timeline-test
+swift run MattermostSwiftCLI diag since-test
+swift run MattermostSwiftCLI diag props-test
+swift run MattermostSwiftCLI diag reaction-test
+swift run MattermostSwiftCLI diag search-test
+swift run MattermostSwiftCLI diag file-test
 swift run MattermostSwiftCLI list-emoji
 swift run MattermostSwiftCLI search-emoji a
-swift run MattermostSwiftCLI preferences-test
-swift run MattermostSwiftCLI preference-roundtrip-test
-swift run MattermostSwiftCLI websocket-test
-swift run MattermostSwiftCLI live-sync-test
-swift run MattermostSwiftCLI reconnect-backfill-test
-swift run MattermostSwiftCLI deletion-backfill-test
-swift run MattermostSwiftCLI live-sync-reconnect-test
-swift run MattermostSwiftCLI all-channel-backfill-test
-swift run MattermostSwiftCLI all-channel-reconnect-test
-swift run MattermostSwiftCLI failure-cleanup-test
-swift run MattermostSwiftCLI residue-audit
-swift run MattermostSwiftCLI typing-test
-swift run MattermostSwiftCLI create-test-channel
-swift run MattermostSwiftCLI rename-test-channel CHANNEL_ID
-swift run MattermostSwiftCLI archive-channel CHANNEL_ID
-swift run MattermostSwiftCLI channel-test
-swift run MattermostSwiftCLI sidebar-category-test
-swift run MattermostSwiftCLI sidebar-move-test
+swift run MattermostSwiftCLI diag preferences-test
+swift run MattermostSwiftCLI diag preference-roundtrip-test
+swift run MattermostSwiftCLI diag websocket-test
+swift run MattermostSwiftCLI diag live-sync-test
+swift run MattermostSwiftCLI diag reconnect-backfill-test
+swift run MattermostSwiftCLI diag deletion-backfill-test
+swift run MattermostSwiftCLI diag live-sync-reconnect-test
+swift run MattermostSwiftCLI diag all-channel-backfill-test
+swift run MattermostSwiftCLI diag all-channel-reconnect-test
+swift run MattermostSwiftCLI diag failure-cleanup-test
+swift run MattermostSwiftCLI diag residue-audit
+swift run MattermostSwiftCLI diag typing-test
+swift run MattermostSwiftCLI diag create-test-channel
+swift run MattermostSwiftCLI diag rename-test-channel CHANNEL_ID
+swift run MattermostSwiftCLI diag archive-channel CHANNEL_ID
+swift run MattermostSwiftCLI diag channel-test
+swift run MattermostSwiftCLI diag sidebar-category-test
+swift run MattermostSwiftCLI diag sidebar-move-test
 swift run MattermostSwiftCLI sync
 swift run MattermostSwiftCLI cache-check
-swift run MattermostSwiftCLI login-test
+swift run MattermostSwiftCLI diag login-test
 ```
 
 After that, grow the SDK one vertical slice at a time: posts, WebSocket events, sidebar categories, reactions, files, search, sync, and persistence. Each slice should include request construction tests, cache/update tests where applicable, plus live CLI verification where practical.

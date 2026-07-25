@@ -8,6 +8,11 @@ Build Mattermost clients in Swift with REST commands, WebSocket live events, and
 
 Use `MattermostClient` as the root entry point: it exposes user, team, channel, post, timeline, and live-event operations as methods directly, with `MattermostSyncService` and `MattermostLiveSyncService` layered on top for cache hydration and live state.
 
+Public response models used by the command-line and persistence workflows conform to
+`Codable`. Use `JSONEncoder` to persist complete values—including post newlines, props,
+metadata, and preference values—and the package's normal decoder configuration when
+reading server-shaped snake-case payloads.
+
 ## Authenticate
 
 Use a personal access token when a host app already owns credential storage:
@@ -190,7 +195,12 @@ let options = MattermostLiveSyncOptions(
 )
 ```
 
-The CLI includes live reconnect checks for this path: `reconnect-backfill-test` proves cursor-based missed-post recovery directly through REST sync, `live-sync-reconnect-test` drives `MattermostLiveSyncService` through a reconnect lifecycle while verifying the second backfill returns and caches a post created while disconnected, and `all-channel-reconnect-test` repeats that reconnect proof with `backfillAllJoinedChannelPosts` enabled.
+The CLI includes live reconnect checks for this path under `diag`:
+`diag reconnect-backfill-test` proves cursor-based missed-post recovery directly through
+REST sync, `diag live-sync-reconnect-test` drives `MattermostLiveSyncService` through a
+reconnect lifecycle while verifying the second backfill returns and caches a post
+created while disconnected, and `diag all-channel-reconnect-test` repeats that reconnect
+proof with `backfillAllJoinedChannelPosts` enabled.
 
 ## Keep Secrets Outside The SDK
 
