@@ -88,6 +88,19 @@ func hydrate(client: MattermostClient, storeURL: URL) async throws {
 
 `MattermostSyncService` stores joined teams, the current user, status, joined channels, memberships, unread counts, sidebar categories, and optional channel timelines. Cursor-based follow-up syncs use Mattermost's `since` timestamp query where possible. Per-channel notification settings are available as `MattermostChannelNotifyProps`, which exposes common Mattermost keys and keeps unknown server keys intact.
 
+All `MattermostStore` operations use `ModelContainer.mainContext` and are main-actor isolated.
+That contract also covers sync and live-sync cache writes, cached fetches, `prunePosts`, and
+`deleteChannelContent`; the package has no background model context. Network requests suspend
+normally, but SwiftData work resumes on the main actor, so large caches can produce a visible UI
+hitch. Schedule large sync and retention passes only during an app-controlled idle window where
+that tradeoff is acceptable.
+
+Host apps own retention policy. A reasonable starting cadence is to prune retained channels after
+initial hydration and then about once per day during an idle window. Delete a channel's cached
+content when it leaves the app's retention scope. To use cached values from another actor, create
+immutable `Sendable` values with `cachedUserSnapshots()`, `cachedChannelSnapshots()`, or
+`cachedPostSnapshots(...)`; snapshots do not move store access itself off the main actor.
+
 ## Work With Timelines
 
 Use the client's timeline methods for both channel timelines and thread timelines:
