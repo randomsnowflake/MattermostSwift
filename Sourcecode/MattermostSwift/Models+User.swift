@@ -27,7 +27,9 @@ public enum MattermostSessionTokenSource: String, Equatable, Sendable {
 }
 
 /// User and session token returned by Mattermost username/password login.
-public struct MattermostSession: Equatable, Sendable {
+///
+/// Its textual descriptions redact the token.
+public struct MattermostSession: Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     public let user: MattermostUser
     public let token: String
     public let tokenSource: MattermostSessionTokenSource
@@ -40,6 +42,14 @@ public struct MattermostSession: Equatable, Sendable {
         self.user = user
         self.token = token
         self.tokenSource = tokenSource
+    }
+
+    public var description: String {
+        "MattermostSession(user: \(user.username), tokenSource: \(tokenSource), token: <redacted>)"
+    }
+
+    public var debugDescription: String {
+        description
     }
 
     public func client(serverURL: URL, urlSession: URLSession = .mattermost) throws -> MattermostClient {

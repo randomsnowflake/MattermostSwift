@@ -159,6 +159,8 @@ try await client.logoutCurrentSession()
 ```
 
 Store any returned token in your app's secure storage, such as Keychain on Apple platforms.
+The textual and debug descriptions of sessions, authentication values, and configurations
+redact bearer tokens so logging those values does not expose credentials.
 `logoutCurrentSession()` revokes Mattermost server sessions; hosts should still discard their
 local token even if remote cleanup fails. Personal access tokens may not be accepted by this endpoint.
 

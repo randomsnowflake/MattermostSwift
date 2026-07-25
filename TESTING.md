@@ -13,6 +13,7 @@ The current unit tests cover:
 - server URL normalization,
 - environment credential validation,
 - username/password login request construction and environment validation,
+- bearer-token redaction in session, authentication, and configuration descriptions,
 - request construction,
 - post update request construction with the `since` timestamp query,
 - unread-context and collapsed-thread request construction,
