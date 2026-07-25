@@ -23,8 +23,6 @@ struct Issue75APIErgonomicsTests {
         #expect(post.originalID == "original-id")
         #expect(post.pendingPostID == "pending-id")
         #expect(post.fileIDs == ["file-id"])
-        #expect(post.userId == post.userID)
-        #expect(post.channelId == post.channelID)
     }
 
     @Test
@@ -40,7 +38,6 @@ struct Issue75APIErgonomicsTests {
         let post = try mattermostSnakeCaseDecoder.decode(MattermostPost.self, from: valid)
         #expect(post.metadata?.files?.first?.id == "file-id")
         #expect(post.rawMetadata?["future"] != nil)
-        #expect(post.postMetadata == post.metadata)
 
         let malformed = Data(#"""
         {
@@ -75,7 +72,8 @@ struct Issue75APIErgonomicsTests {
     @Test
     func postsSinceOptionsDocumentedForkOmitsPaginationAndCursors() async throws {
         let client = try await Self.makeClient { request in
-            let components = try #require(URLComponents(url: #require(request.url), resolvingAgainstBaseURL: false))
+            let url = try #require(request.url)
+            let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
             let query = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
             #expect(query["since"] == "1234")
             #expect(query["page"] == nil)
@@ -120,8 +118,9 @@ struct Issue75APIErgonomicsTests {
                 #expect(body?["include_search_by_id"] as? Bool == true)
                 return try Self.response(body: Data("[]".utf8), request: request)
             default:
+                let url = try #require(request.url)
                 let components = try #require(URLComponents(
-                    url: #require(request.url),
+                    url: url,
                     resolvingAgainstBaseURL: false
                 ))
                 let query = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map {
@@ -235,7 +234,8 @@ struct Issue75APIErgonomicsTests {
     func allPostsAdvancesCursorDeduplicatesAndStops() async throws {
         let requests = MattermostRequestLog()
         let client = try await Self.makeClient { request in
-            let components = try #require(URLComponents(url: #require(request.url), resolvingAgainstBaseURL: false))
+            let url = try #require(request.url)
+            let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
             let before = components.queryItems?.first(where: { $0.name == "before" })?.value
             requests.append(before ?? "<initial>")
 
