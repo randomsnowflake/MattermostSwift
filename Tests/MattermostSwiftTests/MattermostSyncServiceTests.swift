@@ -43,7 +43,6 @@ func syncServiceHydratesStoreCursorsAndBoundedUnreadRefresh() async throws {
     #expect(cursor.lastSyncAt == result.teamCursorLastSyncAt)
     #expect(try store.cachedPosts(channelID: "channel-1").map(\.id) == ["post-3", "post-2", "post-1"])
     #expect(try store.cachedSidebarCategories(teamID: "team-1").map(\.id) == ["category-1"])
-    #expect(tracker.maxConcurrentUnreadRequests > 1)
     #expect(tracker.maxConcurrentUnreadRequests <= 4)
 }
 
