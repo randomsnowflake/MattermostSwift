@@ -883,8 +883,8 @@ func reconnectPolicyCalculatesBackoffAndStopsAtLimit() {
 @Test
 func reconnectPolicyNormalizesInvalidNumbersAndSaturatesLargeAttempts() {
     let policy = MattermostLiveEventReconnectPolicy(
-        initialDelay: .zero,
-        maximumDelay: .zero,
+        initialDelay: .seconds(-1),
+        maximumDelay: .seconds(-1),
         multiplier: -.infinity,
         maxRetries: -1
     )
