@@ -178,7 +178,7 @@ public struct MattermostSyncService: Sendable {
         }
 
         if let teamID = resolvedTeam.teamID {
-            let members = try await client.channelMembersForUser(userID: user.id, teamID: teamID)
+            let members = try await client.channelMembers(userID: user.id, teamID: teamID)
             try store.replaceChannelMembers(members, userID: user.id, teamID: teamID)
             syncedMembersCount = max(syncedMembersCount, members.count)
 
@@ -203,7 +203,7 @@ public struct MattermostSyncService: Sendable {
                 )
             }
         } else if let postChannelID {
-            let unread = try await client.channelUnread(userID: user.id, channelID: postChannelID)
+            let unread = try await client.channelUnread(channelID: postChannelID, userID: user.id)
             try store.upsert(unread: unread, userID: user.id)
             syncedUnreadsCount = 1
         }
@@ -265,7 +265,7 @@ public struct MattermostSyncService: Sendable {
         }
 
         let channels = try await client.joinedChannelsAcrossTeams()
-        let inferredTeamID = channels.lazy.compactMap(\.teamId).first { !$0.isEmpty }
+        let inferredTeamID = channels.lazy.compactMap(\.teamID).first { !$0.isEmpty }
         let inferredTeam = inferredTeamID.flatMap { teamID in
             joinedTeams.first { $0.id == teamID }
         }
@@ -293,7 +293,7 @@ public struct MattermostSyncService: Sendable {
                 while inflight < width, let channel = iterator.next() {
                     inflight += 1
                     group.addTask {
-                        try await client.channelUnread(userID: userID, channelID: channel.id)
+                        try await client.channelUnread(channelID: channel.id, userID: userID)
                     }
                 }
             }

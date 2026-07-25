@@ -80,7 +80,10 @@ public struct MattermostCachedPostSnapshot: Equatable, Sendable, Identifiable {
     public let fileIDs: [String]
     public let hasReactions: Bool?
     public let props: [String: MattermostJSONValue]?
-    public let metadata: [String: MattermostJSONValue]?
+    public let rawMetadata: [String: MattermostJSONValue]?
+
+    @available(*, deprecated, renamed: "rawMetadata")
+    public var metadata: [String: MattermostJSONValue]? { rawMetadata }
 
     @MainActor init(_ cached: MattermostCachedPost) throws {
         id = cached.id
@@ -99,6 +102,6 @@ public struct MattermostCachedPostSnapshot: Equatable, Sendable, Identifiable {
         fileIDs = cached.fileIds
         hasReactions = cached.hasReactions
         props = try cached.decodedProps()
-        metadata = try cached.decodedMetadata()
+        rawMetadata = try cached.decodedMetadata()
     }
 }

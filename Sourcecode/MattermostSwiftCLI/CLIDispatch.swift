@@ -23,7 +23,7 @@ extension MattermostSwiftCLI {
             return
         }
 
-        let client = try MattermostClient.liveFromEnvironment()
+        let client = try MattermostClient.fromEnvironment()
 
         switch command {
         case .me:

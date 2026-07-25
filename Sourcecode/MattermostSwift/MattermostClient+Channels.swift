@@ -65,6 +65,25 @@ extension MattermostClient {
 
     /// Searches channels by name, display name, or purpose.
     public func searchChannels(
+        options: MattermostChannelSearchOptions
+    ) async throws -> MattermostChannelSearchResults {
+        try await httpClient.post(
+            "/channels/search",
+            body: MattermostChannelSearchRequest(
+                term: options.term,
+                teamIds: options.teamIDs,
+                excludeDefaultChannels: options.excludeDefaultChannels,
+                deleted: options.includeDeleted,
+                page: options.page,
+                perPage: options.perPage,
+                includeSearchById: options.includeSearchByID
+            )
+        )
+    }
+
+    /// Compatibility overload for the pre-options parameter list.
+    @available(*, deprecated, message: "Use searchChannels(options:)")
+    public func searchChannels(
         term: String,
         teamIDs: [String] = [],
         excludeDefaultChannels: Bool = false,
@@ -73,16 +92,15 @@ extension MattermostClient {
         perPage: Int = 60,
         includeSearchByID: Bool = false
     ) async throws -> MattermostChannelSearchResults {
-        try await httpClient.post(
-            "/channels/search",
-            body: MattermostChannelSearchRequest(
+        try await searchChannels(
+            options: MattermostChannelSearchOptions(
                 term: term,
-                teamIds: teamIDs,
+                teamIDs: teamIDs,
                 excludeDefaultChannels: excludeDefaultChannels,
-                deleted: includeDeleted,
+                includeDeleted: includeDeleted,
                 page: page,
                 perPage: perPage,
-                includeSearchById: includeSearchByID
+                includeSearchByID: includeSearchByID
             )
         )
     }

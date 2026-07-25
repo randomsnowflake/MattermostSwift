@@ -48,6 +48,7 @@ public final class MattermostCachedUser {
 
 @Model
 public final class MattermostCachedUserStatus {
+    @available(*, deprecated, renamed: "userID")
     @Attribute(.unique) public var userId: String = ""
     public var status: String = ""
     public var manual: Bool?
@@ -56,14 +57,14 @@ public final class MattermostCachedUserStatus {
     public var dndEndTime: Int64?
 
     public init(
-        userId: String,
+        userID: String,
         status: String,
         manual: Bool? = nil,
         lastActivityAt: Int64? = nil,
         activeChannel: String? = nil,
         dndEndTime: Int64? = nil
     ) {
-        self.userId = userId
+        self.userId = userID
         self.status = status
         self.manual = manual
         self.lastActivityAt = lastActivityAt
@@ -71,8 +72,27 @@ public final class MattermostCachedUserStatus {
         self.dndEndTime = dndEndTime
     }
 
+    @available(*, deprecated, message: "Use init(userID:status:manual:lastActivityAt:activeChannel:dndEndTime:)")
+    public convenience init(
+        userId: String,
+        status: String,
+        manual: Bool? = nil,
+        lastActivityAt: Int64? = nil,
+        activeChannel: String? = nil,
+        dndEndTime: Int64? = nil
+    ) {
+        self.init(
+            userID: userId,
+            status: status,
+            manual: manual,
+            lastActivityAt: lastActivityAt,
+            activeChannel: activeChannel,
+            dndEndTime: dndEndTime
+        )
+    }
+
     init(_ status: MattermostUserStatus) {
-        userId = status.userId
+        userId = status.userID
         self.status = status.status
         manual = status.manual
         lastActivityAt = status.lastActivityAt
@@ -119,6 +139,7 @@ public final class MattermostCachedChannel {
     @Attribute(.unique) public var id: String = ""
     public var createAt: Int64?
     public var updateAt: Int64?
+    @available(*, deprecated, renamed: "teamID")
     public var teamId: String?
     public var name: String = ""
     public var displayName: String = ""
@@ -135,7 +156,7 @@ public final class MattermostCachedChannel {
         id = channel.id
         createAt = channel.createAt
         updateAt = channel.updateAt
-        teamId = channel.teamId
+        teamId = channel.teamID
         name = channel.name
         displayName = channel.displayName
         type = channel.type
@@ -155,7 +176,7 @@ public final class MattermostCachedChannel {
 
         createAt = channel.createAt
         updateAt = channel.updateAt
-        teamId = channel.teamId
+        teamId = channel.teamID
         name = channel.name
         displayName = channel.displayName
         type = channel.type
@@ -189,7 +210,9 @@ public final class MattermostCachedChannel {
 public final class MattermostCachedChannelMember {
     #Index<MattermostCachedChannelMember>([\.userId])
     @Attribute(.unique) public var id: String = ""
+    @available(*, deprecated, renamed: "channelID")
     public var channelId: String = ""
+    @available(*, deprecated, renamed: "userID")
     public var userId: String = ""
     public var roles: String?
     public var lastViewedAt: Int64?
@@ -205,9 +228,9 @@ public final class MattermostCachedChannelMember {
     }
 
     init(_ member: MattermostChannelMember) {
-        id = Self.cacheID(channelID: member.channelId, userID: member.userId)
-        channelId = member.channelId
-        userId = member.userId
+        id = Self.cacheID(channelID: member.channelID, userID: member.userID)
+        channelId = member.channelID
+        userId = member.userID
         roles = member.roles
         lastViewedAt = member.lastViewedAt
         msgCount = member.msgCount
@@ -223,8 +246,8 @@ public final class MattermostCachedChannelMember {
     }
 
     func apply(_ member: MattermostChannelMember) {
-        channelId = member.channelId
-        userId = member.userId
+        channelId = member.channelID
+        userId = member.userID
         roles = member.roles
         lastViewedAt = member.lastViewedAt
         msgCount = member.msgCount
@@ -240,8 +263,11 @@ public final class MattermostCachedChannelMember {
 public final class MattermostCachedChannelUnread {
     #Index<MattermostCachedChannelUnread>([\.userId])
     @Attribute(.unique) public var id: String = ""
+    @available(*, deprecated, renamed: "teamID")
     public var teamId: String?
+    @available(*, deprecated, renamed: "channelID")
     public var channelId: String = ""
+    @available(*, deprecated, renamed: "userID")
     public var userId: String = ""
     public var msgCount: Int = 0
     public var mentionCount: Int = 0
@@ -249,9 +275,9 @@ public final class MattermostCachedChannelUnread {
     public var mentionCountRoot: Int?
 
     init(_ unread: MattermostChannelUnread, userID: String) {
-        id = Self.cacheID(channelID: unread.channelId, userID: userID)
-        teamId = unread.teamId
-        channelId = unread.channelId
+        id = Self.cacheID(channelID: unread.channelID, userID: userID)
+        teamId = unread.teamID
+        channelId = unread.channelID
         self.userId = userID
         msgCount = unread.msgCount
         mentionCount = unread.mentionCount
@@ -264,8 +290,8 @@ public final class MattermostCachedChannelUnread {
     }
 
     func apply(_ unread: MattermostChannelUnread, userID: String) {
-        teamId = unread.teamId
-        channelId = unread.channelId
+        teamId = unread.teamID
+        channelId = unread.channelID
         self.userId = userID
         msgCount = unread.msgCount
         mentionCount = unread.mentionCount
@@ -278,8 +304,11 @@ public final class MattermostCachedChannelUnread {
 public final class MattermostCachedThread {
     #Index<MattermostCachedThread>([\.userId, \.teamId])
     @Attribute(.unique) public var id: String = ""
+    @available(*, deprecated, renamed: "rootID")
     public var rootId: String = ""
+    @available(*, deprecated, renamed: "userID")
     public var userId: String = ""
+    @available(*, deprecated, renamed: "teamID")
     public var teamId: String = ""
     public var replyCount: Int64 = 0
     public var lastReplyAt: Int64 = 0
@@ -288,6 +317,7 @@ public final class MattermostCachedThread {
     public var unreadMentions: Int64 = 0
     public var isUrgent: Bool = false
     public var deleteAt: Int64 = 0
+    @available(*, deprecated, renamed: "participantIDs")
     public var participantIds: [String] = []
 
     public var isUnread: Bool {
@@ -352,14 +382,20 @@ public final class MattermostCachedPost {
     public var updateAt: Int64 = 0
     public var editAt: Int64 = 0
     public var deleteAt: Int64 = 0
+    @available(*, deprecated, renamed: "userID")
     public var userId: String = ""
+    @available(*, deprecated, renamed: "channelID")
     public var channelId: String = ""
+    @available(*, deprecated, renamed: "rootID")
     public var rootId: String = ""
+    @available(*, deprecated, renamed: "originalID")
     public var originalId: String?
     public var message: String = ""
     public var type: String = ""
     public var hashtags: String?
+    @available(*, deprecated, renamed: "pendingPostID")
     public var pendingPostId: String?
+    @available(*, deprecated, renamed: "fileIDs")
     public var fileIds: [String] = []
     public var hasReactions: Bool?
     public var propsJSON: String?
@@ -371,15 +407,15 @@ public final class MattermostCachedPost {
         updateAt = post.updateAt
         editAt = post.editAt
         deleteAt = post.deleteAt
-        userId = post.userId
-        channelId = post.channelId
-        rootId = post.rootId
-        originalId = post.originalId
+        userId = post.userID
+        channelId = post.channelID
+        rootId = post.rootID
+        originalId = post.originalID
         message = post.message
         type = post.type
         hashtags = post.hashtags
-        pendingPostId = post.pendingPostId
-        fileIds = post.fileIds ?? []
+        pendingPostId = post.pendingPostID
+        fileIds = post.fileIDs ?? []
         hasReactions = post.hasReactions
         self.propsJSON = propsJSON
         self.metadataJSON = metadataJSON
@@ -412,20 +448,20 @@ public final class MattermostCachedPost {
         }
 
         let propsJSON = try Self.encodedJSON(post.props)
-        let metadataJSON = try Self.encodedJSON(post.metadata)
+        let metadataJSON = try Self.encodedJSON(post.rawMetadata)
         createAt = post.createAt
         updateAt = post.updateAt
         editAt = post.editAt
         deleteAt = post.deleteAt
-        userId = post.userId
-        channelId = post.channelId
-        rootId = post.rootId
-        originalId = post.originalId
+        userId = post.userID
+        channelId = post.channelID
+        rootId = post.rootID
+        originalId = post.originalID
         message = post.message
         type = post.type
         hashtags = post.hashtags
-        pendingPostId = post.pendingPostId
-        fileIds = post.fileIds ?? []
+        pendingPostId = post.pendingPostID
+        fileIds = post.fileIDs ?? []
         hasReactions = post.hasReactions
         self.propsJSON = propsJSON
         self.metadataJSON = metadataJSON
@@ -460,19 +496,21 @@ public final class MattermostCachedPost {
 public final class MattermostCachedReaction {
     #Index<MattermostCachedReaction>([\.postId])
     @Attribute(.unique) public var id: String = ""
+    @available(*, deprecated, renamed: "userID")
     public var userId: String = ""
+    @available(*, deprecated, renamed: "postID")
     public var postId: String = ""
     public var emojiName: String = ""
     public var createAt: Int64?
 
     init(_ reaction: MattermostReaction) {
         id = Self.cacheID(
-            userID: reaction.userId,
-            postID: reaction.postId,
+            userID: reaction.userID,
+            postID: reaction.postID,
             emojiName: reaction.emojiName
         )
-        userId = reaction.userId
-        postId = reaction.postId
+        userId = reaction.userID
+        postId = reaction.postID
         emojiName = reaction.emojiName
         createAt = reaction.createAt
     }
@@ -482,8 +520,8 @@ public final class MattermostCachedReaction {
     }
 
     func apply(_ reaction: MattermostReaction) {
-        userId = reaction.userId
-        postId = reaction.postId
+        userId = reaction.userID
+        postId = reaction.postID
         emojiName = reaction.emojiName
         createAt = reaction.createAt
     }
@@ -493,7 +531,9 @@ public final class MattermostCachedReaction {
 public final class MattermostCachedFile {
     #Index<MattermostCachedFile>([\.postId])
     @Attribute(.unique) public var id: String = ""
+    @available(*, deprecated, renamed: "userID")
     public var userId: String?
+    @available(*, deprecated, renamed: "postID")
     public var postId: String?
     public var createAt: Int64?
     public var updateAt: Int64?
@@ -508,8 +548,8 @@ public final class MattermostCachedFile {
 
     init(_ file: MattermostFileInfo) {
         id = file.id
-        userId = file.userId
-        postId = file.postId
+        userId = file.userID
+        postId = file.postID
         createAt = file.createAt
         updateAt = file.updateAt
         deleteAt = file.deleteAt
@@ -523,8 +563,8 @@ public final class MattermostCachedFile {
     }
 
     func apply(_ file: MattermostFileInfo) {
-        userId = file.userId
-        postId = file.postId
+        userId = file.userID
+        postId = file.postID
         createAt = file.createAt
         updateAt = file.updateAt
         deleteAt = file.deleteAt
@@ -542,11 +582,14 @@ public final class MattermostCachedFile {
 public final class MattermostCachedSidebarCategory {
     #Index<MattermostCachedSidebarCategory>([\.teamId])
     @Attribute(.unique) public var id: String = ""
+    @available(*, deprecated, renamed: "userID")
     public var userId: String?
+    @available(*, deprecated, renamed: "teamID")
     public var teamId: String?
     public var displayName: String = ""
     public var type: String = ""
     public var sortOrder: Int?
+    @available(*, deprecated, renamed: "channelIDs")
     public var channelIds: [String] = []
     public var sorting: String?
     public var muted: Bool?
@@ -554,27 +597,152 @@ public final class MattermostCachedSidebarCategory {
 
     init(_ category: MattermostSidebarCategory) {
         id = category.id
-        userId = category.userId
-        teamId = category.teamId
+        userId = category.userID
+        teamId = category.teamID
         displayName = category.displayName
         type = category.type
         sortOrder = category.sortOrder
-        channelIds = category.channelIds
+        channelIds = category.channelIDs
         sorting = category.sorting
         muted = category.muted
         collapsed = category.collapsed
     }
 
     func apply(_ category: MattermostSidebarCategory) {
-        userId = category.userId
-        teamId = category.teamId
+        userId = category.userID
+        teamId = category.teamID
         displayName = category.displayName
         type = category.type
         sortOrder = category.sortOrder
-        channelIds = category.channelIds
+        channelIds = category.channelIDs
         sorting = category.sorting
         muted = category.muted
         collapsed = category.collapsed
+    }
+}
+
+// Canonical public identifier spelling is bridged to the original persisted
+// SwiftData fields so issue #75 does not rename columns or invalidate stores.
+public extension MattermostCachedUserStatus {
+    var userID: String {
+        get { userId }
+        set { userId = newValue }
+    }
+}
+
+public extension MattermostCachedChannel {
+    var teamID: String? {
+        get { teamId }
+        set { teamId = newValue }
+    }
+}
+
+public extension MattermostCachedChannelMember {
+    var channelID: String {
+        get { channelId }
+        set { channelId = newValue }
+    }
+    var userID: String {
+        get { userId }
+        set { userId = newValue }
+    }
+}
+
+public extension MattermostCachedChannelUnread {
+    var teamID: String? {
+        get { teamId }
+        set { teamId = newValue }
+    }
+    var channelID: String {
+        get { channelId }
+        set { channelId = newValue }
+    }
+    var userID: String {
+        get { userId }
+        set { userId = newValue }
+    }
+}
+
+public extension MattermostCachedThread {
+    var rootID: String {
+        get { rootId }
+        set { rootId = newValue }
+    }
+    var userID: String {
+        get { userId }
+        set { userId = newValue }
+    }
+    var teamID: String {
+        get { teamId }
+        set { teamId = newValue }
+    }
+    var participantIDs: [String] {
+        get { participantIds }
+        set { participantIds = newValue }
+    }
+}
+
+public extension MattermostCachedPost {
+    var userID: String {
+        get { userId }
+        set { userId = newValue }
+    }
+    var channelID: String {
+        get { channelId }
+        set { channelId = newValue }
+    }
+    var rootID: String {
+        get { rootId }
+        set { rootId = newValue }
+    }
+    var originalID: String? {
+        get { originalId }
+        set { originalId = newValue }
+    }
+    var pendingPostID: String? {
+        get { pendingPostId }
+        set { pendingPostId = newValue }
+    }
+    var fileIDs: [String] {
+        get { fileIds }
+        set { fileIds = newValue }
+    }
+}
+
+public extension MattermostCachedReaction {
+    var userID: String {
+        get { userId }
+        set { userId = newValue }
+    }
+    var postID: String {
+        get { postId }
+        set { postId = newValue }
+    }
+}
+
+public extension MattermostCachedFile {
+    var userID: String? {
+        get { userId }
+        set { userId = newValue }
+    }
+    var postID: String? {
+        get { postId }
+        set { postId = newValue }
+    }
+}
+
+public extension MattermostCachedSidebarCategory {
+    var userID: String? {
+        get { userId }
+        set { userId = newValue }
+    }
+    var teamID: String? {
+        get { teamId }
+        set { teamId = newValue }
+    }
+    var channelIDs: [String] {
+        get { channelIds }
+        set { channelIds = newValue }
     }
 }
 

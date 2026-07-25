@@ -143,7 +143,7 @@ func decodesMattermostPostEmbeddedMetadata() throws {
     #expect(post.postMetadata?.reactions?.count == 1)
     #expect(post.postMetadata?.reactions?.first?.emojiName == "thumbsup")
     // The raw metadata dictionary stays available alongside the typed view.
-    #expect(post.metadata?["files"] != nil)
+    #expect(post.rawMetadata?["files"] != nil)
 }
 
 @Test

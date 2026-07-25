@@ -45,6 +45,8 @@ Implemented flow:
 30. Live-verify cursor-based missed-post backfill by seeding a stored channel cursor, creating a temporary post, syncing with `since`, and confirming the post lands in SwiftData.
 31. Live-verify failure cleanup by creating temporary e2e resources, simulating an intermediate failure, and proving posts/categories/channels/sidebar order are cleaned up through the shared helper.
 32. Live-verify WebSocket message lifecycle delivery for posted, edited, and deleted posts through the CLI harness.
+33. Expose consistent `ID`-spelled models, options-backed long requests, millisecond `Date`
+    bridges, and lazy cursor-based `allPosts` iteration while retaining deprecated source aliases.
 
 The CLI reads credentials from environment variables:
 
@@ -116,6 +118,10 @@ The cache merge policy is server timestamp last-write-wins where Mattermost expo
 `MattermostLiveSyncService` builds on the raw stream and sync service. Before each socket connection attempt it runs REST backfill, optionally across joined channel timelines, then applies typed live events into `MattermostStore` as they arrive. Reconnect backfill uses each channel's stored post cursor, so posts created or modified while the socket was down can be fetched through Mattermost's `since` query and merged before live event consumption resumes. It emits `MattermostLiveSyncEvent` values so host apps can show connecting, backfilled, event-applied, unread-refreshed, sidebar-refreshed, thread-state-refreshed, reconnecting, and backfill-failed states; each lifecycle event also exposes a derived `connectionState` for host UI indicators. A non-cancellation REST-backfill failure yields a non-secret diagnostic and the lifecycle continues, allowing a later reconnect to retry; cancellation terminates the stream. `channel_viewed`, `multiple_channels_viewed`, and `post_unread` events refresh channel unread counts when configured, using the current synced user as a fallback when the WebSocket payload omits a user id and refreshing every channel named by a multi-channel event. Thread events such as `response`, `thread_updated`, `thread_follow_changed`, and `thread_read_changed` trigger a targeted `GET /api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}` refresh when enough user/team/thread context is available, then upsert the returned per-user thread state and root post/participants. Replies themselves continue to enter the cache through normal `posted` events. Preference events trigger a sidebar category refresh for the active team when configured. The current policy is still intentionally simple: backfill is page/channel bounded by default, but hosts can opt into `backfillAllJoinedChannelPosts` for a full joined-channel missed-event sweep on connect/reconnect. Conflict handling remains server-timestamp last-write-wins through normal cache upserts. Its reconnect orchestration, missed-post cursor recovery, connection-state projection, backfill failure diagnostics, channel-selection policy, unread invalidation refresh, and thread-state invalidation refresh are unit-tested with an injected lifecycle stream so backfill-on-each-connect behavior can be proven without forcing a real network drop.
 
 The internal REST layer decodes Mattermost snake_case payloads and maps errors into `MattermostError`.
+Public `ID` property spelling is decoupled from Mattermost's `*_id` wire keys through explicit
+`CodingKeys`. Raw millisecond timestamps remain the persistence/wire representation while computed
+`Date` accessors serve host UI code. `MattermostAllPostsSequence` is a stateless public sequence
+whose iterator owns cursor, deduplication, and cancellation state.
 
 ## Expansion Rules
 

@@ -13,25 +13,29 @@ extension MattermostClient {
         case .channel(let channelID):
             postList = try await posts(
                 channelID: channelID,
-                page: request.page,
-                perPage: request.perPage,
-                since: request.since,
-                before: request.before,
-                after: request.after,
-                skipFetchThreads: request.skipFetchThreads,
-                collapsedThreads: request.collapsedThreads,
-                collapsedThreadsExtended: request.collapsedThreadsExtended
+                options: MattermostPostsOptions(
+                    page: request.page,
+                    perPage: request.perPage,
+                    since: request.since,
+                    before: request.before,
+                    after: request.after,
+                    skipFetchThreads: request.skipFetchThreads,
+                    collapsedThreads: request.collapsedThreads,
+                    collapsedThreadsExtended: request.collapsedThreadsExtended
+                )
             )
         case .thread(let rootPostID):
             postList = try await thread(
                 postID: rootPostID,
-                perPage: request.perPage,
-                fromPost: request.fromPost,
-                fromCreateAt: request.fromCreateAt,
-                direction: request.direction,
-                skipFetchThreads: request.skipFetchThreads,
-                collapsedThreads: request.collapsedThreads,
-                collapsedThreadsExtended: request.collapsedThreadsExtended
+                options: MattermostThreadOptions(
+                    perPage: request.perPage,
+                    fromPost: request.fromPost,
+                    fromCreateAt: request.fromCreateAt,
+                    direction: request.direction,
+                    skipFetchThreads: request.skipFetchThreads,
+                    collapsedThreads: request.collapsedThreads,
+                    collapsedThreadsExtended: request.collapsedThreadsExtended
+                )
             )
         }
 
@@ -65,7 +69,10 @@ public extension MattermostClient {
                 var pages: [MattermostPostList] = []
                 var reachedEnd = false
                 for page in 0..<max(1, maxPages) {
-                    let history = try await posts(channelID: channelID, page: page, perPage: pageSize)
+                    let history = try await posts(
+                        channelID: channelID,
+                        options: MattermostPostsOptions(page: page, perPage: pageSize)
+                    )
                     pages.append(history)
                     if history.orderedPosts.count < pageSize {
                         reachedEnd = true
@@ -86,8 +93,7 @@ public extension MattermostClient {
             for page in 0..<max(1, maxPages) {
                 let postList = try await posts(
                     channelID: channelID,
-                    page: page,
-                    perPage: pageSize
+                    options: MattermostPostsOptions(page: page, perPage: pageSize)
                 )
                 pages.append(postList)
                 if postList.orderedPosts.count < pageSize {

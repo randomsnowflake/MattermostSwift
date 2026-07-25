@@ -1719,7 +1719,7 @@ func decodesPostListAndPostState() throws {
         "ok": .bool(true),
         "count": .integer(2),
     ]))
-    #expect(post.metadata?["priority"] == .object([
+    #expect(post.rawMetadata?["priority"] == .object([
         "requested_ack": .bool(false),
     ]))
 }

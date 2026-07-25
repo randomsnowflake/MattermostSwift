@@ -323,7 +323,7 @@ extension MattermostSwiftCLI {
             otherUserID: otherUserID
         )
         let member = try await client.channelMember(channelID: channel.id, userID: currentUser.id)
-        let unread = try await client.channelUnread(userID: currentUser.id, channelID: channel.id)
+        let unread = try await client.channelUnread(channelID: channel.id, userID: currentUser.id)
 
         print("channel: \(channel.id)")
         print("type: \(channel.type)")
@@ -338,8 +338,8 @@ extension MattermostSwiftCLI {
         let user = try await client.currentUser()
         let teamID = try await resolvedTeamID(nil, client: client)
         let threadList = try await client.userThreads(
-            userID: user.id,
             teamID: teamID,
+            userID: user.id,
             request: MattermostThreadListRequest(perPage: 5, extended: true)
         )
         let store = try MattermostStore(inMemory: true)
@@ -357,9 +357,9 @@ extension MattermostSwiftCLI {
 
         if let firstThread = threadList.threads.first {
             let thread = try await client.userThread(
-                userID: user.id,
                 teamID: teamID,
                 threadID: firstThread.id,
+                userID: user.id,
                 extended: true
             )
             print("first-thread: \(thread.id)")

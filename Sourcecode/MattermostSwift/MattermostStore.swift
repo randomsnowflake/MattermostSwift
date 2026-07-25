@@ -106,7 +106,7 @@ public final class MattermostStore {
 
     @discardableResult
     public func upsert(status: MattermostUserStatus) throws -> MattermostCachedUserStatus {
-        if let cached = try cachedUserStatus(userID: status.userId) {
+        if let cached = try cachedUserStatus(userID: status.userID) {
             cached.apply(status)
             return cached
         }
@@ -118,18 +118,18 @@ public final class MattermostStore {
 
     public func upsert(statuses: [MattermostUserStatus]) throws {
         guard !statuses.isEmpty else { return }
-        let ids = statuses.map(\.userId)
+        let ids = statuses.map(\.userID)
         let existing = try fetchInBatches(ids: ids) { chunkIDs in
             FetchDescriptor<MattermostCachedUserStatus>(predicate: #Predicate { chunkIDs.contains($0.userId) })
         }
         var byID = Dictionary(existing.map { ($0.userId, $0) }, uniquingKeysWith: { a, _ in a })
         for status in statuses {
-            if let cached = byID[status.userId] {
+            if let cached = byID[status.userID] {
                 cached.apply(status)
             } else {
                 let cached = MattermostCachedUserStatus(status)
                 context.insert(cached)
-                byID[status.userId] = cached
+                byID[status.userID] = cached
             }
         }
     }
@@ -229,8 +229,8 @@ public final class MattermostStore {
     @discardableResult
     public func upsert(member: MattermostChannelMember) throws -> MattermostCachedChannelMember {
         let id = MattermostCachedChannelMember.cacheID(
-            channelID: member.channelId,
-            userID: member.userId
+            channelID: member.channelID,
+            userID: member.userID
         )
         if let cached = try cachedChannelMember(id: id) {
             cached.apply(member)
@@ -245,14 +245,14 @@ public final class MattermostStore {
     public func upsert(members: [MattermostChannelMember]) throws {
         guard !members.isEmpty else { return }
         let ids = members.map {
-            MattermostCachedChannelMember.cacheID(channelID: $0.channelId, userID: $0.userId)
+            MattermostCachedChannelMember.cacheID(channelID: $0.channelID, userID: $0.userID)
         }
         let existing = try fetchInBatches(ids: ids) { chunkIDs in
             FetchDescriptor<MattermostCachedChannelMember>(predicate: #Predicate { chunkIDs.contains($0.id) })
         }
         var byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for member in members {
-            let id = MattermostCachedChannelMember.cacheID(channelID: member.channelId, userID: member.userId)
+            let id = MattermostCachedChannelMember.cacheID(channelID: member.channelID, userID: member.userID)
             if let cached = byID[id] {
                 cached.apply(member)
             } else {
@@ -274,7 +274,7 @@ public final class MattermostStore {
         let teamChannelIDs = Set(try context.fetch(FetchDescriptor<MattermostCachedChannel>(
             predicate: #Predicate { $0.teamId == teamID }
         )).map(\.id))
-        let retained = Set(members.map(\.channelId))
+        let retained = Set(members.map(\.channelID))
         let existing = try cachedChannelMembers(userID: userID)
         for member in existing
             where teamChannelIDs.contains(member.channelId) && !retained.contains(member.channelId) {
@@ -285,7 +285,7 @@ public final class MattermostStore {
     @discardableResult
     public func upsert(unread: MattermostChannelUnread, userID: String) throws -> MattermostCachedChannelUnread {
         let id = MattermostCachedChannelUnread.cacheID(
-            channelID: unread.channelId,
+            channelID: unread.channelID,
             userID: userID
         )
         if let cached = try cachedChannelUnread(id: id) {
@@ -306,7 +306,7 @@ public final class MattermostStore {
         }
 
         let propsJSON = try MattermostCachedPost.encodedJSON(post.props)
-        let metadataJSON = try MattermostCachedPost.encodedJSON(post.metadata)
+        let metadataJSON = try MattermostCachedPost.encodedJSON(post.rawMetadata)
         let cached = MattermostCachedPost(post, propsJSON: propsJSON, metadataJSON: metadataJSON)
         context.insert(cached)
         return cached
@@ -328,7 +328,7 @@ public final class MattermostStore {
                 try cached.apply(post)
             } else {
                 let propsJSON = try MattermostCachedPost.encodedJSON(post.props)
-                let metadataJSON = try MattermostCachedPost.encodedJSON(post.metadata)
+                let metadataJSON = try MattermostCachedPost.encodedJSON(post.rawMetadata)
                 let cached = MattermostCachedPost(post, propsJSON: propsJSON, metadataJSON: metadataJSON)
                 context.insert(cached)
                 byID[post.id] = cached
@@ -375,8 +375,8 @@ public final class MattermostStore {
     @discardableResult
     public func upsert(reaction: MattermostReaction) throws -> MattermostCachedReaction {
         let id = MattermostCachedReaction.cacheID(
-            userID: reaction.userId,
-            postID: reaction.postId,
+            userID: reaction.userID,
+            postID: reaction.postID,
             emojiName: reaction.emojiName
         )
         if let cached = try cachedReaction(id: id) {
@@ -392,14 +392,14 @@ public final class MattermostStore {
     public func upsert(reactions: [MattermostReaction]) throws {
         guard !reactions.isEmpty else { return }
         let ids = reactions.map {
-            MattermostCachedReaction.cacheID(userID: $0.userId, postID: $0.postId, emojiName: $0.emojiName)
+            MattermostCachedReaction.cacheID(userID: $0.userID, postID: $0.postID, emojiName: $0.emojiName)
         }
         let existing = try fetchInBatches(ids: ids) { chunkIDs in
             FetchDescriptor<MattermostCachedReaction>(predicate: #Predicate { chunkIDs.contains($0.id) })
         }
         var byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for reaction in reactions {
-            let id = MattermostCachedReaction.cacheID(userID: reaction.userId, postID: reaction.postId, emojiName: reaction.emojiName)
+            let id = MattermostCachedReaction.cacheID(userID: reaction.userID, postID: reaction.postID, emojiName: reaction.emojiName)
             if let cached = byID[id] {
                 cached.apply(reaction)
             } else {
@@ -931,8 +931,8 @@ public final class MattermostStore {
         case .reactionRemoved(let reaction):
             if let reaction {
                 let id = MattermostCachedReaction.cacheID(
-                    userID: reaction.userId,
-                    postID: reaction.postId,
+                    userID: reaction.userID,
+                    postID: reaction.postID,
                     emojiName: reaction.emojiName
                 )
                 try deleteCachedReaction(id: id)

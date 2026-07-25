@@ -49,7 +49,7 @@ let session = try await MattermostClient.login(
     password: "password"
 )
 
-let client = try session.client(serverURL: serverURL)
+let client = try session.client()
 print(session.tokenSource)
 
 // Attempt remote server-session cleanup before discarding the local token.
@@ -59,6 +59,9 @@ try await client.logoutCurrentSession()
 `MattermostSession.tokenSource` reports whether Mattermost returned the documented `Token` response header or the browser-compatible `MMAUTHTOKEN` cookie. The login request sends Mattermost's web-client `X-Requested-With: XMLHttpRequest` header so deployments that attach browser session cookies can be handled without storing the password in the SDK.
 `logoutCurrentSession()` is best-effort remote cleanup for password-login sessions; discard the
 local token even if it fails, and do not expect a personal access token to be accepted.
+For a trusted HTTP-only development server, pass `allowInsecureHTTP: true` to login and MFA
+checks. Hosts can inspect `MattermostConfiguration.usesInsecureHTTP` to present their own warning;
+the library does not print to standard error.
 
 ## Hydrate Local Cache
 
@@ -110,11 +113,11 @@ func loadTimeline(
         request: MattermostTimelineRequest(perPage: 40)
     )
 
-    if let lastReplyAt = threadPage.posts.map(\.createAt).max() {
+    if let lastReply = threadPage.posts.max(by: { $0.createAt < $1.createAt }) {
         try await client.markThreadRead(
             teamID: "team-id",
             threadID: rootPostID,
-            timestamp: lastReplyAt
+            upTo: lastReply.createdAt
         )
     }
 
@@ -131,7 +134,20 @@ func loadTimeline(
 
 The timeline target owns the cache scope, so host apps do not need to invent cursor keys. Cached timelines keep deleted-post tombstones for sync correctness, including deletes recovered later through cursor backfill; pass `includeDeleted: false` for normal visible message lists.
 
-Use `markThreadRead(teamID:threadID:timestamp:)` to clear a followed thread's unread state after presenting it. Pass a Mattermost server timestamp in milliseconds, such as a post `createAt` value or thread `lastReplyAt`; seconds-based Unix timestamps leave the thread unread.
+Use `markThreadRead(teamID:threadID:upTo:)` with a `Date`, or the raw `timestamp:` overload with
+Mattermost milliseconds, to clear a followed thread's unread state. Convert other server values
+with `Date(mattermostMilliseconds:)` and `Date.mattermostMilliseconds`.
+
+For direct endpoint loading, use `MattermostPostsOptions`, `MattermostUserSearchOptions`,
+`MattermostChannelSearchOptions`, and `MattermostThreadOptions`. Setting
+`MattermostPostsOptions.since` intentionally ignores page, per-page, before, and after options.
+To walk channel history lazily without hand-written cursor loops:
+
+```swift
+for try await post in client.allPosts(channelID: channelID, pageSize: 100) {
+    print(post.message)
+}
+```
 
 Collapsed-Reply-Threads (CRT) clients compute channel unread from root counts: `MattermostChannel.totalMsgCountRoot` and `MattermostChannelMember.msgCountRoot`/`mentionCountRoot` (also on `MattermostChannelUnread`) surface the server's `_root` counters, so channel unread is `totalMsgCountRoot − msgCountRoot` with `mentionCountRoot` for the channel mention badge. Call `viewChannel(channelID:collapsedThreadsSupported: true)` so marking a channel viewed does not auto-read its threads.
 
@@ -167,7 +183,7 @@ func runLiveSync(
         case .eventApplied(_, let typedEvent):
             print("applied \(typedEvent)")
         case .channelUnreadRefreshed(let unread):
-            print("unread \(unread.channelId): \(unread.msgCount)")
+            print("unread \(unread.channelID): \(unread.msgCount)")
         case .backfillFailed(let failure):
             print("live sync backfill failed on attempt \(failure.attempt): \(failure.message)")
         default:

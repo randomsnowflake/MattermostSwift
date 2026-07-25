@@ -15,6 +15,10 @@ The current unit tests cover:
 - username/password login request construction and environment validation,
 - request construction,
 - post update request construction with the `since` timestamp query,
+- issue #75 API ergonomics: `ID` CodingKeys and aliases, all four options structs, subject-first
+  request paths, plural channel-member decoding, millisecond `Date` conversion/thread-read paths,
+  cursor pagination/deduplication, insecure login/MFA, remembered session URLs, `Duration`
+  reconnect delays, tolerant typed/raw metadata, and host-inspectable insecure configuration,
 - unread-context and collapsed-thread request construction,
 - thread inbox request construction, thread read-state request construction, decoding, and cache upserts,
 - query item construction,
