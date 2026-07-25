@@ -251,3 +251,8 @@ try await client.downloadFile(id: uploaded.fileInfos[0].id, to: destinationURL, 
 Live event streams use finite queues. If a consumer cannot keep up, they finish with
 `MattermostError.liveEventGap`; restart live sync to run its normal authoritative backfill before
 presenting the cache as current.
+
+Live sync skips an individual WebSocket event when its embedded payload cannot be decoded and
+emits `eventApplyFailed` so the host can report schema drift without reconnecting. Failed unread,
+sidebar-category, and thread-state refreshes are likewise emitted through their corresponding
+`MattermostLiveSyncEvent` failure cases; cancellation still stops the stream.

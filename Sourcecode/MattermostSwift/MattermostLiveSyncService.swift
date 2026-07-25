@@ -97,9 +97,17 @@ public enum MattermostLiveSyncEvent: Sendable {
     case connecting(attempt: Int)
     case backfilled(MattermostLiveBackfillResult)
     case eventApplied(MattermostLiveEvent, MattermostTypedLiveEvent)
+    /// The raw event could not be decoded or applied. Live sync skips it and continues.
+    case eventApplyFailed(MattermostLiveEvent, String)
     case channelUnreadRefreshed(MattermostChannelUnread)
+    /// Refreshing unread state failed without terminating live sync.
+    case channelUnreadRefreshFailed(MattermostLiveSyncFailure)
     case sidebarCategoriesRefreshed([MattermostSidebarCategory])
+    /// Refreshing sidebar categories failed without terminating live sync.
+    case sidebarCategoriesRefreshFailed(MattermostLiveSyncFailure)
     case threadStateRefreshed(MattermostThreadResponse)
+    /// Refreshing per-user thread state failed without terminating live sync.
+    case threadStateRefreshFailed(MattermostLiveSyncFailure)
     case reconnecting(attempt: Int, delay: Duration)
     case backfillFailed(MattermostLiveSyncFailure)
 }
@@ -120,9 +128,13 @@ public extension MattermostLiveSyncEvent {
         case .backfillFailed(let failure):
             .failed(attempt: failure.attempt, message: failure.message)
         case .eventApplied,
+             .eventApplyFailed,
              .channelUnreadRefreshed,
+             .channelUnreadRefreshFailed,
              .sidebarCategoriesRefreshed,
-             .threadStateRefreshed:
+             .sidebarCategoriesRefreshFailed,
+             .threadStateRefreshed,
+             .threadStateRefreshFailed:
             nil
         }
     }
@@ -242,11 +254,13 @@ public struct MattermostLiveSyncService: Sendable {
                 do {
                     var activeTeamID = teamID
                     var activeUserID: String?
+                    var currentAttempt = 0
                     for try await lifecycleEvent in lifecycleEvents() {
                         try Task.checkCancellation()
 
                         switch lifecycleEvent {
                         case .connecting(let attempt):
+                            currentAttempt = attempt
                             try Self.yield(.connecting(attempt: attempt), to: continuation)
                             // A backfill failure is reported but no longer terminates the stream:
                             // the lifecycle loop keeps running so the socket can connect and a later
@@ -270,11 +284,22 @@ public struct MattermostLiveSyncService: Sendable {
                                 )), to: continuation)
                             }
 
-                        case .connected:
-                            break
+                        case .connected(let attempt):
+                            currentAttempt = attempt
 
                         case .event(let event):
-                            let typedEvent = try store.apply(liveEvent: event)
+                            let typedEvent: MattermostTypedLiveEvent
+                            do {
+                                typedEvent = try store.apply(liveEvent: event)
+                            } catch is CancellationError {
+                                throw CancellationError()
+                            } catch {
+                                try Self.yield(
+                                    .eventApplyFailed(event, Self.failureMessage(for: error)),
+                                    to: continuation
+                                )
+                                continue
+                            }
                             try store.save()
                             try Self.yield(.eventApplied(event, typedEvent), to: continuation)
 
@@ -304,6 +329,12 @@ public struct MattermostLiveSyncService: Sendable {
                                     } catch is CancellationError {
                                         throw CancellationError()
                                     } catch {
+                                        try Self.yield(.channelUnreadRefreshFailed(
+                                            MattermostLiveSyncFailure(
+                                                attempt: currentAttempt,
+                                                message: Self.failureMessage(for: error)
+                                            )
+                                        ), to: continuation)
                                         continue
                                     }
                                 }
@@ -330,6 +361,12 @@ public struct MattermostLiveSyncService: Sendable {
                                     throw CancellationError()
                                 } catch {
                                     categoriesResult = nil
+                                    try Self.yield(.sidebarCategoriesRefreshFailed(
+                                        MattermostLiveSyncFailure(
+                                            attempt: currentAttempt,
+                                            message: Self.failureMessage(for: error)
+                                        )
+                                    ), to: continuation)
                                 }
                             }
 
@@ -356,6 +393,12 @@ public struct MattermostLiveSyncService: Sendable {
                                     throw CancellationError()
                                 } catch {
                                     threadResult = nil
+                                    try Self.yield(.threadStateRefreshFailed(
+                                        MattermostLiveSyncFailure(
+                                            attempt: currentAttempt,
+                                            message: Self.failureMessage(for: error)
+                                        )
+                                    ), to: continuation)
                                 }
                             }
 

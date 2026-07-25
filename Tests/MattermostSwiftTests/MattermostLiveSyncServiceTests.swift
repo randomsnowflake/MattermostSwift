@@ -342,6 +342,78 @@ func liveSyncAppliesInjectedLifecycleEventsToStore() async throws {
 
 @MainActor
 @Test
+func liveSyncReportsUndecodableEventAndContinuesApplyingLaterEvents() async throws {
+    let service = try MattermostClient(
+        serverURL: try #require(URL(string: "https://mattermost.example.com")),
+        token: "test-token"
+    ).liveSyncService()
+    let store = try MattermostStore(inMemory: true)
+    let undecodable = MattermostLiveEvent(
+        event: "posted",
+        data: ["post": .string(#"{"id":42}"#)],
+        broadcast: nil,
+        seq: 10
+    )
+    let valid = MattermostLiveEvent(
+        event: "posted",
+        data: ["post": .string("""
+        {
+          "id": "post-after-decode-failure",
+          "create_at": 10,
+          "update_at": 10,
+          "edit_at": 0,
+          "delete_at": 0,
+          "user_id": "user-1",
+          "channel_id": "channel-1",
+          "root_id": "",
+          "message": "stream survived",
+          "type": ""
+        }
+        """)],
+        broadcast: nil,
+        seq: 11
+    )
+
+    let stream = service.events(
+        to: store,
+        options: MattermostLiveSyncOptions(maxBackfillChannels: 1),
+        lifecycleEvents: {
+            AsyncThrowingStream { continuation in
+                continuation.yield(.connecting(attempt: 0))
+                continuation.yield(.event(undecodable))
+                continuation.yield(.event(valid))
+                continuation.finish()
+            }
+        },
+        backfill: { _, teamID, _, _ in
+            liveSyncBackfillResult(teamID: teamID ?? "team-1")
+        }
+    )
+
+    var failedEvent: MattermostLiveEvent?
+    var failureMessage: String?
+    var appliedPostID: String?
+    for try await event in stream {
+        switch event {
+        case .eventApplyFailed(let event, let message):
+            failedEvent = event
+            failureMessage = message
+        case .eventApplied(_, .posted(let post)):
+            appliedPostID = post.id
+        default:
+            break
+        }
+    }
+
+    let cachedPost = try #require(try store.cachedPost(id: "post-after-decode-failure"))
+    #expect(failedEvent == undecodable)
+    #expect(failureMessage?.isEmpty == false)
+    #expect(appliedPostID == "post-after-decode-failure")
+    #expect(cachedPost.message == "stream survived")
+}
+
+@MainActor
+@Test
 func liveSyncRefreshesUnreadOnPostUnreadInvalidation() async throws {
     let service = try MattermostClient(
         serverURL: try #require(URL(string: "https://mattermost.example.com")),
@@ -551,6 +623,7 @@ func liveSyncAppliesEventBeforeRefreshFailureAndContinues() async throws {
 
     var appliedEvents: [String] = []
     var refreshedUnread: MattermostChannelUnread?
+    var refreshFailure: MattermostLiveSyncFailure?
     for try await event in stream {
         switch event {
         case .eventApplied(_, .postUnread):
@@ -559,6 +632,8 @@ func liveSyncAppliesEventBeforeRefreshFailureAndContinues() async throws {
             appliedEvents.append(post.id)
         case .channelUnreadRefreshed(let unread):
             refreshedUnread = unread
+        case .channelUnreadRefreshFailed(let failure):
+            refreshFailure = failure
         default:
             break
         }
@@ -568,7 +643,111 @@ func liveSyncAppliesEventBeforeRefreshFailureAndContinues() async throws {
     #expect(appliedEvents == ["post_unread", "post-after-refresh-failure"])
     #expect(unreadRefreshCount == 1)
     #expect(refreshedUnread == nil)
+    #expect(refreshFailure == MattermostLiveSyncFailure(
+        attempt: 0,
+        message: "refresh failed for test"
+    ))
     #expect(cachedPost.message == "still applied")
+}
+
+@MainActor
+@Test
+func liveSyncReportsSidebarAndThreadRefreshFailures() async throws {
+    struct RefreshFailure: LocalizedError {
+        let errorDescription: String?
+    }
+
+    let service = try MattermostClient(
+        serverURL: try #require(URL(string: "https://mattermost.example.com")),
+        token: "test-token"
+    ).liveSyncService()
+    let store = try MattermostStore(inMemory: true)
+    let preferencesChanged = MattermostLiveEvent(
+        event: "preferences_changed",
+        data: [:],
+        broadcast: nil,
+        seq: 30
+    )
+    let threadReadChanged = MattermostLiveEvent(
+        event: "thread_read_changed",
+        data: ["thread_id": .string("root-1")],
+        broadcast: MattermostLiveBroadcast(
+            omitUsers: nil,
+            userId: "user-1",
+            channelId: "channel-1",
+            teamId: "team-1"
+        ),
+        seq: 31
+    )
+    let valid = MattermostLiveEvent(
+        event: "posted",
+        data: ["post": .string("""
+        {
+          "id": "post-after-sidebar-thread-failures",
+          "create_at": 40,
+          "update_at": 40,
+          "edit_at": 0,
+          "delete_at": 0,
+          "user_id": "user-1",
+          "channel_id": "channel-1",
+          "root_id": "",
+          "message": "refresh failures did not stop live sync",
+          "type": ""
+        }
+        """)],
+        broadcast: nil,
+        seq: 32
+    )
+
+    let stream = service.events(
+        to: store,
+        options: MattermostLiveSyncOptions(maxBackfillChannels: 1),
+        lifecycleEvents: {
+            AsyncThrowingStream { continuation in
+                continuation.yield(.connecting(attempt: 3))
+                continuation.yield(.event(preferencesChanged))
+                continuation.yield(.event(threadReadChanged))
+                continuation.yield(.event(valid))
+                continuation.finish()
+            }
+        },
+        backfill: { _, teamID, _, _ in
+            liveSyncBackfillResult(teamID: teamID ?? "team-1")
+        },
+        refreshSidebarCategories: { _ in
+            throw RefreshFailure(errorDescription: "sidebar refresh failed for test")
+        },
+        refreshThreadState: { _, _, _ in
+            throw RefreshFailure(errorDescription: "thread refresh failed for test")
+        }
+    )
+
+    var sidebarFailure: MattermostLiveSyncFailure?
+    var threadFailure: MattermostLiveSyncFailure?
+    var appliedPostID: String?
+    for try await event in stream {
+        switch event {
+        case .sidebarCategoriesRefreshFailed(let failure):
+            sidebarFailure = failure
+        case .threadStateRefreshFailed(let failure):
+            threadFailure = failure
+        case .eventApplied(_, .posted(let post)):
+            appliedPostID = post.id
+        default:
+            break
+        }
+    }
+
+    #expect(sidebarFailure == MattermostLiveSyncFailure(
+        attempt: 3,
+        message: "sidebar refresh failed for test"
+    ))
+    #expect(threadFailure == MattermostLiveSyncFailure(
+        attempt: 3,
+        message: "thread refresh failed for test"
+    ))
+    #expect(appliedPostID == "post-after-sidebar-thread-failures")
+    #expect(try store.cachedPost(id: "post-after-sidebar-thread-failures") != nil)
 }
 
 @MainActor
