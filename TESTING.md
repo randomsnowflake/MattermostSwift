@@ -8,6 +8,10 @@ Run local package tests:
 scripts/test-unit.sh
 ```
 
+GitHub Actions also builds the `MattermostSwift` library scheme for generic iOS 18, macOS 15,
+tvOS 18, watchOS 11, and visionOS 2 destinations. These compile-only jobs keep every platform
+declared in `Package.swift` covered without requiring simulators, signing, or live credentials.
+
 The current unit tests cover:
 
 - server URL normalization,

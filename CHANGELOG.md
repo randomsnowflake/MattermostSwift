@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Declared tvOS 18, watchOS 11, and visionOS 2 support alongside iOS 18 and macOS 15,
+  with CI builds for every supported Apple platform and documentation of the current Linux limits.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,

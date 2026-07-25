@@ -14,10 +14,19 @@ The package is written with Swift concurrency, ships as a Swift Package, and kee
 ## At a Glance
 
 - Swift tools version: 6.0
-- Platforms: iOS 18 and macOS 15
+- Library platforms: iOS 18, macOS 15, tvOS 18, watchOS 11, and visionOS 2
 - Products: `MattermostSwift` library and `MattermostSwiftCLI` executable
 - Documentation: hosted by Swift Package Index at `https://swiftpackageindex.com/randomsnowflake/MattermostSwift`
 - Stability: pre-`1.0.0`; public APIs may evolve between minor releases
+
+The `MattermostSwift` library is built in CI for every declared Apple platform. The
+`MattermostSwiftCLI` executable is a macOS development and verification harness.
+
+Linux is not currently supported. The package's cache layer depends on SwiftData, which is
+Apple-platform-only, and its live-event transport depends on the Apple Foundation implementation
+of `URLSessionWebSocketTask`. Supporting Linux would require separating the portable REST layer
+from the SwiftData cache and Apple WebSocket implementation; the package does not expose that split
+today.
 
 ## Installation
 
