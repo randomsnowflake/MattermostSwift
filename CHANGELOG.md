@@ -6,6 +6,14 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- **Breaking:** `MattermostError.httpStatus` now includes a third `apiError` associated value.
+  `MattermostAPIErrorBody` preserves Mattermost error IDs, detailed errors, request IDs, and body
+  status codes; `MattermostError` also provides `isUnauthorized`, `isForbidden`, and `isNotFound`.
+  Existing `httpStatus` pattern matches must accept the new associated value.
+- **Breaking:** `MattermostLiveSyncFailure` now carries error and underlying-error domain/code
+  identity in addition to its attempt and message, and preserves a typed `MattermostError` when
+  available. Its public initializer now requires structured error identity, and backfill failures
+  populate it from the thrown error.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,

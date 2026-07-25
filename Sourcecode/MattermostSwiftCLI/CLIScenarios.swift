@@ -481,7 +481,7 @@ extension MattermostSwiftCLI {
             let afterDelete: [MattermostPreference]
             do {
                 afterDelete = try await client.preferences(userID: user.id, category: category)
-            } catch MattermostError.httpStatus(let code, _) where code == 404 {
+            } catch MattermostError.httpStatus(let code, _, _) where code == 404 {
                 afterDelete = []
             }
             let stillPresent = afterDelete.contains { $0.category == category && $0.name == name }

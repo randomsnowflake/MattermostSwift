@@ -75,6 +75,7 @@ Public models are intentionally small and stable while the first flow hardens:
 
 - `MattermostUser`
 - `MattermostSession`
+- `MattermostAPIErrorBody`
 - `MattermostUserStatus`
 - `MattermostTeam`
 - `MattermostTeamMember`

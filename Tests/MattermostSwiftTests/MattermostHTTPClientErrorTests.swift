@@ -5,16 +5,54 @@ import Testing
 @Suite(.serialized)
 struct MattermostHTTPClientErrorTests {
     @Test
-    func clientMapsMattermostErrorResponseMessage() async throws {
+    func clientMapsFullMattermostErrorResponse() async throws {
         let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me")
-            let body = Data(#"{"id":"api.context.permissions.app_error","message":"No permission"}"#.utf8)
+            let body = Data(
+                #"""
+                {
+                  "id": "api.context.permissions.app_error",
+                  "message": "No permission",
+                  "detailed_error": "User does not have the required permission.",
+                  "request_id": "request-123",
+                  "status_code": 403
+                }
+                """#.utf8
+            )
             return try Self.response(statusCode: 403, body: body, request: request)
         }
 
-        await #expect(throws: MattermostError.httpStatus(code: 403, message: "No permission")) {
+        let apiError = MattermostAPIErrorBody(
+            id: "api.context.permissions.app_error",
+            message: "No permission",
+            detailedError: "User does not have the required permission.",
+            requestId: "request-123",
+            statusCode: 403
+        )
+        await #expect(throws: MattermostError.httpStatus(
+            code: 403,
+            message: "No permission",
+            apiError: apiError
+        )) {
             _ = try await client.currentUser()
         }
+    }
+
+    @Test
+    func HTTPStatusErrorsExposeCommonStatusAccessors() {
+        let unauthorized = MattermostError.httpStatus(code: 401, message: nil, apiError: nil)
+        let forbidden = MattermostError.httpStatus(code: 403, message: nil, apiError: nil)
+        let notFound = MattermostError.httpStatus(code: 404, message: nil, apiError: nil)
+        let transport = MattermostError.transportFailure("offline")
+
+        #expect(unauthorized.isUnauthorized)
+        #expect(!unauthorized.isForbidden)
+        #expect(!unauthorized.isNotFound)
+        #expect(forbidden.isForbidden)
+        #expect(notFound.isNotFound)
+        #expect(!transport.isUnauthorized)
+        #expect(!transport.isForbidden)
+        #expect(!transport.isNotFound)
     }
 
     @Test
@@ -23,7 +61,7 @@ struct MattermostHTTPClientErrorTests {
             try Self.response(statusCode: 502, body: Data("Bad gateway".utf8), request: request)
         }
 
-        await #expect(throws: MattermostError.httpStatus(code: 502, message: nil)) {
+        await #expect(throws: MattermostError.httpStatus(code: 502, message: nil, apiError: nil)) {
             _ = try await client.currentUser()
         }
     }
@@ -112,7 +150,11 @@ struct MattermostHTTPClientErrorTests {
             }
         )
 
-        await #expect(throws: MattermostError.httpStatus(code: 404, message: "File not found")) {
+        await #expect(throws: MattermostError.httpStatus(
+            code: 404,
+            message: "File not found",
+            apiError: MattermostAPIErrorBody(message: "File not found")
+        )) {
             _ = try await httpClient.data("/files/file-id")
         }
     }

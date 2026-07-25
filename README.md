@@ -46,6 +46,24 @@ To test unreleased changes, use a branch or local path dependency during app dev
 
 The library target has no SwiftUI or Combine dependency.
 
+## Error Handling
+
+Server failures surface as `MattermostError.httpStatus(code:message:apiError:)`. The
+`MattermostAPIErrorBody` preserves Mattermost's stable error `id`, diagnostic detail,
+`requestId`, and body `statusCode` so apps can branch on stable identity and retain the request
+identifier for server-log correlation. Common status checks do not require pattern matching:
+
+```swift
+do {
+    _ = try await client.currentUser()
+} catch let error as MattermostError where error.isUnauthorized {
+    // Present authentication UI.
+} catch MattermostError.httpStatus(_, _, let apiError) {
+    print("Mattermost error: \(apiError?.id ?? "unknown")")
+    print("Request ID: \(apiError?.requestId ?? "unknown")")
+}
+```
+
 ## Documentation
 
 The package includes DocC documentation for the library target. Swift Package Index builds and hosts the latest documentation from the package page:

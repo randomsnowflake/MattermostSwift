@@ -83,12 +83,59 @@ public enum MattermostLiveSyncConnectionState: Equatable, Sendable {
 
 /// Host-visible live-sync failure details.
 public struct MattermostLiveSyncFailure: Equatable, Sendable {
+    /// Reconnect attempt whose backfill failed.
     public let attempt: Int
+    /// Error domain of the backfill failure.
+    public let domain: String
+    /// Error code of the backfill failure.
+    public let code: Int
+    /// Domain of the underlying error, when available.
+    public let underlyingDomain: String?
+    /// Code of the underlying error, when available.
+    public let underlyingCode: Int?
+    /// Human-readable failure description.
     public let message: String
+    /// Typed SDK error, when the backfill failed with `MattermostError`.
+    public let mattermostError: MattermostError?
 
-    public init(attempt: Int, message: String) {
+    public init(
+        attempt: Int,
+        domain: String,
+        code: Int,
+        underlyingDomain: String? = nil,
+        underlyingCode: Int? = nil,
+        message: String,
+        mattermostError: MattermostError? = nil
+    ) {
         self.attempt = attempt
+        self.domain = domain
+        self.code = code
+        self.underlyingDomain = underlyingDomain
+        self.underlyingCode = underlyingCode
         self.message = message
+        self.mattermostError = mattermostError
+    }
+
+    public init(attempt: Int, error: any Error) {
+        let nsError = error as NSError
+        let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
+        self.init(
+            attempt: attempt,
+            domain: nsError.domain,
+            code: nsError.code,
+            underlyingDomain: underlying?.domain,
+            underlyingCode: underlying?.code,
+            message: Self.failureMessage(for: error),
+            mattermostError: error as? MattermostError
+        )
+    }
+
+    private static func failureMessage(for error: any Error) -> String {
+        let message = error.localizedDescription
+        if !message.isEmpty {
+            return message
+        }
+        return String(describing: error)
     }
 }
 
@@ -266,7 +313,7 @@ public struct MattermostLiveSyncService: Sendable {
                             } catch {
                                 try Self.yield(.backfillFailed(MattermostLiveSyncFailure(
                                     attempt: attempt,
-                                    message: Self.failureMessage(for: error)
+                                    error: error
                                 )), to: continuation)
                             }
 
@@ -460,13 +507,6 @@ public struct MattermostLiveSyncService: Sendable {
             .map(\.id)
     }
 
-    private static func failureMessage(for error: any Error) -> String {
-        let message = error.localizedDescription
-        if !message.isEmpty {
-            return message
-        }
-        return String(describing: error)
-    }
 }
 
 /// Lifecycle-level WebSocket events used by live sync orchestration.
