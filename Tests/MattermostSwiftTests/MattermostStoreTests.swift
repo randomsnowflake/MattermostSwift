@@ -862,7 +862,7 @@ func storeAppliesLiveChannelMemberAndUserEvents() throws {
 }
 
 @Test
-func reconnectPolicyCalculatesBackoffAndStopsAtLimit() {
+func reconnectPolicyAppliesFullJitterToCappedExponentialBackoff() {
     let policy = MattermostLiveEventReconnectPolicy(
         initialDelaySeconds: 0.5,
         maxDelaySeconds: 2,
@@ -873,11 +873,38 @@ func reconnectPolicyCalculatesBackoffAndStopsAtLimit() {
     #expect(policy.canRetry(attempt: 0))
     #expect(policy.canRetry(attempt: 1))
     #expect(!policy.canRetry(attempt: 2))
-    #expect(policy.delay(for: 0) == .milliseconds(500))
-    #expect(policy.delay(for: 1) == .seconds(1))
-    #expect(policy.delay(for: 2) == .seconds(2))
-    #expect(policy.delay(for: 3) == .seconds(2))
-    #expect(policy.delay(for: 4) == .seconds(2))
+
+    #expect(policy.delay(for: 0, jitterFraction: 0) == .zero)
+    #expect(policy.delay(for: 0, jitterFraction: 0.5) == .milliseconds(250))
+    #expect(policy.delay(for: 0, jitterFraction: 1) == .milliseconds(500))
+    #expect(policy.delay(for: 1, jitterFraction: 1) == .seconds(1))
+    #expect(policy.delay(for: 2, jitterFraction: 1) == .seconds(2))
+    #expect(policy.delay(for: 3, jitterFraction: 1) == .seconds(2))
+    #expect(policy.delay(for: 4, jitterFraction: 1) == .seconds(2))
+}
+
+@Test(arguments: [
+    (attempt: -1, maximum: Duration.milliseconds(500)),
+    (attempt: 0, maximum: Duration.milliseconds(500)),
+    (attempt: 1, maximum: Duration.seconds(1)),
+    (attempt: 2, maximum: Duration.seconds(2)),
+    (attempt: 10, maximum: Duration.seconds(2)),
+])
+func reconnectPolicyRandomDelayStaysWithinBackoffBounds(
+    attempt: Int,
+    maximum: Duration
+) {
+    let policy = MattermostLiveEventReconnectPolicy(
+        initialDelaySeconds: 0.5,
+        maxDelaySeconds: 2,
+        multiplier: 2
+    )
+
+    for _ in 0..<100 {
+        let delay = policy.delay(for: attempt)
+        #expect(delay >= .zero)
+        #expect(delay <= maximum)
+    }
 }
 
 @Test
@@ -894,14 +921,17 @@ func reconnectPolicyNormalizesInvalidNumbersAndSaturatesLargeAttempts() {
     #expect(policy.multiplier == 1)
     #expect(policy.maxRetries == 0)
     #expect(!policy.canRetry(attempt: 0))
-    #expect(policy.delay(for: .max) == .seconds(1))
+    #expect(policy.delay(for: .max, jitterFraction: 1) == .seconds(1))
 
     let overflowing = MattermostLiveEventReconnectPolicy(
         initialDelaySeconds: .greatestFiniteMagnitude,
         maxDelaySeconds: .greatestFiniteMagnitude,
         multiplier: .greatestFiniteMagnitude
     )
-    #expect(overflowing.delay(for: .max) > .zero)
+    let maximum = overflowing.delay(for: .max, jitterFraction: 1)
+    #expect(maximum == .milliseconds(Int.max / 2))
+    #expect(overflowing.delay(for: .max, jitterFraction: 0) == .zero)
+    #expect(overflowing.delay(for: .max) <= maximum)
 }
 
 @MainActor
