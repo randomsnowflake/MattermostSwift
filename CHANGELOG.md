@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- **Source-breaking:** `MattermostCachedPostSnapshot` now exposes `propsJSON` and
+  `metadataJSON` instead of eagerly decoded `props` and `metadata`. Snapshot creation performs no
+  JSON decoding; call the new throwing `decodedProps()` and `decodedMetadata()` methods on demand.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,
