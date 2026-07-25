@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Safe REST reads and audited read-only POST requests now retry HTTP 429 and 503 responses
+  with bounded backoff, honoring numeric `Retry-After` values. Mutations are never replayed,
+  and exhausted HTTP 429 responses surface as `MattermostError.rateLimited(retryAfter:)`.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,

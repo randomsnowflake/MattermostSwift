@@ -18,7 +18,7 @@ The current unit tests cover:
 - unread-context and collapsed-thread request construction,
 - thread inbox request construction, thread read-state request construction, decoding, and cache upserts,
 - query item construction,
-- REST error handling for Mattermost error bodies, non-JSON error bodies, empty successful JSON responses, and binary/data endpoints,
+- REST error handling for Mattermost error bodies, non-JSON error bodies, empty successful JSON responses, binary/data endpoints, bounded 429 retries with `Retry-After`, dedicated rate-limit errors, and mutation replay prevention,
 - initial Mattermost response decoding,
 - post props/metadata decoding, outbound props request encoding, and SwiftData cache preservation,
 - channel search, batch user lookup, user search/autocomplete/known-user request construction, direct/group channel request construction, and custom emoji request/response decoding,
