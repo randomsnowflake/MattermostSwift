@@ -57,14 +57,14 @@ public final class MattermostCachedUserStatus {
 
     public init(
         userId: String,
-        status: String,
+        status: MattermostUserStatusValue,
         manual: Bool? = nil,
         lastActivityAt: Int64? = nil,
         activeChannel: String? = nil,
         dndEndTime: Int64? = nil
     ) {
         self.userId = userId
-        self.status = status
+        self.status = status.rawValue
         self.manual = manual
         self.lastActivityAt = lastActivityAt
         self.activeChannel = activeChannel
@@ -73,7 +73,7 @@ public final class MattermostCachedUserStatus {
 
     init(_ status: MattermostUserStatus) {
         userId = status.userId
-        self.status = status.status
+        self.status = status.status.rawValue
         manual = status.manual
         lastActivityAt = status.lastActivityAt
         activeChannel = status.activeChannel
@@ -81,7 +81,7 @@ public final class MattermostCachedUserStatus {
     }
 
     func apply(_ status: MattermostUserStatus) {
-        self.status = status.status
+        self.status = status.status.rawValue
         manual = status.manual
         lastActivityAt = status.lastActivityAt
         activeChannel = status.activeChannel
@@ -138,7 +138,7 @@ public final class MattermostCachedChannel {
         teamId = channel.teamId
         name = channel.name
         displayName = channel.displayName
-        type = channel.type
+        type = channel.type.rawValue
         header = channel.header
         purpose = channel.purpose
         deleteAt = channel.deleteAt
@@ -158,7 +158,7 @@ public final class MattermostCachedChannel {
         teamId = channel.teamId
         name = channel.name
         displayName = channel.displayName
-        type = channel.type
+        type = channel.type.rawValue
         header = channel.header
         purpose = channel.purpose
         deleteAt = channel.deleteAt
@@ -376,7 +376,7 @@ public final class MattermostCachedPost {
         rootId = post.rootId
         originalId = post.originalId
         message = post.message
-        type = post.type
+        type = post.type.rawValue
         hashtags = post.hashtags
         pendingPostId = post.pendingPostId
         fileIds = post.fileIds ?? []
@@ -422,7 +422,7 @@ public final class MattermostCachedPost {
         rootId = post.rootId
         originalId = post.originalId
         message = post.message
-        type = post.type
+        type = post.type.rawValue
         hashtags = post.hashtags
         pendingPostId = post.pendingPostId
         fileIds = post.fileIds ?? []
@@ -557,10 +557,10 @@ public final class MattermostCachedSidebarCategory {
         userId = category.userId
         teamId = category.teamId
         displayName = category.displayName
-        type = category.type
+        type = category.type.rawValue
         sortOrder = category.sortOrder
         channelIds = category.channelIds
-        sorting = category.sorting
+        sorting = category.sorting?.rawValue
         muted = category.muted
         collapsed = category.collapsed
     }
@@ -569,10 +569,10 @@ public final class MattermostCachedSidebarCategory {
         userId = category.userId
         teamId = category.teamId
         displayName = category.displayName
-        type = category.type
+        type = category.type.rawValue
         sortOrder = category.sortOrder
         channelIds = category.channelIds
-        sorting = category.sorting
+        sorting = category.sorting?.rawValue
         muted = category.muted
         collapsed = category.collapsed
     }

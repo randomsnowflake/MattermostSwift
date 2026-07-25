@@ -326,7 +326,7 @@ extension MattermostSwiftCLI {
         let unread = try await client.channelUnread(userID: currentUser.id, channelID: channel.id)
 
         print("channel: \(channel.id)")
-        print("type: \(channel.type)")
+        print("type: \(channel.type.rawValue)")
         print("self-user: \(currentUser.id)")
         print("other-user: \(otherUserID)")
         print("member-user: \(member.userId)")
@@ -1647,7 +1647,7 @@ extension MattermostSwiftCLI {
     }
 
     static func isTestSidebarCategory(_ category: MattermostSidebarCategory) -> Bool {
-        category.type == "custom" && isTestResourceName(category.displayName)
+        category.type == .custom && isTestResourceName(category.displayName)
     }
 
     static func isTestChannel(_ channel: MattermostChannel) -> Bool {

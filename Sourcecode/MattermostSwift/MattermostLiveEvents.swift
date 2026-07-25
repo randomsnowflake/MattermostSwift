@@ -112,7 +112,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
 
         return MattermostStatusChangeEvent(
             userID: anyString("user_id", "userId", broadcast: \.userId),
-            status: stringData("status"),
+            status: stringData("status").map(MattermostUserStatusValue.init(rawValue:)),
             manual: boolData("manual")
         )
     }
@@ -326,7 +326,7 @@ public struct MattermostTypingEvent: Equatable, Sendable {
 /// Presence update payload emitted by Mattermost WebSocket events.
 public struct MattermostStatusChangeEvent: Equatable, Sendable {
     public let userID: String?
-    public let status: String?
+    public let status: MattermostUserStatusValue?
     public let manual: Bool?
 }
 

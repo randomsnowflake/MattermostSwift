@@ -92,7 +92,7 @@ extension MattermostSwiftCLI {
     }
 
     static func printStatus(_ status: MattermostUserStatus) {
-        print("\(status.userId)\t\(status.status)")
+        print("\(status.userId)\t\(status.status.rawValue)")
     }
 
     static func printTeam(_ team: MattermostTeam) {
@@ -134,7 +134,7 @@ extension MattermostSwiftCLI {
 
     static func printCategories(_ categories: [MattermostSidebarCategory]) {
         for category in categories {
-            print("\(category.id)\t\(category.type)\t\(category.displayName)\t\(category.channelIds.count) channels")
+            print("\(category.id)\t\(category.type.rawValue)\t\(category.displayName)\t\(category.channelIds.count) channels")
         }
     }
 
@@ -250,7 +250,7 @@ extension MattermostSwiftCLI {
     static func printChannels(_ channels: [MattermostChannel]) {
         for channel in channels.sorted(by: channelSort) {
             let displayName = channel.displayName.isEmpty ? channel.name : channel.displayName
-            print("\(channel.id)\t\(channel.type)\t\(displayName)")
+            print("\(channel.id)\t\(channel.type.rawValue)\t\(displayName)")
         }
     }
 
@@ -259,7 +259,7 @@ extension MattermostSwiftCLI {
         if let teamID = channel.teamId, !teamID.isEmpty {
             print("team: \(teamID)")
         }
-        print("type: \(channel.type)")
+        print("type: \(channel.type.rawValue)")
         print("name: \(channel.name)")
         print("display-name: \(channel.displayName)")
     }

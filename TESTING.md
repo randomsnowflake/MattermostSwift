@@ -20,6 +20,8 @@ The current unit tests cover:
 - query item construction,
 - REST error handling for Mattermost error bodies, non-JSON error bodies, empty successful JSON responses, and binary/data endpoints,
 - initial Mattermost response decoding,
+- typed channel/user-status/post/sidebar domain values, including unknown-value Codable round trips
+  and exact request-wire encoding,
 - post props/metadata decoding, outbound props request encoding, and SwiftData cache preservation,
 - channel search, batch user lookup, user search/autocomplete/known-user request construction, direct/group channel request construction, and custom emoji request/response decoding,
 - user preference request construction and decoding,

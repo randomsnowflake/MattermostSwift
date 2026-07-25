@@ -35,7 +35,7 @@ public struct MattermostCachedChannelSnapshot: Equatable, Sendable, Identifiable
     public let teamID: String?
     public let name: String
     public let displayName: String
-    public let type: String
+    public let type: MattermostChannelType
     public let header: String?
     public let purpose: String?
     public let deleteAt: Int64?
@@ -51,7 +51,7 @@ public struct MattermostCachedChannelSnapshot: Equatable, Sendable, Identifiable
         teamID = cached.teamId
         name = cached.name
         displayName = cached.displayName
-        type = cached.type
+        type = MattermostChannelType(rawValue: cached.type)
         header = cached.header
         purpose = cached.purpose
         deleteAt = cached.deleteAt
@@ -74,7 +74,7 @@ public struct MattermostCachedPostSnapshot: Equatable, Sendable, Identifiable {
     public let rootID: String
     public let originalID: String?
     public let message: String
-    public let type: String
+    public let type: MattermostPostType
     public let hashtags: String?
     public let pendingPostID: String?
     public let fileIDs: [String]
@@ -93,7 +93,7 @@ public struct MattermostCachedPostSnapshot: Equatable, Sendable, Identifiable {
         rootID = cached.rootId
         originalID = cached.originalId
         message = cached.message
-        type = cached.type
+        type = MattermostPostType(rawValue: cached.type)
         hashtags = cached.hashtags
         pendingPostID = cached.pendingPostId
         fileIDs = cached.fileIds

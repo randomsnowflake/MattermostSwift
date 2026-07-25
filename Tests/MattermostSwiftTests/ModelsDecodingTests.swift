@@ -5,6 +5,55 @@ import Testing
 // Decoding coverage for the domain-split model files.
 
 @Test
+func domainValueWrappersExposeKnownMattermostValues() {
+    #expect(MattermostChannelType.open.rawValue == "O")
+    #expect(MattermostChannelType.private.rawValue == "P")
+    #expect(MattermostChannelType.direct.rawValue == "D")
+    #expect(MattermostChannelType.group.rawValue == "G")
+    #expect(MattermostUserStatusValue.online.rawValue == "online")
+    #expect(MattermostUserStatusValue.away.rawValue == "away")
+    #expect(MattermostUserStatusValue.dnd.rawValue == "dnd")
+    #expect(MattermostUserStatusValue.offline.rawValue == "offline")
+    #expect(MattermostPostType.standard.rawValue.isEmpty)
+    #expect(MattermostSidebarCategoryType.custom.rawValue == "custom")
+    #expect(MattermostSidebarCategorySorting.manual.rawValue == "manual")
+}
+
+@Test
+func domainValueWrappersPreserveUnknownValuesThroughCodableRoundTrips() throws {
+    try expectStringCodableRoundTrip(
+        MattermostChannelType.self,
+        rawValue: "future_channel_type"
+    )
+    try expectStringCodableRoundTrip(
+        MattermostUserStatusValue.self,
+        rawValue: "future_user_status"
+    )
+    try expectStringCodableRoundTrip(
+        MattermostPostType.self,
+        rawValue: "future_post_type"
+    )
+    try expectStringCodableRoundTrip(
+        MattermostSidebarCategoryType.self,
+        rawValue: "future_category_type"
+    )
+    try expectStringCodableRoundTrip(
+        MattermostSidebarCategorySorting.self,
+        rawValue: "future_category_sorting"
+    )
+}
+
+private func expectStringCodableRoundTrip<Value>(
+    _ type: Value.Type,
+    rawValue: String
+) throws where Value: Codable & Equatable & RawRepresentable, Value.RawValue == String {
+    let source = Data("\"\(rawValue)\"".utf8)
+    let decoded = try JSONDecoder().decode(type, from: source)
+    #expect(decoded.rawValue == rawValue)
+    #expect(try JSONEncoder().encode(decoded) == source)
+}
+
+@Test
 func decodesMattermostUser() throws {
     // MattermostUser has no custom CodingKeys, so the payload uses its exact
     // property names (camelCase) rather than the server's snake_case form.
@@ -75,7 +124,7 @@ func decodesMattermostChannelAndComputedProps() throws {
     #expect(channel.id == "chan123")
     #expect(channel.name == "town-square")
     #expect(channel.displayName == "Town Square")
-    #expect(channel.type == "O")
+    #expect(channel.type == .open)
     #expect(channel.isDeleted == false)
     #expect(channel.cacheTimestamp == 2000)
 }
@@ -102,6 +151,7 @@ func decodesMattermostPostAndComputedProps() throws {
     let post = try JSONDecoder().decode(MattermostPost.self, from: Data(payload.utf8))
     #expect(post.id == "post123")
     #expect(post.message == "hello world")
+    #expect(post.type == .standard)
     #expect(post.isRootPost == true)
     #expect(post.isEdited == true)
     #expect(post.isDeleted == false)
@@ -186,7 +236,7 @@ func decodesMattermostSidebarCategory() throws {
     let category = try JSONDecoder().decode(MattermostSidebarCategory.self, from: Data(payload.utf8))
     #expect(category.id == "cat123")
     #expect(category.displayName == "Favorites")
-    #expect(category.type == "custom")
+    #expect(category.type == .custom)
     #expect(category.isCustom == true)
     #expect(category.channelIds == ["chan1", "chan2"])
 }

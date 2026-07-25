@@ -10,7 +10,7 @@ public struct MattermostChannel: Decodable, Equatable, Sendable, Identifiable {
     public let teamId: String?
     public let name: String
     public let displayName: String
-    public let type: String
+    public let type: MattermostChannelType
     public let header: String?
     public let purpose: String?
     public let deleteAt: Int64?

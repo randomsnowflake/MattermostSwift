@@ -672,7 +672,7 @@ func httpClientBuildsCreateChannelRequestWithJSONBody() throws {
         displayName: "MattermostSwift Test",
         purpose: nil,
         header: nil,
-        type: "O"
+        type: .open
     )
 
     let request: URLRequest = try httpClient.makeJSONRequest(
@@ -845,9 +845,9 @@ func httpClientBuildsSidebarCategoryCreateRequestWithJSONBody() throws {
         userId: "user-id",
         teamId: "team-id",
         displayName: "MattermostSwift Test",
-        type: "custom",
+        type: .custom,
         channelIds: ["channel-id"],
-        sorting: "manual"
+        sorting: .manual
     )
 
     let request: URLRequest = try httpClient.makeJSONRequest(
@@ -1215,7 +1215,7 @@ func httpClientBuildsUpdateStatusRequestWithJSONBody() throws {
         method: "PUT",
         body: MattermostUserStatusUpdateRequest(
             userId: "user-a",
-            status: "dnd",
+            status: .dnd,
             dndEndTime: 1_780_000_000
         )
     )
@@ -1820,7 +1820,7 @@ func decodesUserStatus() throws {
     let status = try mattermostDecoder.decode(MattermostUserStatus.self, from: json)
 
     #expect(status.userId == "user-id")
-    #expect(status.status == "online")
+    #expect(status.status == .online)
     #expect(status.manual == false)
     #expect(status.lastActivityAt == 123)
     #expect(status.activeChannel == "channel-id")
@@ -2051,7 +2051,7 @@ func decodesTypedWebSocketStatusChangeEvent() throws {
 
     #expect(event.name == .statusChange)
     #expect(statusChange.userID == "user-a")
-    #expect(statusChange.status == "away")
+    #expect(statusChange.status == .away)
     #expect(statusChange.manual == true)
     #expect(try event.typedEvent() == .statusChange(statusChange))
 }
