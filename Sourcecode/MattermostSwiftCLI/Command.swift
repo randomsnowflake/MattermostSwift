@@ -8,6 +8,7 @@ extension MattermostSwiftCLI {
             MattermostSwiftCLI
 
             Usage:
+              swift run MattermostSwiftCLI --help
               swift run MattermostSwiftCLI me
               swift run MattermostSwiftCLI get-user [user-id]
               swift run MattermostSwiftCLI profile-image [user-id]
@@ -194,6 +195,7 @@ enum Command: Equatable {
     case loginTest
     case check
     case help
+    case usageError(String)
 
     init(arguments: [String]) {
         switch arguments.first {
@@ -207,18 +209,26 @@ enum Command: Equatable {
             self = .defaultProfileImage(userID: arguments.dropFirst().first)
         case "get-users":
             let userIDs = Array(arguments.dropFirst())
-            self = userIDs.isEmpty ? .help : .getUsers(userIDs: userIDs)
+            self = userIDs.isEmpty
+                ? .usageError("get-users requires at least one user id")
+                : .getUsers(userIDs: userIDs)
         case "get-users-by-username":
             let usernames = Array(arguments.dropFirst())
-            self = usernames.isEmpty ? .help : .getUsersByUsername(usernames: usernames)
+            self = usernames.isEmpty
+                ? .usageError("get-users-by-username requires at least one username")
+                : .getUsersByUsername(usernames: usernames)
         case "list-channel-users":
             self = .listChannelUsers(channelID: arguments.dropFirst().first)
         case "search-users":
             let terms = arguments.dropFirst().joined(separator: " ")
-            self = terms.isEmpty ? .help : .searchUsers(terms: terms)
+            self = terms.isEmpty
+                ? .usageError("search-users requires search terms")
+                : .searchUsers(terms: terms)
         case "autocomplete-users":
             let name = arguments.dropFirst().joined(separator: " ")
-            self = name.isEmpty ? .help : .autocompleteUsers(name: name)
+            self = name.isEmpty
+                ? .usageError("autocomplete-users requires a name")
+                : .autocompleteUsers(name: name)
         case "known-users":
             self = .knownUsers(includeProfiles: arguments.dropFirst().contains("--profiles"))
         case "status":
@@ -244,7 +254,7 @@ enum Command: Equatable {
             if tail.count == 2 {
                 self = .channelByTeamName(teamName: tail[0], channelName: tail[1])
             } else {
-                self = .help
+                self = .usageError("channel-by-team-name requires a team name and channel name")
             }
         case "channel-stats":
             self = .channelStats(channelID: arguments.dropFirst().first)
@@ -254,15 +264,21 @@ enum Command: Equatable {
             self = .channelMemberCounts(channelIDs: Array(arguments.dropFirst()))
         case "search-channels":
             let terms = arguments.dropFirst().joined(separator: " ")
-            self = terms.isEmpty ? .help : .searchChannels(terms: terms)
+            self = terms.isEmpty
+                ? .usageError("search-channels requires search terms")
+                : .searchChannels(terms: terms)
         case "search-group-channels":
             let terms = arguments.dropFirst().joined(separator: " ")
-            self = terms.isEmpty ? .help : .searchGroupChannels(terms: terms)
+            self = terms.isEmpty
+                ? .usageError("search-group-channels requires search terms")
+                : .searchGroupChannels(terms: terms)
         case "direct-channel-test":
             self = .directChannelTest(userID: arguments.dropFirst().first)
         case "create-group-channel":
             let userIDs = Array(arguments.dropFirst())
-            self = userIDs.count >= 2 ? .createGroupChannel(userIDs: userIDs) : .help
+            self = userIDs.count >= 2
+                ? .createGroupChannel(userIDs: userIDs)
+                : .usageError("create-group-channel requires at least two user ids")
         case "channel-member":
             self = .channelMember(channelID: arguments.dropFirst().first)
         case "list-channel-members":
@@ -318,7 +334,7 @@ enum Command: Equatable {
             if let postID = arguments.dropFirst().first {
                 self = .deleteMessage(postID: postID)
             } else {
-                self = .help
+                self = .usageError("delete-message requires a post id")
             }
         case "thread-test":
             self = .threadTest
@@ -336,7 +352,9 @@ enum Command: Equatable {
             self = .reactionTest
         case "search":
             let terms = arguments.dropFirst().joined(separator: " ")
-            self = terms.isEmpty ? .help : .search(terms: terms)
+            self = terms.isEmpty
+                ? .usageError("search requires search terms")
+                : .search(terms: terms)
         case "search-test":
             self = .searchTest
         case "upload-file":
@@ -346,7 +364,7 @@ enum Command: Equatable {
             if let fileID = tail.first {
                 self = .downloadFile(fileID: fileID, path: tail.dropFirst().first)
             } else {
-                self = .help
+                self = .usageError("download-file requires a file id")
             }
         case "file-test":
             self = .fileTest
@@ -354,7 +372,9 @@ enum Command: Equatable {
             self = .listEmoji
         case "search-emoji":
             let term = arguments.dropFirst().joined(separator: " ")
-            self = term.isEmpty ? .help : .searchEmoji(term: term)
+            self = term.isEmpty
+                ? .usageError("search-emoji requires a search term")
+                : .searchEmoji(term: term)
         case "stream-events":
             let limit = arguments.dropFirst().first.flatMap(Int.init) ?? 1
             self = .streamEvents(limit: max(1, limit))
@@ -390,8 +410,10 @@ enum Command: Equatable {
             self = .loginTest
         case "check":
             self = .check
-        default:
+        case nil, "--help":
             self = .help
+        case let command?:
+            self = .usageError("unknown command '\(command)'")
         }
     }
 
@@ -399,13 +421,13 @@ enum Command: Equatable {
         if arguments.first == "--channel" {
             let remaining = Array(arguments.dropFirst(2))
             guard let channelID = arguments.dropFirst().first, !remaining.isEmpty else {
-                return .help
+                return .usageError("send-message requires a channel id and message after --channel")
             }
             return .sendMessage(channelID: channelID, message: remaining.joined(separator: " "))
         }
 
         guard !arguments.isEmpty else {
-            return .help
+            return .usageError("send-message requires a message")
         }
 
         return .sendMessage(channelID: nil, message: arguments.joined(separator: " "))
@@ -415,25 +437,25 @@ enum Command: Equatable {
         if arguments.first == "--team" {
             let tail = Array(arguments.dropFirst(2))
             guard let teamID = arguments.dropFirst().first, let name = tail.first, tail.count == 1 else {
-                return .help
+                return .usageError("channel-by-name requires a team id and channel name after --team")
             }
             return .channelByName(teamID: teamID, name: name)
         }
 
         guard let name = arguments.first, arguments.count == 1 else {
-            return .help
+            return .usageError("channel-by-name requires exactly one channel name")
         }
         return .channelByName(teamID: nil, name: name)
     }
 
     private static func parseEditMessage(_ arguments: [String]) -> Command {
         guard let postID = arguments.first else {
-            return .help
+            return .usageError("edit-message requires a post id and message")
         }
 
         let messageParts = arguments.dropFirst()
         guard !messageParts.isEmpty else {
-            return .help
+            return .usageError("edit-message requires a message")
         }
 
         return .editMessage(postID: postID, message: messageParts.joined(separator: " "))
@@ -448,20 +470,20 @@ enum Command: Equatable {
             return .listPostUpdates(channelID: arguments[0], since: since)
         }
 
-        return .help
+        return .usageError("list-post-updates requires a numeric since timestamp")
     }
 
     private static func parseUploadFile(_ arguments: [String]) -> Command {
         if arguments.first == "--channel" {
             let tail = Array(arguments.dropFirst(2))
             guard let channelID = arguments.dropFirst().first, let path = tail.first else {
-                return .help
+                return .usageError("upload-file requires a channel id and path after --channel")
             }
             return .uploadFile(channelID: channelID, path: path)
         }
 
         guard let path = arguments.first else {
-            return .help
+            return .usageError("upload-file requires a path")
         }
         return .uploadFile(channelID: nil, path: path)
     }
@@ -469,7 +491,7 @@ enum Command: Equatable {
     private static func parseChannelMembersByID(_ arguments: [String]) -> Command {
         let parsed = parseOptionalChannelArguments(arguments)
         guard !parsed.values.isEmpty else {
-            return .help
+            return .usageError("channel-members-by-id requires at least one user id")
         }
         return .channelMembersByID(channelID: parsed.channelID, userIDs: parsed.values)
     }
@@ -480,7 +502,12 @@ enum Command: Equatable {
     ) -> Command {
         let parsed = parseOptionalChannelArguments(arguments)
         guard let userID = parsed.values.first, parsed.values.count == 1 else {
-            return .help
+            switch mutation {
+            case .add:
+                return .usageError("add-channel-member requires exactly one user id")
+            case .remove:
+                return .usageError("remove-channel-member requires exactly one user id")
+            }
         }
 
         switch mutation {

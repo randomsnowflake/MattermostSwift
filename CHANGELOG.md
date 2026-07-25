@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- `MattermostSwiftCLI --help` and empty invocations now print help without requiring
+  Mattermost credentials. Unknown or malformed commands report a specific diagnostic
+  on stderr and exit with status 2 instead of printing help and exiting successfully.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,

@@ -27,6 +27,8 @@ The current unit tests cover:
 - WebSocket reconnect backoff policy,
 - live-sync reconnect orchestration with an injected lifecycle stream, including backfill on each connecting event, cursor-based recovery of posts missed while disconnected, host-visible connection-state projection, backfill failure diagnostics, capped/all-channel backfill selection, live-event application into SwiftData, unread refresh on `post_unread` and `multiple_channels_viewed` invalidations, and thread-state refresh on thread invalidation,
 - SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, timestamp merge policy, and sync cursors.
+- CLI parser diagnostics plus real executable-process verification that credential-free help writes
+  to stdout with status 0 and malformed invocations write only to stderr with status 2.
 
 ## Live Verification
 

@@ -223,6 +223,10 @@ scripts/test-e2e.sh
 
 `MattermostSwiftCLI` is a development and verification harness, not the primary product surface. Use it to probe endpoints, exercise live server behavior, and run the scripted checks.
 
+Run `swift run MattermostSwiftCLI --help` to list commands without configuring credentials.
+Invalid commands and malformed arguments print a specific error to stderr and exit with status 2;
+runtime or server failures exit with status 1.
+
 `scripts/test-e2e.sh` includes an isolated mutating flow that creates a temporary test channel/category and cleans up the resources it created.
 
 See `ARCHITECTURE.md`, `TESTING.md`, and `ROADMAP.md` for the current design and next milestones.

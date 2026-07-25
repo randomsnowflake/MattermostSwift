@@ -18,9 +18,17 @@ extension MattermostSwiftCLI {
 
     static func run() async throws {
         let command = Command(arguments: Array(CommandLine.arguments.dropFirst()))
-        if case .loginTest = command {
+        switch command {
+        case .help:
+            printHelp()
+            return
+        case .usageError(let message):
+            throw CLIError.usage(message)
+        case .loginTest:
             try await runLoginTest()
             return
+        default:
+            break
         }
 
         let client = try MattermostClient.liveFromEnvironment()
@@ -303,14 +311,16 @@ extension MattermostSwiftCLI {
         case .cacheCheck(let channelID):
             try await runCacheCheck(channelID: channelID)
         case .loginTest:
-            try await runLoginTest()
+            preconditionFailure("login-test must be handled before credential loading")
         case .check:
             let user = try await client.currentUser()
             let channels = try await loadChannels(client: client)
             print("Authenticated as \(user.username) (\(user.id))")
             print("Loaded \(channels.count) channel\(channels.count == 1 ? "" : "s")")
         case .help:
-            printHelp()
+            preconditionFailure("help must be handled before credential loading")
+        case .usageError:
+            preconditionFailure("usage errors must be handled before credential loading")
         }
     }
 
