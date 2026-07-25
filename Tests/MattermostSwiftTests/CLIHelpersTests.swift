@@ -139,7 +139,7 @@ struct CLIHelpersTests {
 
     private func runCLI(arguments: [String]) throws -> (status: Int32, stdout: String, stderr: String) {
         let process = Process()
-        process.executableURL = cliExecutableURL()
+        process.executableURL = try cliExecutableURL()
         process.arguments = arguments
 
         var environment = ProcessInfo.processInfo.environment
@@ -165,15 +165,21 @@ struct CLIHelpersTests {
         )
     }
 
-    private func cliExecutableURL() -> URL {
-        #if os(macOS)
-        Bundle.main.bundleURL
+    private func cliExecutableURL() throws -> URL {
+        var directory = URL(fileURLWithPath: CommandLine.arguments[0])
             .deletingLastPathComponent()
-            .appendingPathComponent("MattermostSwiftCLI")
-        #else
-        URL(fileURLWithPath: CommandLine.arguments[0])
-            .deletingLastPathComponent()
-            .appendingPathComponent("MattermostSwiftCLI")
-        #endif
+            .standardizedFileURL
+
+        while directory.path != "/" {
+            let candidate = directory.appendingPathComponent("MattermostSwiftCLI")
+            if FileManager.default.isExecutableFile(atPath: candidate.path) {
+                return candidate
+            }
+            directory.deleteLastPathComponent()
+        }
+
+        throw CocoaError(.fileNoSuchFile, userInfo: [
+            NSFilePathErrorKey: "MattermostSwiftCLI",
+        ])
     }
 }
