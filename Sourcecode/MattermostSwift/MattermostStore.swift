@@ -940,7 +940,7 @@ public final class MattermostStore {
         case .statusChange(let statusChange):
             if let userID = statusChange.userID, let status = statusChange.status {
                 let cachedStatus = MattermostCachedUserStatus(
-                    userId: userID,
+                    userID: userID,
                     status: status,
                     manual: statusChange.manual
                 )

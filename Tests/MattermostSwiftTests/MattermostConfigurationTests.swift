@@ -71,13 +71,13 @@ func configurationRejectsNonHTTPScheme() throws {
 @Test
 func environmentClientRequiresURL() throws {
     #expect(throws: MattermostError.missingEnvironmentVariable("MATTERMOST_URL")) {
-        _ = try MattermostClient.liveFromEnvironment([:])
+        _ = try MattermostClient.fromEnvironment(_:)([:])
     }
 }
 
 @Test
 func environmentClientAcceptsAuthTokenAlias() throws {
-    let client = try MattermostClient.liveFromEnvironment([
+    let client = try MattermostClient.fromEnvironment(_:)([
         "MATTERMOST_URL": "https://mattermost.example.com",
         "MATTERMOST_AUTH_TOKEN": "token",
     ])
@@ -455,7 +455,7 @@ func httpClientBuildsUserSearchRequestWithJSONBody() throws {
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let search = MattermostUserSearchRequest(
         term: "alice",
-        teamId: "team-id",
+        teamID: "team-id",
         inChannelId: "channel-id",
         allowInactive: true,
         withoutTeam: false,
@@ -608,7 +608,7 @@ func httpClientBuildsChannelMembershipManagementRequests() throws {
     let singleAddRequest: URLRequest = try httpClient.makeJSONRequest(
         endpoint: "/channels/channel-id/members",
         method: "POST",
-        body: MattermostAddChannelMembersRequest(userId: "user-a")
+        body: MattermostAddChannelMembersRequest(userID: "user-a")
     )
     let singleAddBody = try JSONSerialization.jsonObject(
         with: try #require(singleAddRequest.httpBody)
@@ -667,7 +667,7 @@ func httpClientBuildsCreateChannelRequestWithJSONBody() throws {
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let channel = MattermostCreateChannelRequest(
-        teamId: "team-id",
+        teamID: "team-id",
         name: "mmswift-test",
         displayName: "MattermostSwift Test",
         purpose: nil,
@@ -739,7 +739,7 @@ func httpClientBuildsViewChannelRequestWithJSONBody() throws {
         authentication: .bearerToken("token")
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
-    let view = MattermostViewChannelRequest(channelId: "channel-id", prevChannelId: "previous-id", collapsedThreadsSupported: false)
+    let view = MattermostViewChannelRequest(channelID: "channel-id", prevChannelId: "previous-id", collapsedThreadsSupported: false)
 
     let request: URLRequest = try httpClient.makeJSONRequest(
         endpoint: "/channels/members/me/view",
@@ -760,7 +760,7 @@ func httpClientBuildsTypingRequestWithJSONBody() throws {
         authentication: .bearerToken("token")
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
-    let typing = MattermostTypingRequest(channelId: "channel-id", parentId: "root-id")
+    let typing = MattermostTypingRequest(channelID: "channel-id", parentId: "root-id")
 
     let request: URLRequest = try httpClient.makeJSONRequest(
         endpoint: "/users/me/typing",
@@ -802,7 +802,7 @@ func httpClientBuildsPreferenceSaveAndDeleteRequestsWithJSONBody() throws {
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let preferences = [
-        MattermostPreference(userId: "user-id", category: "mmswift", name: "flag", value: "true"),
+        MattermostPreference(userID: "user-id", category: "mmswift", name: "flag", value: "true"),
     ]
 
     let saveRequest: URLRequest = try httpClient.makeJSONRequest(
@@ -842,8 +842,8 @@ func httpClientBuildsSidebarCategoryCreateRequestWithJSONBody() throws {
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let category = MattermostSidebarCategoryRequest(
         id: nil,
-        userId: "user-id",
-        teamId: "team-id",
+        userID: "user-id",
+        teamID: "team-id",
         displayName: "MattermostSwift Test",
         type: "custom",
         channelIds: ["channel-id"],
@@ -929,10 +929,10 @@ func httpClientBuildsPostRequestWithJSONBody() throws {
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let request = MattermostCreatePostRequest(
-        channelId: "channel-id",
+        channelID: "channel-id",
         message: "hello",
-        rootId: nil,
-        fileIds: [],
+        rootID: nil,
+        fileIDs: [],
         props: [:]
     )
 
@@ -962,10 +962,10 @@ func httpClientBuildsPostRequestWithPropsJSONBody() throws {
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let request = MattermostCreatePostRequest(
-        channelId: "channel-id",
+        channelID: "channel-id",
         message: "hello",
-        rootId: "root-id",
-        fileIds: ["file-id"],
+        rootID: "root-id",
+        fileIDs: ["file-id"],
         props: [
             "mmswift": .object([
                 "ok": .bool(true),
@@ -1108,8 +1108,8 @@ func httpClientBuildsReactionRequestWithJSONBody() throws {
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let reaction = MattermostReactionRequest(
-        userId: "user-id",
-        postId: "post-id",
+        userID: "user-id",
+        postID: "post-id",
         emojiName: "smile"
     )
 
@@ -1214,7 +1214,7 @@ func httpClientBuildsUpdateStatusRequestWithJSONBody() throws {
         endpoint: "/users/user-a/status",
         method: "PUT",
         body: MattermostUserStatusUpdateRequest(
-            userId: "user-a",
+            userID: "user-a",
             status: "dnd",
             dndEndTime: 1_780_000_000
         )
@@ -1384,7 +1384,7 @@ func decodesSidebarCategory() throws {
     #expect(category.id == "category-id")
     #expect(category.displayName == "Favorites")
     #expect(category.sortOrder == 10)
-    #expect(category.channelIds == ["channel-a", "channel-b"])
+    #expect(category.channelIDs == ["channel-a", "channel-b"])
     #expect(category.collapsed == true)
 }
 
@@ -1401,7 +1401,7 @@ func decodesPreference() throws {
 
     let preference = try mattermostDecoder.decode(MattermostPreference.self, from: json)
 
-    #expect(preference.userId == "user-id")
+    #expect(preference.userID == "user-id")
     #expect(preference.category == "sidebar_settings")
     #expect(preference.name == "favorite")
     #expect(preference.value == "true")
@@ -1452,8 +1452,8 @@ func decodesTeamMember() throws {
     let member = try mattermostDecoder.decode(MattermostTeamMember.self, from: json)
 
     #expect(member.id == "team-id:user-id")
-    #expect(member.teamId == "team-id")
-    #expect(member.userId == "user-id")
+    #expect(member.teamID == "team-id")
+    #expect(member.userID == "user-id")
     #expect(member.roles == "team_user team_admin")
     #expect(member.deleteAt == 0)
     #expect(member.schemeUser == true)
@@ -1519,17 +1519,17 @@ func decodesChannelMemberAndUnreadState() throws {
     let member = try mattermostDecoder.decode(MattermostChannelMember.self, from: memberJSON)
     let unread = try mattermostDecoder.decode(MattermostChannelUnread.self, from: unreadJSON)
 
-    #expect(stats.channelId == "channel-id")
+    #expect(stats.channelID == "channel-id")
     #expect(stats.memberCount == 42)
     #expect(stats.guestCount == 3)
     #expect(stats.pinnedPostCount == 2)
     #expect(stats.totalMessageCount == 99)
-    #expect(member.channelId == "channel-id")
+    #expect(member.channelID == "channel-id")
     #expect(member.notifyProps?["desktop"] == "mention")
     #expect(member.channelNotifyProps.desktop == "mention")
     #expect(member.channelNotifyProps.markUnread == "all")
     #expect(member.msgCount == 20)
-    #expect(unread.teamId == "team-id")
+    #expect(unread.teamID == "team-id")
     #expect(unread.msgCount == 3)
     #expect(unread.mentionCount == 1)
 }
@@ -1798,8 +1798,8 @@ func decodesReaction() throws {
 
     let reaction = try mattermostDecoder.decode(MattermostReaction.self, from: json)
 
-    #expect(reaction.userId == "user-id")
-    #expect(reaction.postId == "post-id")
+    #expect(reaction.userID == "user-id")
+    #expect(reaction.postID == "post-id")
     #expect(reaction.emojiName == "smile")
     #expect(reaction.createAt == 123)
 }
@@ -1819,7 +1819,7 @@ func decodesUserStatus() throws {
 
     let status = try mattermostDecoder.decode(MattermostUserStatus.self, from: json)
 
-    #expect(status.userId == "user-id")
+    #expect(status.userID == "user-id")
     #expect(status.status == "online")
     #expect(status.manual == false)
     #expect(status.lastActivityAt == 123)
@@ -1858,7 +1858,7 @@ func decodesFileUploadResponse() throws {
     #expect(fileInfo.name == "hello.txt")
     #expect(fileInfo.extensionName == "txt")
     #expect(fileInfo.size == 5)
-    #expect(upload.clientIds == ["client-id"])
+    #expect(upload.clientIDs == ["client-id"])
 }
 
 @Test
@@ -1927,7 +1927,7 @@ func decodesWebSocketLiveEventAndEmbeddedPost() throws {
 
     #expect(event.event == "posted")
     #expect(event.name == .posted)
-    #expect(event.broadcast?.channelId == "channel-a")
+    #expect(event.broadcast?.channelID == "channel-a")
     #expect(decodedPost.id == "post-a")
     #expect(decodedPost.message == "hello")
     #expect(event.data["set_online"] == .bool(true))
@@ -1955,8 +1955,8 @@ func decodingWebSocketLiveEventToleratesUnexpectedBroadcastFieldTypes() throws {
 
     #expect(event.event == "custom_plugin_event")
     #expect(event.data["value"] == .integer(1))
-    #expect(event.broadcast?.channelId == nil)
-    #expect(event.broadcast?.teamId == "team-a")
+    #expect(event.broadcast?.channelID == nil)
+    #expect(event.broadcast?.teamID == "team-a")
     #expect(event.broadcast?.omitUsers == ["unexpected"])
     #expect(try event.typedEvent() == .unknown(event))
 }
@@ -2341,7 +2341,7 @@ func decodesCustomEmoji() throws {
     let emoji = try mattermostDecoder.decode(MattermostCustomEmoji.self, from: json)
 
     #expect(emoji.id == "emoji-a")
-    #expect(emoji.creatorId == "user-a")
+    #expect(emoji.creatorID == "user-a")
     #expect(emoji.name == "party_parrot")
     #expect(emoji.createAt == 1)
 }

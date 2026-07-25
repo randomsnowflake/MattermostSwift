@@ -33,8 +33,8 @@ func liveEventDecodesCoreFieldsAndBroadcast() throws {
     // free-form `data` dictionary, so its keys stay verbatim (snake_case).
     #expect(event.stringData("user_id") == "user-1")
     #expect(event.anyString("user_id", "userId") == "user-1")
-    #expect(event.broadcast?.channelId == "channel-1")
-    #expect(event.broadcast?.teamId == "team-1")
+    #expect(event.broadcast?.channelID == "channel-1")
+    #expect(event.broadcast?.teamID == "team-1")
 
     // anyString falls back to broadcast metadata when data is absent.
     let typing = try #require(event.decodedTyping())
@@ -58,9 +58,9 @@ func liveBroadcastDecodesOmitUsersAndToleratesMissingKeys() throws {
     )
 
     #expect(broadcast.omitUsers == ["a", "b"])
-    #expect(broadcast.channelId == "channel-9")
-    #expect(broadcast.userId == nil)
-    #expect(broadcast.teamId == nil)
+    #expect(broadcast.channelID == "channel-9")
+    #expect(broadcast.userID == nil)
+    #expect(broadcast.teamID == nil)
 }
 
 @Test
@@ -80,9 +80,9 @@ func liveBroadcastToleratesUnexpectedFieldTypes() throws {
     )
 
     #expect(broadcast.omitUsers == ["a"])
-    #expect(broadcast.userId == nil)
-    #expect(broadcast.channelId == nil)
-    #expect(broadcast.teamId == nil)
+    #expect(broadcast.userID == nil)
+    #expect(broadcast.channelID == nil)
+    #expect(broadcast.teamID == nil)
 }
 
 @Test
@@ -99,9 +99,9 @@ func liveBroadcastDecodesWithPlainDecoder() throws {
     let broadcast = try JSONDecoder().decode(MattermostLiveBroadcast.self, from: Data(json.utf8))
 
     #expect(broadcast.omitUsers == ["a"])
-    #expect(broadcast.userId == "user-1")
-    #expect(broadcast.channelId == "channel-1")
-    #expect(broadcast.teamId == "team-1")
+    #expect(broadcast.userID == "user-1")
+    #expect(broadcast.channelID == "channel-1")
+    #expect(broadcast.teamID == "team-1")
 }
 
 @Test
@@ -229,7 +229,7 @@ func webSocketEnvelopeToleratesWrongTypedFields() throws {
 
     #expect(event.event == "typing")
     #expect(event.data == [:])
-    #expect(event.broadcast?.channelId == nil)
+    #expect(event.broadcast?.channelID == nil)
 }
 
 @Test

@@ -109,7 +109,7 @@ func decodesMattermostPostAndComputedProps() throws {
     #expect(post.replyCount == 4)
     #expect(post.lastReplyAt == 500)
     #expect(post.isFollowing == true)
-    #expect(post.postMetadata == nil)
+    #expect(post.metadata == nil)
 }
 
 @Test
@@ -137,11 +137,11 @@ func decodesMattermostPostEmbeddedMetadata() throws {
     }
     """
     let post = try JSONDecoder().decode(MattermostPost.self, from: Data(payload.utf8))
-    #expect(post.postMetadata?.files?.count == 1)
-    #expect(post.postMetadata?.files?.first?.name == "report.pdf")
-    #expect(post.postMetadata?.files?.first?.extensionName == "pdf")
-    #expect(post.postMetadata?.reactions?.count == 1)
-    #expect(post.postMetadata?.reactions?.first?.emojiName == "thumbsup")
+    #expect(post.metadata?.files?.count == 1)
+    #expect(post.metadata?.files?.first?.name == "report.pdf")
+    #expect(post.metadata?.files?.first?.extensionName == "pdf")
+    #expect(post.metadata?.reactions?.count == 1)
+    #expect(post.metadata?.reactions?.first?.emojiName == "thumbsup")
     // The raw metadata dictionary stays available alongside the typed view.
     #expect(post.rawMetadata?["files"] != nil)
 }
@@ -168,7 +168,7 @@ func decodesMattermostPostWithMalformedMetadataAsNil() throws {
     """
     let post = try JSONDecoder().decode(MattermostPost.self, from: Data(payload.utf8))
     #expect(post.id == "post123")
-    #expect(post.postMetadata == nil)
+    #expect(post.metadata == nil)
 }
 
 @Test
@@ -188,7 +188,7 @@ func decodesMattermostSidebarCategory() throws {
     #expect(category.displayName == "Favorites")
     #expect(category.type == "custom")
     #expect(category.isCustom == true)
-    #expect(category.channelIds == ["chan1", "chan2"])
+    #expect(category.channelIDs == ["chan1", "chan2"])
 }
 
 @Test
@@ -203,7 +203,7 @@ func decodesMattermostChannelStatsWithServerKeys() throws {
     }
     """
     let stats = try mattermostSnakeCaseDecoder.decode(MattermostChannelStats.self, from: Data(payload.utf8))
-    #expect(stats.channelId == "chan123")
+    #expect(stats.channelID == "chan123")
     #expect(stats.memberCount == 42)
     #expect(stats.guestCount == 3)
     #expect(stats.pinnedPostCount == 5)
@@ -248,8 +248,8 @@ func decodesChannelMemberRootCounters() throws {
     }
     """
     let member = try mattermostSnakeCaseDecoder.decode(MattermostChannelMember.self, from: Data(payload.utf8))
-    #expect(member.channelId == "chan123")
-    #expect(member.userId == "user123")
+    #expect(member.channelID == "chan123")
+    #expect(member.userID == "user123")
     #expect(member.msgCount == 100)
     #expect(member.mentionCount == 3)
     #expect(member.msgCountRoot == 40)

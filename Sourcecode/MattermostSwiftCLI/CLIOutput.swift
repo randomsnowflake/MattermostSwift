@@ -92,7 +92,7 @@ extension MattermostSwiftCLI {
     }
 
     static func printStatus(_ status: MattermostUserStatus) {
-        print("\(status.userId)\t\(status.status)")
+        print("\(status.userID)\t\(status.status)")
     }
 
     static func printTeam(_ team: MattermostTeam) {
@@ -117,7 +117,7 @@ extension MattermostSwiftCLI {
 
     static func printTeamMembers(_ members: [MattermostTeamMember]) {
         for member in members.sorted(by: teamMemberSort) {
-            print("\(member.teamId)\t\(member.userId)\t\(member.roles ?? "")")
+            print("\(member.teamID)\t\(member.userID)\t\(member.roles ?? "")")
         }
     }
 
@@ -126,15 +126,15 @@ extension MattermostSwiftCLI {
     }
 
     static func teamMemberSort(_ lhs: MattermostTeamMember, _ rhs: MattermostTeamMember) -> Bool {
-        if lhs.teamId == rhs.teamId {
-            return lhs.userId.localizedStandardCompare(rhs.userId) == .orderedAscending
+        if lhs.teamID == rhs.teamID {
+            return lhs.userID.localizedStandardCompare(rhs.userID) == .orderedAscending
         }
-        return lhs.teamId.localizedStandardCompare(rhs.teamId) == .orderedAscending
+        return lhs.teamID.localizedStandardCompare(rhs.teamID) == .orderedAscending
     }
 
     static func printCategories(_ categories: [MattermostSidebarCategory]) {
         for category in categories {
-            print("\(category.id)\t\(category.type)\t\(category.displayName)\t\(category.channelIds.count) channels")
+            print("\(category.id)\t\(category.type)\t\(category.displayName)\t\(category.channelIDs.count) channels")
         }
     }
 
@@ -153,8 +153,8 @@ extension MattermostSwiftCLI {
     }
 
     static func printChannelMember(_ member: MattermostChannelMember) {
-        print("channel: \(member.channelId)")
-        print("user: \(member.userId)")
+        print("channel: \(member.channelID)")
+        print("user: \(member.userID)")
         if let msgCount = member.msgCount {
             print("messages-read: \(msgCount)")
         }
@@ -166,7 +166,7 @@ extension MattermostSwiftCLI {
 
     static func printChannelMembers(_ members: [MattermostChannelMember]) {
         for member in members.sorted(by: channelMemberSort) {
-            print("\(member.channelId)\t\(member.userId)\t\(member.roles ?? "")")
+            print("\(member.channelID)\t\(member.userID)\t\(member.roles ?? "")")
         }
     }
 
@@ -174,10 +174,10 @@ extension MattermostSwiftCLI {
         _ lhs: MattermostChannelMember,
         _ rhs: MattermostChannelMember
     ) -> Bool {
-        if lhs.channelId == rhs.channelId {
-            return lhs.userId.localizedStandardCompare(rhs.userId) == .orderedAscending
+        if lhs.channelID == rhs.channelID {
+            return lhs.userID.localizedStandardCompare(rhs.userID) == .orderedAscending
         }
-        return lhs.channelId.localizedStandardCompare(rhs.channelId) == .orderedAscending
+        return lhs.channelID.localizedStandardCompare(rhs.channelID) == .orderedAscending
     }
 
     static func printNotifyProps(_ props: MattermostChannelNotifyProps) {
@@ -187,8 +187,8 @@ extension MattermostSwiftCLI {
     }
 
     static func printChannelUnread(_ unread: MattermostChannelUnread) {
-        print("channel: \(unread.channelId)")
-        if let teamID = unread.teamId, !teamID.isEmpty {
+        print("channel: \(unread.channelID)")
+        if let teamID = unread.teamID, !teamID.isEmpty {
             print("team: \(teamID)")
         }
         print("messages: \(unread.msgCount)")
@@ -209,7 +209,7 @@ extension MattermostSwiftCLI {
 
     static func printPost(_ post: MattermostPost) {
         let message = post.message.replacing("\n", with: " ")
-        print("\(post.id)\t\(post.channelId)\t\(post.userId)\t\(message)")
+        print("\(post.id)\t\(post.channelID)\t\(post.userID)\t\(message)")
     }
 
     static func printFileInfo(_ fileInfo: MattermostFileInfo) {
@@ -223,7 +223,7 @@ extension MattermostSwiftCLI {
     }
 
     static func printLiveEvent(_ event: MattermostLiveEvent) {
-        let channelID = event.broadcast?.channelId ?? "-"
+        let channelID = event.broadcast?.channelID ?? "-"
         let postID = (try? event.decodedPost()?.id) ?? "-"
         print("\(event.event)\t\(channelID)\t\(postID)")
     }
@@ -256,7 +256,7 @@ extension MattermostSwiftCLI {
 
     static func printChannel(_ channel: MattermostChannel) {
         print("channel: \(channel.id)")
-        if let teamID = channel.teamId, !teamID.isEmpty {
+        if let teamID = channel.teamID, !teamID.isEmpty {
             print("team: \(teamID)")
         }
         print("type: \(channel.type)")
@@ -265,7 +265,7 @@ extension MattermostSwiftCLI {
     }
 
     static func printChannelStats(_ stats: MattermostChannelStats) {
-        if let channelID = stats.channelId, !channelID.isEmpty {
+        if let channelID = stats.channelID, !channelID.isEmpty {
             print("channel: \(channelID)")
         }
         if let memberCount = stats.memberCount {

@@ -55,7 +55,9 @@ extension MattermostSwiftCLI {
             let users = try await client.users(channelID: resolvedChannelID(channelID), perPage: 20)
             printUsers(users)
         case .searchUsers(let terms):
-            let users = try await client.searchUsers(term: terms, limit: 20)
+            let users = try await client.searchUsers(
+                options: MattermostUserSearchOptions(term: terms, limit: 20)
+            )
             printUsers(users)
         case .autocompleteUsers(let name):
             let autocomplete = try await client.autocompleteUsers(name: name, limit: 20)
@@ -132,7 +134,9 @@ extension MattermostSwiftCLI {
                 let channels = try await client.searchTeamChannels(teamID: teamID, term: terms)
                 printChannels(channels)
             } else {
-                let results = try await client.searchChannels(term: terms, perPage: 20)
+                let results = try await client.searchChannels(
+                    options: MattermostChannelSearchOptions(term: terms, perPage: 20)
+                )
                 printChannels(results.channels)
             }
         case .searchGroupChannels(let terms):
@@ -222,7 +226,10 @@ extension MattermostSwiftCLI {
         case .archiveChannel(let channelID):
             try await runArchiveChannel(client: client, channelID: channelID)
         case .listPosts(let channelID):
-            let postList = try await client.posts(channelID: resolvedChannelID(channelID), perPage: 20)
+            let postList = try await client.posts(
+                channelID: resolvedChannelID(channelID),
+                options: MattermostPostsOptions(perPage: 20)
+            )
             printPosts(postList.orderedPosts)
         case .pinnedPosts(let channelID):
             let postList = try await client.pinnedPosts(channelID: resolvedChannelID(channelID))

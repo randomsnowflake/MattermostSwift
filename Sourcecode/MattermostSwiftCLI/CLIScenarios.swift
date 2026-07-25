@@ -54,7 +54,10 @@ extension MattermostSwiftCLI {
             )
             createdPostIDs.append(reply.id)
 
-            let thread = try await client.thread(postID: root.id)
+            let thread = try await client.thread(
+                postID: root.id,
+                options: MattermostThreadOptions()
+            )
 
             let user = try await client.currentUser()
             let reaction = try await client.addReaction(
@@ -116,7 +119,7 @@ extension MattermostSwiftCLI {
             print("team: \(teamID)")
             print("channel: \(channel.id)")
             print("category: \(category.id)")
-            print("sidebar-moved: \(movedCategory?.channelIds.first == channel.id)")
+            print("sidebar-moved: \(movedCategory?.channelIDs.first == channel.id)")
             print("root-post: \(root.id)")
             print("edited-post: \(editedRoot.id)")
             print("reply-post: \(reply.id)")
@@ -180,7 +183,10 @@ extension MattermostSwiftCLI {
                 rootID: createdRoot.id
             )
             reply = createdReply
-            let thread = try await client.thread(postID: createdRoot.id)
+            let thread = try await client.thread(
+                postID: createdRoot.id,
+                options: MattermostThreadOptions()
+            )
             let replyDeleteStatus = try await client.deletePost(id: createdReply.id)
             let rootDeleteStatus = try await client.deletePost(id: createdRoot.id)
 
@@ -288,7 +294,7 @@ extension MattermostSwiftCLI {
             collapsedThreads: true,
             collapsedThreadsExtended: true
         )
-        let decodedPosts = postList.posts.values.allSatisfy { !$0.id.isEmpty && $0.channelId == channelID }
+        let decodedPosts = postList.posts.values.allSatisfy { !$0.id.isEmpty && $0.channelID == channelID }
 
         print("channel: \(channelID)")
         print("unread-context-posts: \(postList.orderedPosts.count)")
@@ -329,7 +335,7 @@ extension MattermostSwiftCLI {
         print("type: \(channel.type)")
         print("self-user: \(currentUser.id)")
         print("other-user: \(otherUserID)")
-        print("member-user: \(member.userId)")
+        print("member-user: \(member.userID)")
         print("unread-messages: \(unread.msgCount)")
     }
 
@@ -455,7 +461,7 @@ extension MattermostSwiftCLI {
         print("preferences: \(preferences.count)")
         print("first-category: \(firstCategory ?? "-")")
         print("category-preferences: \(categoryPreferences.count)")
-        print("decoded-preferences: \(preferences.allSatisfy { !$0.userId.isEmpty && !$0.category.isEmpty && !$0.name.isEmpty })")
+        print("decoded-preferences: \(preferences.allSatisfy { !$0.userID.isEmpty && !$0.category.isEmpty && !$0.name.isEmpty })")
     }
 
     static func runPreferenceRoundTripTest(client: MattermostClient) async throws {
@@ -464,7 +470,7 @@ extension MattermostSwiftCLI {
         let category = "mmswift_test"
         let name = "preference_roundtrip_\(suffix)"
         let preference = MattermostPreference(
-            userId: user.id,
+            userID: user.id,
             category: category,
             name: name,
             value: "created-\(suffix)"
@@ -503,7 +509,7 @@ extension MattermostSwiftCLI {
     static func runSearchTest(client: MattermostClient) async throws {
         let channelID = try resolvedChannelID(nil)
         let channel = try await client.channel(id: channelID)
-        let teamID = if let channelTeamID = channel.teamId, !channelTeamID.isEmpty {
+        let teamID = if let channelTeamID = channel.teamID, !channelTeamID.isEmpty {
             channelTeamID
         } else {
             try await loadTeamID(client: client)
@@ -1286,7 +1292,7 @@ extension MattermostSwiftCLI {
             print("channel: \(createdChannel.id)")
             print("created-name: \(createdChannel.name)")
             print("renamed-name: \(patched.name)")
-            print("member-user: \(member.userId)")
+            print("member-user: \(member.userID)")
             print("unread-messages: \(unread.msgCount)")
             print("view-status: \(view.status)")
             print("delete-status: \(deleteStatus.status)")
@@ -1314,7 +1320,7 @@ extension MattermostSwiftCLI {
                 teamID: teamID,
                 categoryID: createdCategory.id,
                 displayName: "MattermostSwift Test Renamed \(suffix)",
-                channelIDs: createdCategory.channelIds
+                channelIDs: createdCategory.channelIDs
             )
             let orderWithCategory = try await client.sidebarCategoryOrder(teamID: teamID)
             let deleted = try await client.deleteSidebarCategory(teamID: teamID, categoryID: createdCategory.id)
@@ -1380,8 +1386,8 @@ extension MattermostSwiftCLI {
             print("channel: \(createdChannel.id)")
             print("category: \(createdCategory.id)")
             print("updated-categories: \(moveResult.updatedCategories.count)")
-            print("category-contained-channel: \(movedCategory?.channelIds.contains(createdChannel.id) == true)")
-            print("category-first-channel: \(movedCategory?.channelIds.first == createdChannel.id)")
+            print("category-contained-channel: \(movedCategory?.channelIDs.contains(createdChannel.id) == true)")
+            print("category-first-channel: \(movedCategory?.channelIDs.first == createdChannel.id)")
             print("delete-category-status: \(deletedCategory.status)")
             print("delete-channel-status: \(deleteChannelStatus.status)")
             print("restored-order-count: \(restoredOrder.count)")

@@ -39,15 +39,15 @@ func cachedUserRoundTripsThroughStore() throws {
 func cachedReactionAndFileRoundTripThroughStore() throws {
     let store = try MattermostStore(inMemory: true)
     let reaction = MattermostReaction(
-        userId: "user-1",
-        postId: "post-1",
+        userID: "user-1",
+        postID: "post-1",
         emojiName: "tada",
         createAt: 999
     )
     let file = MattermostFileInfo(
         id: "file-1",
-        userId: "user-1",
-        postId: "post-1",
+        userID: "user-1",
+        postID: "post-1",
         createAt: 100,
         updateAt: 101,
         deleteAt: 0,
