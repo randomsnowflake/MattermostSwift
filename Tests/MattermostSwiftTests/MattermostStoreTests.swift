@@ -270,8 +270,10 @@ func cachedPostSnapshotsKeepJSONRawAndDecodeOnDemand() throws {
     let snapshot = try #require(
         try store.cachedPostSnapshots(channelID: "channel-1").first
     )
-    #expect(snapshot.propsJSON == try MattermostCachedPost.encodedJSON(post.props))
-    #expect(snapshot.metadataJSON == try MattermostCachedPost.encodedJSON(post.metadata))
+    let expectedPropsJSON = try MattermostCachedPost.encodedJSON(post.props)
+    let expectedMetadataJSON = try MattermostCachedPost.encodedJSON(post.metadata)
+    #expect(snapshot.propsJSON == expectedPropsJSON)
+    #expect(snapshot.metadataJSON == expectedMetadataJSON)
     #expect(try snapshot.decodedProps()?["webhook_name"] == .string("Build Bot"))
     #expect(
         try snapshot.decodedProps()?["nested_value"]
