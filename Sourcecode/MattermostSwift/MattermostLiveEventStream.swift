@@ -585,7 +585,9 @@ struct MattermostWebSocketError: Decodable, Sendable {
     let message: String?
 }
 
-/// Shared snake_case coders reused by API and WebSocket payload handling.
+/// Shared JSON coders reused by API and WebSocket payload handling.
+let mattermostPlainDecoder = JSONDecoder()
+
 let mattermostSnakeCaseDecoder: JSONDecoder = {
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase

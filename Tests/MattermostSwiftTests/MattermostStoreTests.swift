@@ -610,6 +610,35 @@ func storeCachesChannelMembersAndUnreadState() throws {
 
 @MainActor
 @Test
+func storeReplaceJoinedChannelsBatchRemovesOnlyRemovedChannelMembers() throws {
+    let store = try MattermostStore(inMemory: true)
+    let removedChannels = [
+        storeTestChannel(id: "removed-1", teamID: "team-1"),
+        storeTestChannel(id: "removed-2", teamID: "team-1"),
+    ]
+    let retainedChannel = storeTestChannel(id: "retained", teamID: "team-1")
+    let otherTeamChannel = storeTestChannel(id: "other-team", teamID: "team-2")
+
+    try store.upsert(channels: removedChannels + [retainedChannel, otherTeamChannel])
+    try store.upsert(members: (removedChannels + [retainedChannel, otherTeamChannel]).map {
+        storeTestChannelMember(channelID: $0.id)
+    })
+
+    try store.replaceJoinedChannels([retainedChannel], teamID: "team-1")
+    try store.save()
+
+    #expect(try store.cachedChannel(id: "removed-1", includeDeleted: true) == nil)
+    #expect(try store.cachedChannel(id: "removed-2", includeDeleted: true) == nil)
+    #expect(try store.cachedChannel(id: "retained") != nil)
+    #expect(try store.cachedChannel(id: "other-team") != nil)
+    #expect(try store.cachedChannelMember(channelID: "removed-1", userID: "user-1") == nil)
+    #expect(try store.cachedChannelMember(channelID: "removed-2", userID: "user-1") == nil)
+    #expect(try store.cachedChannelMember(channelID: "retained", userID: "user-1") != nil)
+    #expect(try store.cachedChannelMember(channelID: "other-team", userID: "user-1") != nil)
+}
+
+@MainActor
+@Test
 func storeCachesReactionsFilesAndCursors() throws {
     let store = try MattermostStore(inMemory: true)
     let reaction = MattermostReaction(
@@ -1119,6 +1148,40 @@ private func storeTestPost(id: String, channelID: String, message: String, creat
         pendingPostId: nil,
         fileIds: nil,
         hasReactions: nil
+    )
+}
+
+private func storeTestChannel(id: String, teamID: String) -> MattermostChannel {
+    MattermostChannel(
+        id: id,
+        createAt: 1,
+        updateAt: 1,
+        teamId: teamID,
+        name: id,
+        displayName: id,
+        type: "O",
+        header: nil,
+        purpose: nil,
+        deleteAt: nil,
+        totalMsgCount: nil,
+        totalMsgCountRoot: nil,
+        lastPostAt: nil,
+        lastRootPostAt: nil
+    )
+}
+
+private func storeTestChannelMember(channelID: String) -> MattermostChannelMember {
+    MattermostChannelMember(
+        channelId: channelID,
+        userId: "user-1",
+        roles: "channel_user",
+        lastViewedAt: 0,
+        msgCount: 0,
+        mentionCount: 0,
+        msgCountRoot: nil,
+        mentionCountRoot: nil,
+        notifyProps: [:],
+        lastUpdateAt: 1
     )
 }
 
