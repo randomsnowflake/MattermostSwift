@@ -69,7 +69,7 @@ The library never stores credentials and never logs token values.
 
 HTTP and WebSocket requests set a browser-shaped macOS Safari `User-Agent`, matching the deployment reality that Mattermost's official desktop app is an Electron/browser wrapper and reducing the chance that a fronting edge layer classifies compiled SDK traffic as unusual automation. Transport uses native `URLSession` and `URLSessionWebSocketTask` only.
 
-`MattermostLiveEventStream` uses `URLSessionWebSocketTask`. `events()` is a single authenticated connection, while `lifecycleEvents(policy:)` reconnects with exponential backoff and emits connecting/reconnecting notices for sync orchestration.
+`MattermostLiveEventStream` uses `URLSessionWebSocketTask`. `events()` is a single authenticated connection, while `lifecycleEvents(policy:)` reconnects with exponential backoff and emits connecting/reconnecting notices for sync orchestration. Malformed event frames remain nonfatal: the receive loop skips them, emits `eventDecodeFailed` with structured failure details through the lifecycle stream, and continues reading the same connection.
 
 Public models are intentionally small and stable while the first flow hardens:
 

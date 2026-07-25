@@ -28,6 +28,7 @@ public struct MattermostLiveEventStream: Sendable {
                 do {
                     try await runAuthenticatedConnection(
                         onConnected: {},
+                        onEventDecodeFailed: { _ in },
                         onEvent: { try Self.yield($0, to: continuation) }
                     )
                     continuation.finish()
@@ -54,6 +55,7 @@ public struct MattermostLiveEventStream: Sendable {
     }
 
     /// Yields connection lifecycle notifications and live events, reconnecting with exponential backoff.
+    /// Malformed event frames yield `eventDecodeFailed` and are skipped without closing the connection.
     /// Its queue holds at most 512 lifecycle records. Ingress overflow aborts the current socket
     /// generation and follows the normal reconnect/backfill path instead of hiding a gap.
     public func lifecycleEvents(
@@ -73,6 +75,7 @@ public struct MattermostLiveEventStream: Sendable {
                             onConnected: {
                                 try Self.yield(.connected(attempt: currentAttempt), to: continuation)
                             },
+                            onEventDecodeFailed: { try Self.yield($0, to: continuation) },
                             onEvent: { event in
                                 try Self.yield(.event(event), to: continuation)
                             }
@@ -127,6 +130,7 @@ public struct MattermostLiveEventStream: Sendable {
 
     private func runAuthenticatedConnection(
         onConnected: @escaping @Sendable () async throws -> Void,
+        onEventDecodeFailed: @escaping @Sendable (MattermostLiveEventStreamLifecycleEvent) async throws -> Void,
         onEvent: @escaping @Sendable (MattermostLiveEvent) async throws -> Void
     ) async throws {
         let webSocketTask = urlSession.webSocketTask(with: makeWebSocketRequest())
@@ -145,13 +149,21 @@ public struct MattermostLiveEventStream: Sendable {
         // add a child task that returns immediately and tears down an otherwise healthy
         // receive loop through the task-group race below.
         guard isHeartbeatEnabled else {
-            try await receiveEvents(from: webSocketTask, onEvent: onEvent)
+            try await receiveEvents(
+                from: webSocketTask,
+                onEventDecodeFailed: onEventDecodeFailed,
+                onEvent: onEvent
+            )
             return
         }
 
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
-                try await self.receiveEvents(from: webSocketTask, onEvent: onEvent)
+                try await self.receiveEvents(
+                    from: webSocketTask,
+                    onEventDecodeFailed: onEventDecodeFailed,
+                    onEvent: onEvent
+                )
             }
             if isHeartbeatEnabled {
                 group.addTask {
@@ -172,10 +184,26 @@ public struct MattermostLiveEventStream: Sendable {
 
     private func receiveEvents(
         from webSocketTask: URLSessionWebSocketTask,
+        onEventDecodeFailed: @escaping @Sendable (MattermostLiveEventStreamLifecycleEvent) async throws -> Void,
+        onEvent: @escaping @Sendable (MattermostLiveEvent) async throws -> Void
+    ) async throws {
+        try await receiveEvents(
+            receiveEnvelope: { try await self.receiveEnvelope(from: webSocketTask) },
+            onEventDecodeFailed: onEventDecodeFailed,
+            onEvent: onEvent
+        )
+    }
+
+    func receiveEvents(
+        receiveEnvelope: @escaping @Sendable () async throws -> MattermostWebSocketEnvelope,
+        onEventDecodeFailed: @escaping @Sendable (MattermostLiveEventStreamLifecycleEvent) async throws -> Void,
         onEvent: @escaping @Sendable (MattermostLiveEvent) async throws -> Void
     ) async throws {
         while !Task.isCancelled {
-            if let event = try await receiveEvent(from: webSocketTask) {
+            if let event = try await receiveEvent(
+                receiveEnvelope: receiveEnvelope,
+                onEventDecodeFailed: onEventDecodeFailed
+            ) {
                 try await onEvent(event)
             }
         }
@@ -322,10 +350,16 @@ public struct MattermostLiveEventStream: Sendable {
     }
 
 
-    private func receiveEvent(from webSocketTask: URLSessionWebSocketTask) async throws -> MattermostLiveEvent? {
+    private func receiveEvent(
+        receiveEnvelope: @escaping @Sendable () async throws -> MattermostWebSocketEnvelope,
+        onEventDecodeFailed: @escaping @Sendable (MattermostLiveEventStreamLifecycleEvent) async throws -> Void
+    ) async throws -> MattermostLiveEvent? {
         do {
-            return try await receiveEnvelope(from: webSocketTask).liveEvent
-        } catch is DecodingError {
+            return try await receiveEnvelope().liveEvent
+        } catch let error as DecodingError {
+            try await onEventDecodeFailed(
+                .eventDecodeFailed(MattermostLiveEventStreamFailure(error: error))
+            )
             return nil
         }
     }
@@ -534,13 +568,13 @@ struct MattermostWebSocketEnvelope: Decodable, Sendable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        event = Self.decodeIfPresent(String.self, from: container, forKey: .event)
-        data = Self.decodeIfPresent([String: MattermostJSONValue].self, from: container, forKey: .data)
-        broadcast = Self.decodeIfPresent(MattermostLiveBroadcast.self, from: container, forKey: .broadcast)
+        event = try Self.decodeIfPresent(String.self, from: container, forKey: .event)
+        data = try Self.decodeIfPresent([String: MattermostJSONValue].self, from: container, forKey: .data)
+        broadcast = try Self.decodeIfPresent(MattermostLiveBroadcast.self, from: container, forKey: .broadcast)
         seq = Self.decodeInt(container, forKey: .seq)
         seqReply = Self.decodeInt(container, forKey: .seqReply)
-        status = Self.decodeIfPresent(String.self, from: container, forKey: .status)
-        error = Self.decodeIfPresent(MattermostWebSocketError.self, from: container, forKey: .error)
+        status = try Self.decodeIfPresent(String.self, from: container, forKey: .status)
+        error = try Self.decodeIfPresent(MattermostWebSocketError.self, from: container, forKey: .error)
     }
 
     var liveEvent: MattermostLiveEvent? {
@@ -559,10 +593,10 @@ struct MattermostWebSocketEnvelope: Decodable, Sendable {
         _ type: Value.Type,
         from container: KeyedDecodingContainer<CodingKeys>,
         forKey key: CodingKeys
-    ) -> Value? {
+    ) throws -> Value? {
         do {
             return try container.decodeIfPresent(type, forKey: key)
-        } catch {
+        } catch is DecodingError {
             return nil
         }
     }
