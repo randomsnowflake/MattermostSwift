@@ -328,8 +328,9 @@ private final class MattermostConditionalSyncRequestTracker: @unchecked Sendable
     ) throws -> (HTTPURLResponse, Data) {
         var headers = headers
         headers["Content-Type"] = "application/json"
+        let url = try #require(request.url)
         let response = try #require(HTTPURLResponse(
-            url: try #require(request.url),
+            url: url,
             statusCode: statusCode,
             httpVersion: "HTTP/1.1",
             headerFields: headers
