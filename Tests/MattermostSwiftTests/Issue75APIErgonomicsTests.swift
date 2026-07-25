@@ -74,7 +74,7 @@ struct Issue75APIErgonomicsTests {
 
     @Test
     func postsSinceOptionsDocumentedForkOmitsPaginationAndCursors() async throws {
-        let client = try await makeClient { request in
+        let client = try await Self.makeClient { request in
             let components = try #require(URLComponents(url: #require(request.url), resolvingAgainstBaseURL: false))
             let query = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
             #expect(query["since"] == "1234")
@@ -100,7 +100,7 @@ struct Issue75APIErgonomicsTests {
     @Test
     func searchAndThreadOptionsDriveWireRequests() async throws {
         let paths = MattermostRequestLog()
-        let client = try await makeClient { request in
+        let client = try await Self.makeClient { request in
             paths.append(request.url?.path ?? "")
             switch request.url?.path ?? "" {
             case "/api/v4/users/search":
@@ -162,7 +162,7 @@ struct Issue75APIErgonomicsTests {
 
     @Test
     func pluralChannelMemberAddDecodesEveryMembership() async throws {
-        let client = try await makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.path == "/api/v4/channels/channel-id/members")
             let json = try JSONSerialization.jsonObject(with: MattermostTestSupport.bodyData(from: request)) as? [String: Any]
             #expect(json?["user_ids"] as? [String] == ["user-a", "user-b"])
@@ -179,13 +179,13 @@ struct Issue75APIErgonomicsTests {
             channelID: "channel-id",
             userIDs: ["user-a", "user-b"]
         )
-        #expect(members.map(\.userID) == ["user-a", "user-b"])
+        #expect(members.map { $0.userID } == ["user-a", "user-b"])
     }
 
     @Test
     func subjectFirstOverloadsUseExpectedPaths() async throws {
         let paths = MattermostRequestLog()
-        let client = try await makeClient { request in
+        let client = try await Self.makeClient { request in
             paths.append(request.url?.path ?? "")
             if request.url?.path.hasSuffix("/posts/unread") == true {
                 return try Self.response(body: Self.postListJSON(order: []), request: request)
@@ -216,7 +216,7 @@ struct Issue75APIErgonomicsTests {
         let date = Date(mattermostMilliseconds: milliseconds)
         #expect(date.mattermostMilliseconds == milliseconds)
 
-        let client = try await makeClient { request in
+        let client = try await Self.makeClient { request in
             #expect(request.url?.path.hasSuffix("/read/1780000000123") == true)
             return try Self.response(
                 body: Data(#"{"id":"thread-id","last_viewed_at":1780000000123}"#.utf8),
@@ -234,7 +234,7 @@ struct Issue75APIErgonomicsTests {
     @Test
     func allPostsAdvancesCursorDeduplicatesAndStops() async throws {
         let requests = MattermostRequestLog()
-        let client = try await makeClient { request in
+        let client = try await Self.makeClient { request in
             let components = try #require(URLComponents(url: #require(request.url), resolvingAgainstBaseURL: false))
             let before = components.queryItems?.first(where: { $0.name == "before" })?.value
             requests.append(before ?? "<initial>")

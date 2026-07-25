@@ -455,7 +455,7 @@ func httpClientBuildsUserSearchRequestWithJSONBody() throws {
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let search = MattermostUserSearchRequest(
         term: "alice",
-        teamID: "team-id",
+        teamId: "team-id",
         inChannelId: "channel-id",
         allowInactive: true,
         withoutTeam: false,
@@ -608,7 +608,7 @@ func httpClientBuildsChannelMembershipManagementRequests() throws {
     let singleAddRequest: URLRequest = try httpClient.makeJSONRequest(
         endpoint: "/channels/channel-id/members",
         method: "POST",
-        body: MattermostAddChannelMembersRequest(userID: "user-a")
+        body: MattermostAddChannelMembersRequest(userId: "user-a")
     )
     let singleAddBody = try JSONSerialization.jsonObject(
         with: try #require(singleAddRequest.httpBody)
@@ -667,7 +667,7 @@ func httpClientBuildsCreateChannelRequestWithJSONBody() throws {
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let channel = MattermostCreateChannelRequest(
-        teamID: "team-id",
+        teamId: "team-id",
         name: "mmswift-test",
         displayName: "MattermostSwift Test",
         purpose: nil,
@@ -739,7 +739,7 @@ func httpClientBuildsViewChannelRequestWithJSONBody() throws {
         authentication: .bearerToken("token")
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
-    let view = MattermostViewChannelRequest(channelID: "channel-id", prevChannelId: "previous-id", collapsedThreadsSupported: false)
+    let view = MattermostViewChannelRequest(channelId: "channel-id", prevChannelId: "previous-id", collapsedThreadsSupported: false)
 
     let request: URLRequest = try httpClient.makeJSONRequest(
         endpoint: "/channels/members/me/view",
@@ -760,7 +760,7 @@ func httpClientBuildsTypingRequestWithJSONBody() throws {
         authentication: .bearerToken("token")
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
-    let typing = MattermostTypingRequest(channelID: "channel-id", parentId: "root-id")
+    let typing = MattermostTypingRequest(channelId: "channel-id", parentId: "root-id")
 
     let request: URLRequest = try httpClient.makeJSONRequest(
         endpoint: "/users/me/typing",
@@ -842,8 +842,8 @@ func httpClientBuildsSidebarCategoryCreateRequestWithJSONBody() throws {
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let category = MattermostSidebarCategoryRequest(
         id: nil,
-        userID: "user-id",
-        teamID: "team-id",
+        userId: "user-id",
+        teamId: "team-id",
         displayName: "MattermostSwift Test",
         type: "custom",
         channelIds: ["channel-id"],
@@ -929,10 +929,10 @@ func httpClientBuildsPostRequestWithJSONBody() throws {
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let request = MattermostCreatePostRequest(
-        channelID: "channel-id",
+        channelId: "channel-id",
         message: "hello",
-        rootID: nil,
-        fileIDs: [],
+        rootId: nil,
+        fileIds: [],
         props: [:]
     )
 
@@ -962,10 +962,10 @@ func httpClientBuildsPostRequestWithPropsJSONBody() throws {
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let request = MattermostCreatePostRequest(
-        channelID: "channel-id",
+        channelId: "channel-id",
         message: "hello",
-        rootID: "root-id",
-        fileIDs: ["file-id"],
+        rootId: "root-id",
+        fileIds: ["file-id"],
         props: [
             "mmswift": .object([
                 "ok": .bool(true),
@@ -1108,8 +1108,8 @@ func httpClientBuildsReactionRequestWithJSONBody() throws {
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let reaction = MattermostReactionRequest(
-        userID: "user-id",
-        postID: "post-id",
+        userId: "user-id",
+        postId: "post-id",
         emojiName: "smile"
     )
 
@@ -1214,7 +1214,7 @@ func httpClientBuildsUpdateStatusRequestWithJSONBody() throws {
         endpoint: "/users/user-a/status",
         method: "PUT",
         body: MattermostUserStatusUpdateRequest(
-            userID: "user-a",
+            userId: "user-a",
             status: "dnd",
             dndEndTime: 1_780_000_000
         )

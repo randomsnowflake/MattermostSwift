@@ -170,7 +170,7 @@ func storeCachesChannelsPostsAndThreads() throws {
                 "ok": .bool(true),
             ]),
         ],
-        metadata: [
+        rawMetadata: [
             "priority": .object([
                 "requested_ack": .bool(false),
             ]),
