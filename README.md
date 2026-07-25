@@ -234,6 +234,8 @@ The library target also includes a DocC quick-start article at `Sourcecode/Matte
 own main-actor boundary, and perform cache mutations through store APIs. Joined channels,
 memberships, sidebar categories, and unread rows are reconciled only from complete scoped server
 responses, so an empty response can safely remove stale local rows for that scope.
+When channel-user hydration is enabled for a selected timeline channel, `MattermostSyncService`
+follows every profile page so channels with more than 60 members are cached completely.
 For work outside that actor, use `cachedUserSnapshots()`, `cachedChannelSnapshots()`, or
 `cachedPostSnapshots(...)`; these immutable `Sendable` values do not retain a SwiftData context.
 
