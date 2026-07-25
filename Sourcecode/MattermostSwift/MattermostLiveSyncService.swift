@@ -128,27 +128,32 @@ extension MattermostLiveSyncEvent {
     }
 }
 
-typealias MattermostLiveSyncLifecycleEvents = @Sendable () -> AsyncThrowingStream<
-    MattermostLiveEventStreamLifecycleEvent, Error
->
-typealias MattermostLiveSyncBackfill = @MainActor @Sendable (
-    _ store: MattermostStore,
-    _ teamID: String?,
-    _ teamName: String?,
-    _ options: MattermostLiveSyncOptions
-) async throws -> MattermostLiveBackfillResult
-typealias MattermostLiveSyncUnreadRefresh = @MainActor @Sendable (
-    _ userID: String,
-    _ channelID: String
-) async throws -> MattermostChannelUnread
-typealias MattermostLiveSyncSidebarRefresh = @MainActor @Sendable (
-    _ teamID: String
-) async throws -> [MattermostSidebarCategory]
-typealias MattermostLiveSyncThreadStateRefresh = @MainActor @Sendable (
-    _ userID: String,
-    _ teamID: String,
-    _ threadID: String
-) async throws -> MattermostThreadResponse
+typealias MattermostLiveSyncLifecycleEvents =
+    @Sendable () -> AsyncThrowingStream<
+        MattermostLiveEventStreamLifecycleEvent, Error
+    >
+typealias MattermostLiveSyncBackfill =
+    @MainActor @Sendable (
+        _ store: MattermostStore,
+        _ teamID: String?,
+        _ teamName: String?,
+        _ options: MattermostLiveSyncOptions
+    ) async throws -> MattermostLiveBackfillResult
+typealias MattermostLiveSyncUnreadRefresh =
+    @MainActor @Sendable (
+        _ userID: String,
+        _ channelID: String
+    ) async throws -> MattermostChannelUnread
+typealias MattermostLiveSyncSidebarRefresh =
+    @MainActor @Sendable (
+        _ teamID: String
+    ) async throws -> [MattermostSidebarCategory]
+typealias MattermostLiveSyncThreadStateRefresh =
+    @MainActor @Sendable (
+        _ userID: String,
+        _ teamID: String,
+        _ threadID: String
+    ) async throws -> MattermostThreadResponse
 
 /// Keeps a `MattermostStore` updated from WebSocket events with bounded REST backfill.
 public struct MattermostLiveSyncService: Sendable {
