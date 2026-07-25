@@ -48,7 +48,6 @@ public final class MattermostCachedUser {
 
 @Model
 public final class MattermostCachedUserStatus {
-    @available(*, deprecated, renamed: "userID")
     @Attribute(.unique) public var userId: String = ""
     public var status: String = ""
     public var manual: Bool?
@@ -139,7 +138,6 @@ public final class MattermostCachedChannel {
     @Attribute(.unique) public var id: String = ""
     public var createAt: Int64?
     public var updateAt: Int64?
-    @available(*, deprecated, renamed: "teamID")
     public var teamId: String?
     public var name: String = ""
     public var displayName: String = ""
@@ -210,9 +208,7 @@ public final class MattermostCachedChannel {
 public final class MattermostCachedChannelMember {
     #Index<MattermostCachedChannelMember>([\.userId])
     @Attribute(.unique) public var id: String = ""
-    @available(*, deprecated, renamed: "channelID")
     public var channelId: String = ""
-    @available(*, deprecated, renamed: "userID")
     public var userId: String = ""
     public var roles: String?
     public var lastViewedAt: Int64?
@@ -263,11 +259,8 @@ public final class MattermostCachedChannelMember {
 public final class MattermostCachedChannelUnread {
     #Index<MattermostCachedChannelUnread>([\.userId])
     @Attribute(.unique) public var id: String = ""
-    @available(*, deprecated, renamed: "teamID")
     public var teamId: String?
-    @available(*, deprecated, renamed: "channelID")
     public var channelId: String = ""
-    @available(*, deprecated, renamed: "userID")
     public var userId: String = ""
     public var msgCount: Int = 0
     public var mentionCount: Int = 0
@@ -304,11 +297,8 @@ public final class MattermostCachedChannelUnread {
 public final class MattermostCachedThread {
     #Index<MattermostCachedThread>([\.userId, \.teamId])
     @Attribute(.unique) public var id: String = ""
-    @available(*, deprecated, renamed: "rootID")
     public var rootId: String = ""
-    @available(*, deprecated, renamed: "userID")
     public var userId: String = ""
-    @available(*, deprecated, renamed: "teamID")
     public var teamId: String = ""
     public var replyCount: Int64 = 0
     public var lastReplyAt: Int64 = 0
@@ -317,7 +307,6 @@ public final class MattermostCachedThread {
     public var unreadMentions: Int64 = 0
     public var isUrgent: Bool = false
     public var deleteAt: Int64 = 0
-    @available(*, deprecated, renamed: "participantIDs")
     public var participantIds: [String] = []
 
     public var isUnread: Bool {
@@ -382,20 +371,14 @@ public final class MattermostCachedPost {
     public var updateAt: Int64 = 0
     public var editAt: Int64 = 0
     public var deleteAt: Int64 = 0
-    @available(*, deprecated, renamed: "userID")
     public var userId: String = ""
-    @available(*, deprecated, renamed: "channelID")
     public var channelId: String = ""
-    @available(*, deprecated, renamed: "rootID")
     public var rootId: String = ""
-    @available(*, deprecated, renamed: "originalID")
     public var originalId: String?
     public var message: String = ""
     public var type: String = ""
     public var hashtags: String?
-    @available(*, deprecated, renamed: "pendingPostID")
     public var pendingPostId: String?
-    @available(*, deprecated, renamed: "fileIDs")
     public var fileIds: [String] = []
     public var hasReactions: Bool?
     public var propsJSON: String?
@@ -496,9 +479,7 @@ public final class MattermostCachedPost {
 public final class MattermostCachedReaction {
     #Index<MattermostCachedReaction>([\.postId])
     @Attribute(.unique) public var id: String = ""
-    @available(*, deprecated, renamed: "userID")
     public var userId: String = ""
-    @available(*, deprecated, renamed: "postID")
     public var postId: String = ""
     public var emojiName: String = ""
     public var createAt: Int64?
@@ -531,9 +512,7 @@ public final class MattermostCachedReaction {
 public final class MattermostCachedFile {
     #Index<MattermostCachedFile>([\.postId])
     @Attribute(.unique) public var id: String = ""
-    @available(*, deprecated, renamed: "userID")
     public var userId: String?
-    @available(*, deprecated, renamed: "postID")
     public var postId: String?
     public var createAt: Int64?
     public var updateAt: Int64?
@@ -582,14 +561,11 @@ public final class MattermostCachedFile {
 public final class MattermostCachedSidebarCategory {
     #Index<MattermostCachedSidebarCategory>([\.teamId])
     @Attribute(.unique) public var id: String = ""
-    @available(*, deprecated, renamed: "userID")
     public var userId: String?
-    @available(*, deprecated, renamed: "teamID")
     public var teamId: String?
     public var displayName: String = ""
     public var type: String = ""
     public var sortOrder: Int?
-    @available(*, deprecated, renamed: "channelIDs")
     public var channelIds: [String] = []
     public var sorting: String?
     public var muted: Bool?
