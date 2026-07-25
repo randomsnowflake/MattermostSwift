@@ -929,6 +929,8 @@ func storePrunesPostsKeepingNewestForChannel() throws {
     try store.upsert(post: storeTestPost(id: "other", channelID: "channel-2", message: "other", createAt: 5))
     try store.upsert(reaction: MattermostReaction(userId: "user-1", postId: "post-1", emojiName: "old", createAt: 11))
     try store.upsert(reaction: MattermostReaction(userId: "user-1", postId: "post-2", emojiName: "kept", createAt: 21))
+    try store.upsert(thread: storeTestThread(id: "post-1", unreadReplies: 1), userID: "user-1", teamID: "team-1")
+    try store.upsert(thread: storeTestThread(id: "post-2", unreadReplies: 1), userID: "user-1", teamID: "team-1")
     try store.upsert(file: MattermostFileInfo(
         id: "file-1",
         userId: "user-1",
@@ -971,6 +973,25 @@ func storePrunesPostsKeepingNewestForChannel() throws {
     #expect(try store.cachedReaction(id: keptReactionID) != nil)
     #expect(try store.cachedFiles(postID: "post-1").isEmpty)
     #expect(try store.cachedFiles(postID: "post-2").map(\.id) == ["file-2"])
+    #expect(try store.cachedThreadState(rootID: "post-1", userID: "user-1", teamID: "team-1") == nil)
+    #expect(try store.cachedThreadState(rootID: "post-2", userID: "user-1", teamID: "team-1") != nil)
+}
+
+@MainActor
+@Test
+func deletingChannelContentRemovesCachedThreadStates() throws {
+    let store = try MattermostStore(inMemory: true)
+    try store.upsert(
+        thread: storeTestThread(id: "root-1", unreadReplies: 2),
+        userID: "user-1",
+        teamID: "team-1"
+    )
+    try store.save()
+
+    try store.deleteChannelContent(channelID: "channel-1")
+    try store.save()
+
+    #expect(try store.cachedThreadStates().isEmpty)
 }
 
 @MainActor

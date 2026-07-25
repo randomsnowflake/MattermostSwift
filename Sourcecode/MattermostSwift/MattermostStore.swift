@@ -840,6 +840,11 @@ public final class MattermostStore {
         }) {
             context.delete(file)
         }
+        for thread in try fetchInBatches(ids: postIDs, descriptor: { chunkIDs in
+            FetchDescriptor<MattermostCachedThread>(predicate: #Predicate { chunkIDs.contains($0.rootId) })
+        }) {
+            context.delete(thread)
+        }
     }
 
     public func cachedFile(id: String) throws -> MattermostCachedFile? {
