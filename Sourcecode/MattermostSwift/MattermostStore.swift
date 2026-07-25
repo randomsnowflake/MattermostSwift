@@ -11,7 +11,7 @@ public final class MattermostStore {
     private static let batchedFetchIDLimit = 500
 
     public static var schema: Schema {
-        Schema(versionedSchema: MattermostCacheSchemaV1.self)
+        Schema(versionedSchema: MattermostCacheSchemaV2.self)
     }
 
     public let container: ModelContainer
@@ -904,6 +904,37 @@ public final class MattermostStore {
         let cursor = MattermostSyncCursor(scope: scope, lastSyncAt: lastSyncAt, lastItemID: lastItemID)
         context.insert(cursor)
         return cursor
+    }
+
+    func cachedETag(scope: String) throws -> MattermostCacheETag? {
+        var descriptor = FetchDescriptor<MattermostCacheETag>(
+            predicate: #Predicate { $0.scope == scope }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    @discardableResult
+    func setETag(
+        scope: String,
+        value: String,
+        itemIDs: [String]
+    ) throws -> MattermostCacheETag {
+        if let cached = try cachedETag(scope: scope) {
+            cached.value = value
+            cached.itemIDs = itemIDs
+            return cached
+        }
+
+        let cached = MattermostCacheETag(scope: scope, value: value, itemIDs: itemIDs)
+        context.insert(cached)
+        return cached
+    }
+
+    func removeETag(scope: String) throws {
+        if let cached = try cachedETag(scope: scope) {
+            context.delete(cached)
+        }
     }
 
     @discardableResult

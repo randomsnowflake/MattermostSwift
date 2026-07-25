@@ -19,6 +19,8 @@ The current unit tests cover:
 - thread inbox request construction, thread read-state request construction, decoding, and cache upserts,
 - query item construction,
 - REST error handling for Mattermost error bodies, non-JSON error bodies, empty successful JSON responses, and binary/data endpoints,
+- scoped sync-list ETag persistence and `If-None-Match` request construction, HTTP 304 cached
+  readback, exclusion of post/unread requests, and V1-to-V2 SwiftData cache migration,
 - initial Mattermost response decoding,
 - post props/metadata decoding, outbound props request encoding, and SwiftData cache preservation,
 - channel search, batch user lookup, user search/autocomplete/known-user request construction, direct/group channel request construction, and custom emoji request/response decoding,
@@ -26,7 +28,7 @@ The current unit tests cover:
 - WebSocket live event decoding, typed post create/edit/delete/unread and thread update/read/follow event helpers, embedded post/channel/user/member decoding, and tolerant invalidation events,
 - WebSocket reconnect backoff policy,
 - live-sync reconnect orchestration with an injected lifecycle stream, including backfill on each connecting event, cursor-based recovery of posts missed while disconnected, host-visible connection-state projection, backfill failure diagnostics, capped/all-channel backfill selection, live-event application into SwiftData, unread refresh on `post_unread` and `multiple_channels_viewed` invalidations, and thread-state refresh on thread invalidation,
-- SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, timestamp merge policy, and sync cursors.
+- SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, timestamp merge policy, sync cursors, and conditional-list ETags.
 
 ## Live Verification
 

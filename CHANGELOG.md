@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Workspace sync now persists scoped ETags for joined-team, joined-channel, and sidebar-category
+  lists, sends `If-None-Match` on later syncs, and treats HTTP 304 as cached unchanged data.
+  Post timelines and unread-count requests remain unconditional.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,

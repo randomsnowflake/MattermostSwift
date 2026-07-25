@@ -36,6 +36,30 @@ public struct MattermostSidebarCategory: Decodable, Equatable, Sendable, Identif
         type == "custom"
     }
 
+    init(
+        id: String,
+        userId: String?,
+        teamId: String?,
+        displayName: String,
+        type: String,
+        sortOrder: Int?,
+        channelIds: [String],
+        sorting: String?,
+        muted: Bool?,
+        collapsed: Bool?
+    ) {
+        self.id = id
+        self.userId = userId
+        self.teamId = teamId
+        self.displayName = displayName
+        self.type = type
+        self.sortOrder = sortOrder
+        self.channelIds = channelIds
+        self.sorting = sorting
+        self.muted = muted
+        self.collapsed = collapsed
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
         case userId

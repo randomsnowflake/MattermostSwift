@@ -234,6 +234,10 @@ The library target also includes a DocC quick-start article at `Sourcecode/Matte
 own main-actor boundary, and perform cache mutations through store APIs. Joined channels,
 memberships, sidebar categories, and unread rows are reconciled only from complete scoped server
 responses, so an empty response can safely remove stale local rows for that scope.
+`MattermostSyncService` persists server ETags and ordered list membership for joined teams,
+joined channels, and sidebar categories. Later syncs send `If-None-Match`; a `304 Not Modified`
+reuses the scoped cached list without rewriting it. Post timelines and unread counts deliberately
+bypass this conditional-list cache so their freshness behavior is unchanged.
 For work outside that actor, use `cachedUserSnapshots()`, `cachedChannelSnapshots()`, or
 `cachedPostSnapshots(...)`; these immutable `Sendable` values do not retain a SwiftData context.
 
