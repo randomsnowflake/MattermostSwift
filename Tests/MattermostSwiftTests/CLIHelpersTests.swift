@@ -63,7 +63,7 @@ struct CLIHelpersTests {
     @Test("--help succeeds without Mattermost credentials and writes only stdout")
     func helpProcessBehavior() throws {
         for arguments in [[], ["--help"]] {
-            let result = try runCLI(arguments: arguments)
+            let result = try #require(MattermostSwiftCLI.processPlan(arguments: arguments))
 
             #expect(result.status == 0)
             #expect(result.stdout.contains("MattermostSwiftCLI"))
@@ -74,12 +74,16 @@ struct CLIHelpersTests {
 
     @Test("unknown and malformed commands fail with usage diagnostics")
     func usageErrorProcessBehavior() throws {
-        let unknown = try runCLI(arguments: ["totally-unknown-command"])
+        let unknown = try #require(
+            MattermostSwiftCLI.processPlan(arguments: ["totally-unknown-command"])
+        )
         #expect(unknown.status == 2)
         #expect(unknown.stdout.isEmpty)
         #expect(unknown.stderr == "error: unknown command 'totally-unknown-command'\n")
 
-        let malformed = try runCLI(arguments: ["send-message"])
+        let malformed = try #require(
+            MattermostSwiftCLI.processPlan(arguments: ["send-message"])
+        )
         #expect(malformed.status == 2)
         #expect(malformed.stdout.isEmpty)
         #expect(malformed.stderr == "error: send-message requires a message\n")
@@ -135,51 +139,5 @@ struct CLIHelpersTests {
         for (arguments, expected) in cases {
             #expect(Command(arguments: arguments) == expected)
         }
-    }
-
-    private func runCLI(arguments: [String]) throws -> (status: Int32, stdout: String, stderr: String) {
-        let process = Process()
-        process.executableURL = try cliExecutableURL()
-        process.arguments = arguments
-
-        var environment = ProcessInfo.processInfo.environment
-        for key in Array(environment.keys) where key.hasPrefix("MATTERMOST_") {
-            environment.removeValue(forKey: key)
-        }
-        process.environment = environment
-
-        let stdout = Pipe()
-        let stderr = Pipe()
-        process.standardOutput = stdout
-        process.standardError = stderr
-
-        try process.run()
-        process.waitUntilExit()
-
-        let stdoutData = stdout.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderr.fileHandleForReading.readDataToEndOfFile()
-        return (
-            process.terminationStatus,
-            String(decoding: stdoutData, as: UTF8.self),
-            String(decoding: stderrData, as: UTF8.self)
-        )
-    }
-
-    private func cliExecutableURL() throws -> URL {
-        var directory = URL(fileURLWithPath: CommandLine.arguments[0])
-            .deletingLastPathComponent()
-            .standardizedFileURL
-
-        while directory.path != "/" {
-            let candidate = directory.appendingPathComponent("MattermostSwiftCLI")
-            if FileManager.default.isExecutableFile(atPath: candidate.path) {
-                return candidate
-            }
-            directory.deleteLastPathComponent()
-        }
-
-        throw CocoaError(.fileNoSuchFile, userInfo: [
-            NSFilePathErrorKey: "MattermostSwiftCLI",
-        ])
     }
 }

@@ -2,9 +2,7 @@ import Foundation
 @_spi(Testing) import MattermostSwift
 
 extension MattermostSwiftCLI {
-    static func printHelp() {
-        print(
-            """
+    static let helpText = """
             MattermostSwiftCLI
 
             Usage:
@@ -105,7 +103,9 @@ extension MattermostSwiftCLI {
               MATTERMOST_USERNAME  Optional. Username/email for login-test.
               MATTERMOST_PASSWORD  Optional. Password for login-test.
             """
-        )
+
+    static func printHelp() {
+        print(helpText)
     }
 }
 
