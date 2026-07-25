@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Live-sync channel backfill and bulk unread refresh now share the sync service's width-8 bounded
+  concurrency, reducing reconnect and mark-all-read latency while preserving cancellation and
+  channel/user result association.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,

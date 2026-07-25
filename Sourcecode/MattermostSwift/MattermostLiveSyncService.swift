@@ -290,23 +290,30 @@ public struct MattermostLiveSyncService: Sendable {
 
                             var unreadResults: [MattermostChannelUnread] = []
                             if let refreshUnread {
-                                for unreadRefresh in typedEvent.unreadRefreshes(
+                                let unreadRefreshes = typedEvent.unreadRefreshes(
                                     options: options,
                                     fallbackUserID: activeUserID
-                                ) {
+                                )
+                                let refreshResults = try await mattermostBoundedConcurrentMap(
+                                    unreadRefreshes
+                                ) { unreadRefresh in
                                     do {
                                         let unread = try await refreshUnread(
                                             unreadRefresh.userID,
                                             unreadRefresh.channelID
                                         )
-                                        try store.upsert(unread: unread, userID: unreadRefresh.userID)
-                                        unreadResults.append(unread)
+                                        try store.upsert(
+                                            unread: unread,
+                                            userID: unreadRefresh.userID
+                                        )
+                                        return unread
                                     } catch is CancellationError {
                                         throw CancellationError()
                                     } catch {
-                                        continue
+                                        return nil
                                     }
                                 }
+                                unreadResults = refreshResults.compactMap { $0 }
                             }
 
                             var categoriesResult: [MattermostSidebarCategory]?
@@ -424,15 +431,13 @@ public struct MattermostLiveSyncService: Sendable {
         )
 
         let channelIDs = Self.backfillChannelIDs(from: sync.channels, options: options)
-        var postSyncs: [MattermostChannelPostSyncResult] = []
-        for channelID in channelIDs {
-            let postSync = try await client.syncChannelPosts(
+        let postSyncs = try await mattermostBoundedConcurrentMap(channelIDs) { channelID in
+            try await client.syncChannelPosts(
                 channelID: channelID,
                 to: store,
                 perPage: options.syncOptions.postPageSize,
                 maxPages: options.syncOptions.maxPostPages
             )
-            postSyncs.append(postSync)
         }
         try store.save()
 
@@ -532,7 +537,7 @@ private struct MattermostLiveSyncThreadStateRefreshRequest: Equatable {
     let threadID: String
 }
 
-private struct MattermostLiveSyncUnreadRefreshRequest: Equatable {
+private struct MattermostLiveSyncUnreadRefreshRequest: Equatable, Sendable {
     let userID: String
     let channelID: String
 }
