@@ -3,7 +3,7 @@ import Foundation
 /// Immutable, sendable representation of a cached user.
 /// Create snapshots through `MattermostStore`; never retain a managed SwiftData object for
 /// background work.
-public struct MattermostCachedUserSnapshot: Equatable, Sendable, Identifiable {
+public struct MattermostCachedUserSnapshot: Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let username: String
     public let email: String?
@@ -28,7 +28,7 @@ public struct MattermostCachedUserSnapshot: Equatable, Sendable, Identifiable {
 }
 
 /// Immutable, sendable representation of a cached channel.
-public struct MattermostCachedChannelSnapshot: Equatable, Sendable, Identifiable {
+public struct MattermostCachedChannelSnapshot: Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let createAt: Int64?
     public let updateAt: Int64?
@@ -63,7 +63,7 @@ public struct MattermostCachedChannelSnapshot: Equatable, Sendable, Identifiable
 }
 
 /// Immutable, sendable representation of a cached post.
-public struct MattermostCachedPostSnapshot: Equatable, Sendable, Identifiable {
+public struct MattermostCachedPostSnapshot: Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let createAt: Int64
     public let updateAt: Int64

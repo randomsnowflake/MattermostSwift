@@ -3,7 +3,7 @@ import Foundation
 // MARK: - User, session, status, and autocomplete models
 
 /// Authenticated Mattermost user profile data.
-public struct MattermostUser: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostUser: Decodable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let username: String
     public let email: String?
