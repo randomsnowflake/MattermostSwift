@@ -124,7 +124,9 @@ public struct MattermostUserAutocomplete: Decodable, Equatable, Sendable {
 }
 
 /// Sanitized active session metadata returned by Mattermost for active user sessions.
-public struct MattermostUserSession: Decodable, Equatable, Sendable, Identifiable, CustomStringConvertible, CustomDebugStringConvertible {
+public struct MattermostUserSession: Decodable, Equatable, Sendable, Identifiable, CustomStringConvertible,
+    CustomDebugStringConvertible
+{
     public let id: String
     public let userId: String?
     public let createAt: Int64?

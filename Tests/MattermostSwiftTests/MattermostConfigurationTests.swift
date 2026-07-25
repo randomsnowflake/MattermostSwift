@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import MattermostSwift
 
 @Test
@@ -89,7 +90,7 @@ func environmentClientAcceptsAuthTokenAlias() throws {
 func loginFromEnvironmentRequiresUsername() async {
     await #expect(throws: MattermostError.missingEnvironmentVariable("MATTERMOST_USERNAME")) {
         try await MattermostClient.loginFromEnvironment([
-            "MATTERMOST_URL": "https://mattermost.example.com",
+            "MATTERMOST_URL": "https://mattermost.example.com"
         ])
     }
 }
@@ -133,7 +134,9 @@ func httpClientBuildsUserProfileImageRequests() throws {
     #expect(profileRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/image")
     #expect(profileRequest.value(forHTTPHeaderField: "Authorization") == "Bearer token")
     #expect(profileRequest.value(forHTTPHeaderField: "User-Agent") == MattermostUserAgent.browser)
-    #expect(defaultProfileRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/users/user-id/image/default")
+    #expect(
+        defaultProfileRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/users/user-id/image/default"
+    )
     #expect(defaultProfileRequest.value(forHTTPHeaderField: "Authorization") == "Bearer token")
     #expect(defaultProfileRequest.value(forHTTPHeaderField: "User-Agent") == MattermostUserAgent.browser)
 }
@@ -345,7 +348,9 @@ func httpClientBuildsQueryRequest() throws {
 
     #expect(!request.httpShouldHandleCookies)
 
-    #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/system/ping?get_server_status=true&use_rest_semantics=true")
+    #expect(
+        request.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/system/ping?get_server_status=true&use_rest_semantics=true")
 }
 
 @Test
@@ -392,7 +397,10 @@ func httpClientBuildsTeamMemberRequests() throws {
         ]
     )
 
-    #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/teams/team-id/members?page=2&per_page=20&sort=Username&exclude_deleted_users=true")
+    #expect(
+        request.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/teams/team-id/members?page=2&per_page=20&sort=Username&exclude_deleted_users=true"
+    )
     #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token")
 }
 
@@ -414,7 +422,9 @@ func httpClientBuildsChannelUsersRequest() throws {
         ]
     )
 
-    #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users?in_channel=channel-id&page=0&per_page=20")
+    #expect(
+        request.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/users?in_channel=channel-id&page=0&per_page=20")
 }
 
 @Test
@@ -436,9 +446,10 @@ func httpClientBuildsUsersByIDsAndUsernamesRequests() throws {
         method: "POST",
         body: ["alice", "bob"]
     )
-    let usernamesBody = try JSONSerialization.jsonObject(
-        with: try #require(usernamesRequest.httpBody)
-    ) as? [String]
+    let usernamesBody =
+        try JSONSerialization.jsonObject(
+            with: try #require(usernamesRequest.httpBody)
+        ) as? [String]
 
     #expect(idsRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/users/ids")
     #expect(idsBody == ["user-a", "user-b"])
@@ -498,7 +509,10 @@ func httpClientBuildsUserAutocompleteAndKnownUsersRequests() throws {
     )
     let known = try httpClient.makeRequest(endpoint: "/users/known", method: "GET")
 
-    #expect(autocomplete.url?.absoluteString == "https://mattermost.example.com/api/v4/users/autocomplete?name=alice&limit=20&team_id=team-id&channel_id=channel-id")
+    #expect(
+        autocomplete.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/users/autocomplete?name=alice&limit=20&team_id=team-id&channel_id=channel-id"
+    )
     #expect(known.url?.absoluteString == "https://mattermost.example.com/api/v4/users/known")
 }
 
@@ -539,15 +553,18 @@ func httpClientBuildsChannelStatsRequests() throws {
         method: "POST",
         body: ["channel-a", "channel-b"]
     )
-    let memberCountsBody = try JSONSerialization.jsonObject(
-        with: try #require(memberCountsRequest.httpBody)
-    ) as? [String]
+    let memberCountsBody =
+        try JSONSerialization.jsonObject(
+            with: try #require(memberCountsRequest.httpBody)
+        ) as? [String]
 
     #expect(statsRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/stats")
     #expect(statsRequest.value(forHTTPHeaderField: "Authorization") == "Bearer token")
-    #expect(timezonesRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/timezones")
+    #expect(
+        timezonesRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/timezones")
     #expect(timezonesRequest.value(forHTTPHeaderField: "Authorization") == "Bearer token")
-    #expect(memberCountsRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/stats/member_count")
+    #expect(
+        memberCountsRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/stats/member_count")
     #expect(memberCountsBody == ["channel-a", "channel-b"])
 }
 
@@ -568,7 +585,9 @@ func httpClientBuildsPublicChannelListRequest() throws {
         ]
     )
 
-    #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/teams/team-id/channels?page=2&per_page=20")
+    #expect(
+        request.url?.absoluteString == "https://mattermost.example.com/api/v4/teams/team-id/channels?page=2&per_page=20"
+    )
     #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token")
 }
 
@@ -591,9 +610,14 @@ func httpClientBuildsChannelByNameRequests() throws {
         queryItems: [URLQueryItem(name: "include_deleted", value: "true")]
     )
 
-    #expect(byTeamID.url?.absoluteString == "https://mattermost.example.com/api/v4/teams/team-id/channels/name/town-square?include_deleted=false")
+    #expect(
+        byTeamID.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/teams/team-id/channels/name/town-square?include_deleted=false")
     #expect(byTeamID.value(forHTTPHeaderField: "Authorization") == "Bearer token")
-    #expect(byTeamName.url?.absoluteString == "https://mattermost.example.com/api/v4/teams/name/team-name/channels/name/town-square?include_deleted=true")
+    #expect(
+        byTeamName.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/teams/name/team-name/channels/name/town-square?include_deleted=true"
+    )
     #expect(byTeamName.value(forHTTPHeaderField: "Authorization") == "Bearer token")
 }
 
@@ -610,27 +634,30 @@ func httpClientBuildsChannelMembershipManagementRequests() throws {
         method: "POST",
         body: MattermostAddChannelMembersRequest(userId: "user-a")
     )
-    let singleAddBody = try JSONSerialization.jsonObject(
-        with: try #require(singleAddRequest.httpBody)
-    ) as? [String: Any]
+    let singleAddBody =
+        try JSONSerialization.jsonObject(
+            with: try #require(singleAddRequest.httpBody)
+        ) as? [String: Any]
 
     let bulkAddRequest: URLRequest = try httpClient.makeJSONRequest(
         endpoint: "/channels/channel-id/members",
         method: "POST",
         body: MattermostAddChannelMembersRequest(userIds: ["user-a", "user-b"], postRootId: "root-post-id")
     )
-    let bulkAddBody = try JSONSerialization.jsonObject(
-        with: try #require(bulkAddRequest.httpBody)
-    ) as? [String: Any]
+    let bulkAddBody =
+        try JSONSerialization.jsonObject(
+            with: try #require(bulkAddRequest.httpBody)
+        ) as? [String: Any]
 
     let byIDsRequest: URLRequest = try httpClient.makeJSONRequest(
         endpoint: "/channels/channel-id/members/ids",
         method: "POST",
         body: ["user-a", "user-b"]
     )
-    let byIDsBody = try JSONSerialization.jsonObject(
-        with: try #require(byIDsRequest.httpBody)
-    ) as? [String]
+    let byIDsBody =
+        try JSONSerialization.jsonObject(
+            with: try #require(byIDsRequest.httpBody)
+        ) as? [String]
 
     let removeRequest = try httpClient.makeRequest(
         endpoint: "/channels/channel-id/members/user-a",
@@ -653,9 +680,12 @@ func httpClientBuildsChannelMembershipManagementRequests() throws {
     #expect(bulkAddBody?["post_root_id"] as? String == "root-post-id")
     #expect(byIDsRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/members/ids")
     #expect(byIDsBody == ["user-a", "user-b"])
-    #expect(removeRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/members/user-a")
+    #expect(
+        removeRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/members/user-a")
     #expect(removeRequest.httpMethod == "DELETE")
-    #expect(listRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/members?page=2&per_page=20")
+    #expect(
+        listRequest.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/channels/channel-id/members?page=2&per_page=20")
     #expect(listRequest.httpMethod == "GET")
 }
 
@@ -702,27 +732,30 @@ func httpClientBuildsDirectAndGroupChannelRequests() throws {
         method: "POST",
         body: ["user-a", "user-b"]
     )
-    let directBody = try JSONSerialization.jsonObject(
-        with: try #require(directRequest.httpBody)
-    ) as? [String]
+    let directBody =
+        try JSONSerialization.jsonObject(
+            with: try #require(directRequest.httpBody)
+        ) as? [String]
 
     let groupRequest: URLRequest = try httpClient.makeJSONRequest(
         endpoint: "/channels/group",
         method: "POST",
         body: ["user-a", "user-b", "user-c"]
     )
-    let groupBody = try JSONSerialization.jsonObject(
-        with: try #require(groupRequest.httpBody)
-    ) as? [String]
+    let groupBody =
+        try JSONSerialization.jsonObject(
+            with: try #require(groupRequest.httpBody)
+        ) as? [String]
 
     let searchRequest: URLRequest = try httpClient.makeJSONRequest(
         endpoint: "/channels/group/search",
         method: "POST",
         body: MattermostTeamChannelSearchRequest(term: "alice")
     )
-    let searchBody = try JSONSerialization.jsonObject(
-        with: try #require(searchRequest.httpBody)
-    ) as? [String: Any]
+    let searchBody =
+        try JSONSerialization.jsonObject(
+            with: try #require(searchRequest.httpBody)
+        ) as? [String: Any]
 
     #expect(directRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/direct")
     #expect(directBody == ["user-a", "user-b"])
@@ -739,7 +772,8 @@ func httpClientBuildsViewChannelRequestWithJSONBody() throws {
         authentication: .bearerToken("token")
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
-    let view = MattermostViewChannelRequest(channelId: "channel-id", prevChannelId: "previous-id", collapsedThreadsSupported: false)
+    let view = MattermostViewChannelRequest(
+        channelId: "channel-id", prevChannelId: "previous-id", collapsedThreadsSupported: false)
 
     let request: URLRequest = try httpClient.makeJSONRequest(
         endpoint: "/channels/members/me/view",
@@ -790,8 +824,11 @@ func httpClientBuildsPreferenceRequests() throws {
     )
 
     #expect(all.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/preferences")
-    #expect(category.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/preferences/sidebar_settings")
-    #expect(named.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/preferences/sidebar_settings/name/favorite")
+    #expect(
+        category.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/preferences/sidebar_settings")
+    #expect(
+        named.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/users/me/preferences/sidebar_settings/name/favorite")
 }
 
 @Test
@@ -802,7 +839,7 @@ func httpClientBuildsPreferenceSaveAndDeleteRequestsWithJSONBody() throws {
     )
     let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: .shared)
     let preferences = [
-        MattermostPreference(userId: "user-id", category: "mmswift", name: "flag", value: "true"),
+        MattermostPreference(userId: "user-id", category: "mmswift", name: "flag", value: "true")
     ]
 
     let saveRequest: URLRequest = try httpClient.makeJSONRequest(
@@ -824,14 +861,14 @@ func httpClientBuildsPreferenceSaveAndDeleteRequestsWithJSONBody() throws {
     #expect(saveBody?.first?["category"] as? String == "mmswift")
     #expect(saveBody?.first?["name"] as? String == "flag")
     #expect(saveBody?.first?["value"] as? String == "true")
-    #expect(deleteRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/users/user-id/preferences/delete")
+    #expect(
+        deleteRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/users/user-id/preferences/delete")
     #expect(deleteRequest.httpMethod == "POST")
     #expect(deleteBody?.first?["user_id"] as? String == "user-id")
     #expect(deleteBody?.first?["category"] as? String == "mmswift")
     #expect(deleteBody?.first?["name"] as? String == "flag")
     #expect(deleteBody?.first?["value"] as? String == "true")
 }
-
 
 @Test
 func httpClientBuildsSidebarCategoryCreateRequestWithJSONBody() throws {
@@ -857,7 +894,9 @@ func httpClientBuildsSidebarCategoryCreateRequestWithJSONBody() throws {
     )
     let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: Any]
 
-    #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/teams/team-id/channels/categories")
+    #expect(
+        request.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/users/me/teams/team-id/channels/categories")
     #expect(body?["user_id"] as? String == "user-id")
     #expect(body?["team_id"] as? String == "team-id")
     #expect(body?["display_name"] as? String == "MattermostSwift Test")
@@ -881,7 +920,9 @@ func httpClientBuildsSidebarCategoryOrderRequestWithJSONBody() throws {
     )
     let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String]
 
-    #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/teams/team-id/channels/categories/order")
+    #expect(
+        request.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/users/me/teams/team-id/channels/categories/order")
     #expect(body == ["a", "b"])
 }
 
@@ -897,11 +938,13 @@ func httpClientBuildsPostSinceRequest() throws {
         endpoint: "/channels/channel-id/posts",
         method: "GET",
         queryItems: [
-            URLQueryItem(name: "since", value: "1780000000000"),
+            URLQueryItem(name: "since", value: "1780000000000")
         ]
     )
 
-    #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/posts?since=1780000000000")
+    #expect(
+        request.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/channels/channel-id/posts?since=1780000000000")
 }
 
 @Test
@@ -971,7 +1014,7 @@ func httpClientBuildsPostRequestWithPropsJSONBody() throws {
                 "ok": .bool(true),
                 "count": .integer(2),
                 "note": .string("roundtrip"),
-            ]),
+            ])
         ]
     )
 
@@ -1038,7 +1081,10 @@ func httpClientBuildsThreadRequest() throws {
         ]
     )
 
-    #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/posts/post-id/thread?perPage=20&fromPost=reply-id&fromCreateAt=1780000000000&direction=down&skipFetchThreads=true&collapsedThreads=true&collapsedThreadsExtended=true")
+    #expect(
+        request.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/posts/post-id/thread?perPage=20&fromPost=reply-id&fromCreateAt=1780000000000&direction=down&skipFetchThreads=true&collapsedThreads=true&collapsedThreadsExtended=true"
+    )
 }
 
 @Test
@@ -1061,7 +1107,10 @@ func httpClientBuildsUnreadPostsRequest() throws {
         ]
     )
 
-    #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/channels/channel-id/posts/unread?limit_before=5&limit_after=7&skipFetchThreads=false&collapsedThreads=true&collapsedThreadsExtended=true")
+    #expect(
+        request.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/users/me/channels/channel-id/posts/unread?limit_before=5&limit_after=7&skipFetchThreads=false&collapsedThreads=true&collapsedThreadsExtended=true"
+    )
 }
 
 @Test
@@ -1092,12 +1141,17 @@ func httpClientBuildsUserThreadRequests() throws {
         endpoint: "/users/me/teams/team-id/threads/thread-id",
         method: "GET",
         queryItems: [
-            URLQueryItem(name: "extended", value: "true"),
+            URLQueryItem(name: "extended", value: "true")
         ]
     )
 
-    #expect(listRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/teams/team-id/threads?since=1780000000000&before=before-thread&after=after-thread&per_page=20&extended=true&deleted=true&unread=true&threadsOnly=true&totalsOnly=true&excludeDirect=true")
-    #expect(stateRequest.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/teams/team-id/threads/thread-id?extended=true")
+    #expect(
+        listRequest.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/users/me/teams/team-id/threads?since=1780000000000&before=before-thread&after=after-thread&per_page=20&extended=true&deleted=true&unread=true&threadsOnly=true&totalsOnly=true&excludeDirect=true"
+    )
+    #expect(
+        stateRequest.url?.absoluteString
+            == "https://mattermost.example.com/api/v4/users/me/teams/team-id/threads/thread-id?extended=true")
 }
 
 @Test
@@ -1280,7 +1334,7 @@ func httpClientBuildsMultipartPutBody() throws {
                 filename: "avatar.png",
                 contentType: "image/png",
                 data: Data("png".utf8)
-            ),
+            )
         ],
         boundary: "Boundary"
     )
@@ -1309,26 +1363,28 @@ func httpClientEscapesMultipartDispositionValues() throws {
                 filename: "report\"draft\n.txt",
                 contentType: "text/plain",
                 data: Data("hello".utf8)
-            ),
+            )
         ],
         boundary: "Boundary"
     )
     let text = String(decoding: body, as: UTF8.self)
 
-    #expect(text.contains(#"Content-Disposition: form-data; name="files\"x  X-Injected: yes"; filename="report\"draft .txt""#))
+    #expect(
+        text.contains(
+            #"Content-Disposition: form-data; name="files\"x  X-Injected: yes"; filename="report\"draft .txt""#))
     #expect(!text.contains("\r\nX-Injected: yes"))
 }
 
 @Test
 func decodesServerPing() throws {
     let json = """
-    {
-      "status": "OK",
-      "ActiveSearchBackend": "database",
-      "database_status": "OK",
-      "filestore_status": "OK"
-    }
-    """.data(using: .utf8)!
+        {
+          "status": "OK",
+          "ActiveSearchBackend": "database",
+          "database_status": "OK",
+          "filestore_status": "OK"
+        }
+        """.data(using: .utf8)!
 
     let ping = try mattermostDecoder.decode(MattermostServerPing.self, from: json)
 
@@ -1341,18 +1397,18 @@ func decodesServerPing() throws {
 @Test
 func decodesUserAutocompleteBuckets() throws {
     let json = """
-    {
-      "users": [
-        {"id": "user-a", "username": "alice"}
-      ],
-      "in_channel": [
-        {"id": "user-b", "username": "bob"}
-      ],
-      "out_of_channel": [
-        {"id": "user-a", "username": "alice"}
-      ]
-    }
-    """.data(using: .utf8)!
+        {
+          "users": [
+            {"id": "user-a", "username": "alice"}
+          ],
+          "in_channel": [
+            {"id": "user-b", "username": "bob"}
+          ],
+          "out_of_channel": [
+            {"id": "user-a", "username": "alice"}
+          ]
+        }
+        """.data(using: .utf8)!
 
     let autocomplete = try mattermostDecoder.decode(MattermostUserAutocomplete.self, from: json)
 
@@ -1365,19 +1421,19 @@ func decodesUserAutocompleteBuckets() throws {
 @Test
 func decodesSidebarCategory() throws {
     let json = """
-    {
-      "id": "category-id",
-      "user_id": "user-id",
-      "team_id": "team-id",
-      "display_name": "Favorites",
-      "type": "favorites",
-      "sort_order": 10,
-      "channel_ids": ["channel-a", "channel-b"],
-      "sorting": "manual",
-      "muted": false,
-      "collapsed": true
-    }
-    """.data(using: .utf8)!
+        {
+          "id": "category-id",
+          "user_id": "user-id",
+          "team_id": "team-id",
+          "display_name": "Favorites",
+          "type": "favorites",
+          "sort_order": 10,
+          "channel_ids": ["channel-a", "channel-b"],
+          "sorting": "manual",
+          "muted": false,
+          "collapsed": true
+        }
+        """.data(using: .utf8)!
 
     let category = try mattermostDecoder.decode(MattermostSidebarCategory.self, from: json)
 
@@ -1391,13 +1447,13 @@ func decodesSidebarCategory() throws {
 @Test
 func decodesPreference() throws {
     let json = """
-    {
-      "user_id": "user-id",
-      "category": "sidebar_settings",
-      "name": "favorite",
-      "value": "true"
-    }
-    """.data(using: .utf8)!
+        {
+          "user_id": "user-id",
+          "category": "sidebar_settings",
+          "name": "favorite",
+          "value": "true"
+        }
+        """.data(using: .utf8)!
 
     let preference = try mattermostDecoder.decode(MattermostPreference.self, from: json)
 
@@ -1411,24 +1467,24 @@ func decodesPreference() throws {
 @Test
 func decodesSidebarCategoryListAndPreservesServerOrder() throws {
     let json = """
-    {
-      "categories": [
         {
-          "id": "b",
-          "display_name": "Second",
-          "type": "custom",
-          "channel_ids": []
-        },
-        {
-          "id": "a",
-          "display_name": "First",
-          "type": "custom",
-          "channel_ids": []
+          "categories": [
+            {
+              "id": "b",
+              "display_name": "Second",
+              "type": "custom",
+              "channel_ids": []
+            },
+            {
+              "id": "a",
+              "display_name": "First",
+              "type": "custom",
+              "channel_ids": []
+            }
+          ],
+          "order": ["a", "b"]
         }
-      ],
-      "order": ["a", "b"]
-    }
-    """.data(using: .utf8)!
+        """.data(using: .utf8)!
 
     let list = try mattermostDecoder.decode(MattermostSidebarCategoryList.self, from: json)
 
@@ -1437,17 +1493,18 @@ func decodesSidebarCategoryListAndPreservesServerOrder() throws {
 
 @Test
 func decodesTeamMember() throws {
-    let json = Data("""
-    {
-      "team_id": "team-id",
-      "user_id": "user-id",
-      "roles": "team_user team_admin",
-      "delete_at": 0,
-      "scheme_user": true,
-      "scheme_admin": false,
-      "explicit_roles": "team_admin"
-    }
-    """.utf8)
+    let json = Data(
+        """
+        {
+          "team_id": "team-id",
+          "user_id": "user-id",
+          "roles": "team_user team_admin",
+          "delete_at": 0,
+          "scheme_user": true,
+          "scheme_admin": false,
+          "explicit_roles": "team_admin"
+        }
+        """.utf8)
 
     let member = try mattermostDecoder.decode(MattermostTeamMember.self, from: json)
 
@@ -1463,57 +1520,60 @@ func decodesTeamMember() throws {
 
 @Test
 func sidebarChannelIDsMoveAndClampPosition() {
-    #expect(MattermostClient.sidebarChannelIDs(
-        ["a", "b", "c"],
-        moving: "b",
-        to: 0
-    ) == ["b", "a", "c"])
-    #expect(MattermostClient.sidebarChannelIDs(
-        ["a", "b", "c"],
-        moving: "d",
-        to: 99
-    ) == ["a", "b", "c", "d"])
-    #expect(MattermostClient.sidebarChannelIDs(
-        ["a", "b", "c"],
-        moving: "c",
-        to: -3
-    ) == ["c", "a", "b"])
+    #expect(
+        MattermostClient.sidebarChannelIDs(
+            ["a", "b", "c"],
+            moving: "b",
+            to: 0
+        ) == ["b", "a", "c"])
+    #expect(
+        MattermostClient.sidebarChannelIDs(
+            ["a", "b", "c"],
+            moving: "d",
+            to: 99
+        ) == ["a", "b", "c", "d"])
+    #expect(
+        MattermostClient.sidebarChannelIDs(
+            ["a", "b", "c"],
+            moving: "c",
+            to: -3
+        ) == ["c", "a", "b"])
 }
 
 @Test
 func decodesChannelMemberAndUnreadState() throws {
     let statsJSON = """
-    {
-      "channel_id": "channel-id",
-      "member_count": 42,
-      "guest_count": 3,
-      "pinnedpost_count": 2,
-      "total_msg_count": 99
-    }
-    """.data(using: .utf8)!
+        {
+          "channel_id": "channel-id",
+          "member_count": 42,
+          "guest_count": 3,
+          "pinnedpost_count": 2,
+          "total_msg_count": 99
+        }
+        """.data(using: .utf8)!
     let memberJSON = """
-    {
-      "channel_id": "channel-id",
-      "user_id": "user-id",
-      "roles": "channel_user",
-      "last_viewed_at": 100,
-      "msg_count": 20,
-      "mention_count": 2,
-      "notify_props": {
-        "desktop": "mention",
-        "mark_unread": "all"
-      },
-      "last_update_at": 120
-    }
-    """.data(using: .utf8)!
+        {
+          "channel_id": "channel-id",
+          "user_id": "user-id",
+          "roles": "channel_user",
+          "last_viewed_at": 100,
+          "msg_count": 20,
+          "mention_count": 2,
+          "notify_props": {
+            "desktop": "mention",
+            "mark_unread": "all"
+          },
+          "last_update_at": 120
+        }
+        """.data(using: .utf8)!
     let unreadJSON = """
-    {
-      "team_id": "team-id",
-      "channel_id": "channel-id",
-      "msg_count": 3,
-      "mention_count": 1
-    }
-    """.data(using: .utf8)!
+        {
+          "team_id": "team-id",
+          "channel_id": "channel-id",
+          "msg_count": 3,
+          "mention_count": 1
+        }
+        """.data(using: .utf8)!
 
     let stats = try mattermostDecoder.decode(MattermostChannelStats.self, from: statsJSON)
     let member = try mattermostDecoder.decode(MattermostChannelMember.self, from: memberJSON)
@@ -1645,13 +1705,13 @@ func channelNotifyPropsUnmutePreservesExplicitNonNoneDeliveryValues() {
 @Test
 func decodesChannelViewResponse() throws {
     let json = """
-    {
-      "status": "OK",
-      "last_viewed_at_times": {
-        "channel-id": 123
-      }
-    }
-    """.data(using: .utf8)!
+        {
+          "status": "OK",
+          "last_viewed_at_times": {
+            "channel-id": 123
+          }
+        }
+        """.data(using: .utf8)!
 
     let response = try mattermostDecoder.decode(MattermostChannelViewResponse.self, from: json)
 
@@ -1662,46 +1722,46 @@ func decodesChannelViewResponse() throws {
 @Test
 func decodesPostListAndPostState() throws {
     let json = """
-    {
-      "order": ["post-a"],
-      "posts": {
-        "post-a": {
-          "id": "post-a",
-          "create_at": 10,
-          "update_at": 20,
-          "edit_at": 30,
-          "delete_at": 0,
-          "user_id": "user-a",
-          "channel_id": "channel-a",
-          "root_id": "",
-          "original_id": "",
-          "message": "hello",
-          "type": "",
-          "hashtags": "",
-          "pending_post_id": "",
-          "file_ids": [],
-          "has_reactions": false,
-          "reply_count": 3,
-          "last_reply_at": 40,
-          "is_following": true,
-          "props": {
-            "mmswift": {
-              "ok": true,
-              "count": 2
+        {
+          "order": ["post-a"],
+          "posts": {
+            "post-a": {
+              "id": "post-a",
+              "create_at": 10,
+              "update_at": 20,
+              "edit_at": 30,
+              "delete_at": 0,
+              "user_id": "user-a",
+              "channel_id": "channel-a",
+              "root_id": "",
+              "original_id": "",
+              "message": "hello",
+              "type": "",
+              "hashtags": "",
+              "pending_post_id": "",
+              "file_ids": [],
+              "has_reactions": false,
+              "reply_count": 3,
+              "last_reply_at": 40,
+              "is_following": true,
+              "props": {
+                "mmswift": {
+                  "ok": true,
+                  "count": 2
+                }
+              },
+              "metadata": {
+                "priority": {
+                  "requested_ack": false
+                }
+              }
             }
           },
-          "metadata": {
-            "priority": {
-              "requested_ack": false
-            }
-          }
+          "next_post_id": "next",
+          "prev_post_id": "prev",
+          "has_next": false
         }
-      },
-      "next_post_id": "next",
-      "prev_post_id": "prev",
-      "has_next": false
-    }
-    """.data(using: .utf8)!
+        """.data(using: .utf8)!
 
     let postList = try mattermostDecoder.decode(MattermostPostList.self, from: json)
     let post = try #require(postList.orderedPosts.first)
@@ -1715,60 +1775,64 @@ func decodesPostListAndPostState() throws {
     #expect(post.replyCount == 3)
     #expect(post.lastReplyAt == 40)
     #expect(post.isFollowing == true)
-    #expect(post.props?["mmswift"] == .object([
-        "ok": .bool(true),
-        "count": .integer(2),
-    ]))
-    #expect(post.metadata?["priority"] == .object([
-        "requested_ack": .bool(false),
-    ]))
+    #expect(
+        post.props?["mmswift"]
+            == .object([
+                "ok": .bool(true),
+                "count": .integer(2),
+            ]))
+    #expect(
+        post.metadata?["priority"]
+            == .object([
+                "requested_ack": .bool(false)
+            ]))
 }
 
 @Test
 func decodesThreadListAndThreadState() throws {
     let json = """
-    {
-      "total": 2,
-      "total_unread_threads": 1,
-      "total_unread_mentions": 1,
-      "total_unread_urgent_mentions": 1,
-      "threads": [
         {
-          "id": "root-post",
-          "reply_count": 3,
-          "last_reply_at": 40,
-          "last_viewed_at": 20,
-          "unread_replies": 2,
-          "unread_mentions": 1,
-          "is_urgent": true,
-          "delete_at": 0,
-          "participants": [
+          "total": 2,
+          "total_unread_threads": 1,
+          "total_unread_mentions": 1,
+          "total_unread_urgent_mentions": 1,
+          "threads": [
             {
-              "id": "user-a",
-              "username": "alice"
+              "id": "root-post",
+              "reply_count": 3,
+              "last_reply_at": 40,
+              "last_viewed_at": 20,
+              "unread_replies": 2,
+              "unread_mentions": 1,
+              "is_urgent": true,
+              "delete_at": 0,
+              "participants": [
+                {
+                  "id": "user-a",
+                  "username": "alice"
+                }
+              ],
+              "post": {
+                "id": "root-post",
+                "create_at": 10,
+                "update_at": 40,
+                "edit_at": 0,
+                "delete_at": 0,
+                "user_id": "user-a",
+                "channel_id": "channel-a",
+                "root_id": "",
+                "original_id": "",
+                "message": "root",
+                "type": "",
+                "hashtags": "",
+                "pending_post_id": "",
+                "file_ids": [],
+                "has_reactions": false
+              }
             }
-          ],
-          "post": {
-            "id": "root-post",
-            "create_at": 10,
-            "update_at": 40,
-            "edit_at": 0,
-            "delete_at": 0,
-            "user_id": "user-a",
-            "channel_id": "channel-a",
-            "root_id": "",
-            "original_id": "",
-            "message": "root",
-            "type": "",
-            "hashtags": "",
-            "pending_post_id": "",
-            "file_ids": [],
-            "has_reactions": false
-          }
+          ]
         }
-      ]
-    }
-    """.data(using: .utf8)!
+        """.data(using: .utf8)!
 
     let list = try mattermostDecoder.decode(MattermostThreadList.self, from: json)
     let thread = try #require(list.threads.first)
@@ -1788,13 +1852,13 @@ func decodesThreadListAndThreadState() throws {
 @Test
 func decodesReaction() throws {
     let json = """
-    {
-      "user_id": "user-id",
-      "post_id": "post-id",
-      "emoji_name": "smile",
-      "create_at": 123
-    }
-    """.data(using: .utf8)!
+        {
+          "user_id": "user-id",
+          "post_id": "post-id",
+          "emoji_name": "smile",
+          "create_at": 123
+        }
+        """.data(using: .utf8)!
 
     let reaction = try mattermostDecoder.decode(MattermostReaction.self, from: json)
 
@@ -1807,15 +1871,15 @@ func decodesReaction() throws {
 @Test
 func decodesUserStatus() throws {
     let json = """
-    {
-      "user_id": "user-id",
-      "status": "online",
-      "manual": false,
-      "last_activity_at": 123,
-      "active_channel": "channel-id",
-      "dnd_end_time": 0
-    }
-    """.data(using: .utf8)!
+        {
+          "user_id": "user-id",
+          "status": "online",
+          "manual": false,
+          "last_activity_at": 123,
+          "active_channel": "channel-id",
+          "dnd_end_time": 0
+        }
+        """.data(using: .utf8)!
 
     let status = try mattermostDecoder.decode(MattermostUserStatus.self, from: json)
 
@@ -1829,27 +1893,27 @@ func decodesUserStatus() throws {
 @Test
 func decodesFileUploadResponse() throws {
     let json = """
-    {
-      "file_infos": [
         {
-          "id": "file-id",
-          "user_id": "user-id",
-          "post_id": "",
-          "create_at": 10,
-          "update_at": 20,
-          "delete_at": 0,
-          "name": "hello.txt",
-          "extension": "txt",
-          "size": 5,
-          "mime_type": "text/plain",
-          "width": 0,
-          "height": 0,
-          "has_preview_image": false
+          "file_infos": [
+            {
+              "id": "file-id",
+              "user_id": "user-id",
+              "post_id": "",
+              "create_at": 10,
+              "update_at": 20,
+              "delete_at": 0,
+              "name": "hello.txt",
+              "extension": "txt",
+              "size": 5,
+              "mime_type": "text/plain",
+              "width": 0,
+              "height": 0,
+              "has_preview_image": false
+            }
+          ],
+          "client_ids": ["client-id"]
         }
-      ],
-      "client_ids": ["client-id"]
-    }
-    """.data(using: .utf8)!
+        """.data(using: .utf8)!
 
     let upload = try mattermostDecoder.decode(MattermostFileUploadResponse.self, from: json)
     let fileInfo = try #require(upload.fileInfos.first)
@@ -1864,35 +1928,35 @@ func decodesFileUploadResponse() throws {
 @Test
 func decodesPostSearchResults() throws {
     let json = """
-    {
-      "order": ["post-a"],
-      "posts": {
-        "post-a": {
-          "id": "post-a",
-          "create_at": 10,
-          "update_at": 20,
-          "edit_at": 0,
-          "delete_at": 0,
-          "user_id": "user-a",
-          "channel_id": "channel-a",
-          "root_id": "",
-          "original_id": "",
-          "message": "hello search",
-          "type": "",
-          "hashtags": "",
-          "pending_post_id": "",
-          "file_ids": [],
-          "has_reactions": false
+        {
+          "order": ["post-a"],
+          "posts": {
+            "post-a": {
+              "id": "post-a",
+              "create_at": 10,
+              "update_at": 20,
+              "edit_at": 0,
+              "delete_at": 0,
+              "user_id": "user-a",
+              "channel_id": "channel-a",
+              "root_id": "",
+              "original_id": "",
+              "message": "hello search",
+              "type": "",
+              "hashtags": "",
+              "pending_post_id": "",
+              "file_ids": [],
+              "has_reactions": false
+            }
+          },
+          "matches": {
+            "post-a": ["hello"]
+          },
+          "next_post_id": "",
+          "prev_post_id": "",
+          "first_inaccessible_post_time": 0
         }
-      },
-      "matches": {
-        "post-a": ["hello"]
-      },
-      "next_post_id": "",
-      "prev_post_id": "",
-      "first_inaccessible_post_time": 0
-    }
-    """.data(using: .utf8)!
+        """.data(using: .utf8)!
 
     let results = try mattermostDecoder.decode(MattermostPostSearchResults.self, from: json)
 
@@ -1904,23 +1968,23 @@ func decodesPostSearchResults() throws {
 @Test
 func decodesWebSocketLiveEventAndEmbeddedPost() throws {
     let post = """
-    {"id":"post-a","create_at":10,"update_at":20,"edit_at":0,"delete_at":0,"user_id":"user-a","channel_id":"channel-a","root_id":"","original_id":"","message":"hello","type":"","hashtags":"","pending_post_id":"","file_ids":[],"has_reactions":false}
-    """
+        {"id":"post-a","create_at":10,"update_at":20,"edit_at":0,"delete_at":0,"user_id":"user-a","channel_id":"channel-a","root_id":"","original_id":"","message":"hello","type":"","hashtags":"","pending_post_id":"","file_ids":[],"has_reactions":false}
+        """
     let escapedPost = post.replacing("\\", with: "\\\\").replacing("\"", with: "\\\"")
     let json = """
-    {
-      "event": "posted",
-      "data": {
-        "post": "\(escapedPost)",
-        "set_online": true
-      },
-      "broadcast": {
-        "channel_id": "channel-a",
-        "team_id": "team-a"
-      },
-      "seq": 3
-    }
-    """.data(using: .utf8)!
+        {
+          "event": "posted",
+          "data": {
+            "post": "\(escapedPost)",
+            "set_online": true
+          },
+          "broadcast": {
+            "channel_id": "channel-a",
+            "team_id": "team-a"
+          },
+          "seq": 3
+        }
+        """.data(using: .utf8)!
 
     let event = try mattermostDecoder.decode(MattermostLiveEvent.self, from: json)
     let decodedPost = try #require(try event.decodedPost())
@@ -1937,19 +2001,19 @@ func decodesWebSocketLiveEventAndEmbeddedPost() throws {
 @Test
 func decodingWebSocketLiveEventToleratesUnexpectedBroadcastFieldTypes() throws {
     let json = """
-    {
-      "event": "custom_plugin_event",
-      "data": {
-        "value": 1
-      },
-      "broadcast": {
-        "channel_id": 42,
-        "team_id": "team-a",
-        "omit_users": "unexpected"
-      },
-      "seq": 3
-    }
-    """.data(using: .utf8)!
+        {
+          "event": "custom_plugin_event",
+          "data": {
+            "value": 1
+          },
+          "broadcast": {
+            "channel_id": 42,
+            "team_id": "team-a",
+            "omit_users": "unexpected"
+          },
+          "seq": 3
+        }
+        """.data(using: .utf8)!
 
     let event = try mattermostDecoder.decode(MattermostLiveEvent.self, from: json)
 
@@ -1964,11 +2028,11 @@ func decodingWebSocketLiveEventToleratesUnexpectedBroadcastFieldTypes() throws {
 @Test
 func decodesTypedWebSocketPostMutationEvents() throws {
     let post = """
-    {"id":"post-a","create_at":10,"update_at":30,"edit_at":30,"delete_at":0,"user_id":"user-a","channel_id":"channel-a","root_id":"","original_id":"","message":"edited","type":"","hashtags":"","pending_post_id":"","file_ids":[],"has_reactions":false}
-    """
+        {"id":"post-a","create_at":10,"update_at":30,"edit_at":30,"delete_at":0,"user_id":"user-a","channel_id":"channel-a","root_id":"","original_id":"","message":"edited","type":"","hashtags":"","pending_post_id":"","file_ids":[],"has_reactions":false}
+        """
     let deletedPost = """
-    {"id":"post-a","create_at":10,"update_at":40,"edit_at":30,"delete_at":40,"user_id":"user-a","channel_id":"channel-a","root_id":"","original_id":"","message":"edited","type":"","hashtags":"","pending_post_id":"","file_ids":[],"has_reactions":false}
-    """
+        {"id":"post-a","create_at":10,"update_at":40,"edit_at":30,"delete_at":40,"user_id":"user-a","channel_id":"channel-a","root_id":"","original_id":"","message":"edited","type":"","hashtags":"","pending_post_id":"","file_ids":[],"has_reactions":false}
+        """
     let editedEvent = try mattermostDecoder.decode(
         MattermostLiveEvent.self,
         from: postMutationEventJSON(event: "post_edited", post: post)
@@ -1992,19 +2056,19 @@ func decodesTypedWebSocketPostMutationEvents() throws {
 @Test
 func decodesTypedWebSocketTypingEvent() throws {
     let json = """
-    {
-      "event": "typing",
-      "data": {
-        "user_id": "user-a",
-        "channel_id": "channel-a",
-        "parent_id": "root-a"
-      },
-      "broadcast": {
-        "channel_id": "channel-a"
-      },
-      "seq": 4
-    }
-    """.data(using: .utf8)!
+        {
+          "event": "typing",
+          "data": {
+            "user_id": "user-a",
+            "channel_id": "channel-a",
+            "parent_id": "root-a"
+          },
+          "broadcast": {
+            "channel_id": "channel-a"
+          },
+          "seq": 4
+        }
+        """.data(using: .utf8)!
 
     let event = try mattermostDecoder.decode(MattermostLiveEvent.self, from: json)
     let typing = try #require(event.decodedTyping())
@@ -2019,32 +2083,32 @@ func decodesTypedWebSocketTypingEvent() throws {
 private func postMutationEventJSON(event: String, post: String) -> Data {
     let escapedPost = post.replacing("\\", with: "\\\\").replacing("\"", with: "\\\"")
     return """
-    {
-      "event": "\(event)",
-      "data": {
-        "post": "\(escapedPost)"
-      },
-      "broadcast": {
-        "channel_id": "channel-a"
-      },
-      "seq": 4
-    }
-    """.data(using: .utf8)!
+        {
+          "event": "\(event)",
+          "data": {
+            "post": "\(escapedPost)"
+          },
+          "broadcast": {
+            "channel_id": "channel-a"
+          },
+          "seq": 4
+        }
+        """.data(using: .utf8)!
 }
 
 @Test
 func decodesTypedWebSocketStatusChangeEvent() throws {
     let json = """
-    {
-      "event": "status_change",
-      "data": {
-        "user_id": "user-a",
-        "status": "away",
-        "manual": true
-      },
-      "seq": 5
-    }
-    """.data(using: .utf8)!
+        {
+          "event": "status_change",
+          "data": {
+            "user_id": "user-a",
+            "status": "away",
+            "manual": true
+          },
+          "seq": 5
+        }
+        """.data(using: .utf8)!
 
     let event = try mattermostDecoder.decode(MattermostLiveEvent.self, from: json)
     let statusChange = try #require(event.decodedStatusChange())
@@ -2059,16 +2123,16 @@ func decodesTypedWebSocketStatusChangeEvent() throws {
 @Test
 func decodesTypedWebSocketChannelViewedEvent() throws {
     let json = """
-    {
-      "event": "channel_viewed",
-      "data": {
-        "user_id": "user-a",
-        "channel_id": "channel-a",
-        "prev_channel_id": "channel-b"
-      },
-      "seq": 6
-    }
-    """.data(using: .utf8)!
+        {
+          "event": "channel_viewed",
+          "data": {
+            "user_id": "user-a",
+            "channel_id": "channel-a",
+            "prev_channel_id": "channel-b"
+          },
+          "seq": 6
+        }
+        """.data(using: .utf8)!
 
     let event = try mattermostDecoder.decode(MattermostLiveEvent.self, from: json)
     let channelViewed = try #require(event.decodedChannelViewed())
@@ -2083,20 +2147,20 @@ func decodesTypedWebSocketChannelViewedEvent() throws {
 @Test
 func decodesTypedWebSocketPostUnreadEvent() throws {
     let json = """
-    {
-      "event": "post_unread",
-      "data": {
-        "channel_id": "channel-a",
-        "post_id": "post-a"
-      },
-      "broadcast": {
-        "user_id": "user-a",
-        "channel_id": "channel-a",
-        "team_id": "team-a"
-      },
-      "seq": 7
-    }
-    """.data(using: .utf8)!
+        {
+          "event": "post_unread",
+          "data": {
+            "channel_id": "channel-a",
+            "post_id": "post-a"
+          },
+          "broadcast": {
+            "user_id": "user-a",
+            "channel_id": "channel-a",
+            "team_id": "team-a"
+          },
+          "seq": 7
+        }
+        """.data(using: .utf8)!
 
     let event = try mattermostDecoder.decode(MattermostLiveEvent.self, from: json)
     let invalidation = MattermostCacheInvalidationEvent(
@@ -2115,8 +2179,8 @@ func decodesTypedWebSocketPostUnreadEvent() throws {
 @Test
 func decodesTypedWebSocketThreadUpdatedEventWithEmbeddedPost() throws {
     let post = """
-    {"id":"reply-a","create_at":10,"update_at":10,"edit_at":0,"delete_at":0,"user_id":"user-a","channel_id":"channel-a","root_id":"root-a","message":"reply","type":""}
-    """
+        {"id":"reply-a","create_at":10,"update_at":10,"edit_at":0,"delete_at":0,"user_id":"user-a","channel_id":"channel-a","root_id":"root-a","message":"reply","type":""}
+        """
     let event = try mattermostDecoder.decode(
         MattermostLiveEvent.self,
         from: postMutationEventJSON(event: "thread_updated", post: post)
@@ -2136,20 +2200,20 @@ func decodesTypedWebSocketThreadUpdatedEventWithEmbeddedPost() throws {
 @Test
 func decodesTypedWebSocketThreadReadChangedEventWithIDsOnly() throws {
     let json = """
-    {
-      "event": "thread_read_changed",
-      "data": {
-        "thread_id": "root-a",
-        "post_id": "reply-a",
-        "channel_id": "channel-a"
-      },
-      "broadcast": {
-        "user_id": "user-a",
-        "team_id": "team-a"
-      },
-      "seq": 8
-    }
-    """.data(using: .utf8)!
+        {
+          "event": "thread_read_changed",
+          "data": {
+            "thread_id": "root-a",
+            "post_id": "reply-a",
+            "channel_id": "channel-a"
+          },
+          "broadcast": {
+            "user_id": "user-a",
+            "team_id": "team-a"
+          },
+          "seq": 8
+        }
+        """.data(using: .utf8)!
 
     let event = try mattermostDecoder.decode(MattermostLiveEvent.self, from: json)
     let thread = try event.decodedThreadEvent()
@@ -2167,22 +2231,24 @@ func decodesTypedWebSocketThreadReadChangedEventWithIDsOnly() throws {
 @Test
 func decodesNestedJSONValue() throws {
     let json = """
-    {
-      "outer": {
-        "name": "value",
-        "count": 2,
-        "items": [true, null]
-      }
-    }
-    """.data(using: .utf8)!
+        {
+          "outer": {
+            "name": "value",
+            "count": 2,
+            "items": [true, null]
+          }
+        }
+        """.data(using: .utf8)!
 
     let value = try mattermostDecoder.decode([String: MattermostJSONValue].self, from: json)
 
-    #expect(value["outer"] == .object([
-        "name": .string("value"),
-        "count": .integer(2),
-        "items": .array([.bool(true), .null]),
-    ]))
+    #expect(
+        value["outer"]
+            == .object([
+                "name": .string("value"),
+                "count": .integer(2),
+                "items": .array([.bool(true), .null]),
+            ]))
 }
 
 @Test
@@ -2291,30 +2357,30 @@ func httpClientBuildsEmojiSearchRequestWithJSONBody() throws {
 @Test
 func decodesChannelSearchResultsObjectAndArray() throws {
     let objectJSON = """
-    {
-      "channels": [
         {
-          "id": "channel-a",
-          "team_id": "team-a",
-          "name": "town-square",
-          "display_name": "Town Square",
-          "type": "O"
+          "channels": [
+            {
+              "id": "channel-a",
+              "team_id": "team-a",
+              "name": "town-square",
+              "display_name": "Town Square",
+              "type": "O"
+            }
+          ],
+          "total_count": 1
         }
-      ],
-      "total_count": 1
-    }
-    """.data(using: .utf8)!
+        """.data(using: .utf8)!
     let arrayJSON = """
-    [
-      {
-        "id": "channel-b",
-        "team_id": "team-a",
-        "name": "off-topic",
-        "display_name": "Off-Topic",
-        "type": "O"
-      }
-    ]
-    """.data(using: .utf8)!
+        [
+          {
+            "id": "channel-b",
+            "team_id": "team-a",
+            "name": "off-topic",
+            "display_name": "Off-Topic",
+            "type": "O"
+          }
+        ]
+        """.data(using: .utf8)!
 
     let objectResults = try mattermostDecoder.decode(MattermostChannelSearchResults.self, from: objectJSON)
     let arrayResults = try mattermostDecoder.decode(MattermostChannelSearchResults.self, from: arrayJSON)
@@ -2328,15 +2394,15 @@ func decodesChannelSearchResultsObjectAndArray() throws {
 @Test
 func decodesCustomEmoji() throws {
     let json = """
-    {
-      "id": "emoji-a",
-      "creator_id": "user-a",
-      "name": "party_parrot",
-      "create_at": 1,
-      "update_at": 2,
-      "delete_at": 0
-    }
-    """.data(using: .utf8)!
+        {
+          "id": "emoji-a",
+          "creator_id": "user-a",
+          "name": "party_parrot",
+          "create_at": 1,
+          "update_at": 2,
+          "delete_at": 0
+        }
+        """.data(using: .utf8)!
 
     let emoji = try mattermostDecoder.decode(MattermostCustomEmoji.self, from: json)
 

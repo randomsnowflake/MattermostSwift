@@ -216,10 +216,16 @@ The e2e script uses `mmswift-test-` and `MattermostSwift Test` markers and attem
 ## Development
 
 ```sh
+scripts/lint.sh
 scripts/test-unit.sh
+scripts/test-coverage.sh
 scripts/test-live.sh
 scripts/test-e2e.sh
 ```
+
+`scripts/lint.sh` enforces the checked-in `.swift-format` rules. The coverage script requires
+Xcode's `xcrun` and produces an LCOV report at `coverage.lcov`; CI uploads that report as an
+artifact. See `CONTRIBUTING.md` for formatter, single-test, public API, and pull request guidance.
 
 `MattermostSwiftCLI` is a development and verification harness, not the primary product surface. Use it to probe endpoints, exercise live server behavior, and run the scripted checks.
 

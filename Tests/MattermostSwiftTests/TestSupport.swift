@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import MattermostSwift
 
 enum MattermostTestSupport {
@@ -12,7 +13,7 @@ enum MattermostTestSupport {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MattermostMockURLProtocol.self]
         configuration.httpAdditionalHeaders = [
-            MattermostMockURLProtocol.handlerIDHeader: handlerID,
+            MattermostMockURLProtocol.handlerIDHeader: handlerID
         ]
         return URLSession(configuration: configuration)
     }
@@ -24,12 +25,13 @@ enum MattermostTestSupport {
         request: URLRequest
     ) throws -> (HTTPURLResponse, Data) {
         let url = try #require(request.url)
-        let response = try #require(HTTPURLResponse(
-            url: url,
-            statusCode: statusCode,
-            httpVersion: "HTTP/1.1",
-            headerFields: ["Content-Type": contentType]
-        ))
+        let response = try #require(
+            HTTPURLResponse(
+                url: url,
+                statusCode: statusCode,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": contentType]
+            ))
         return (response, body)
     }
 
@@ -114,7 +116,8 @@ actor MattermostMockURLProtocolHandlers {
 
     func response(for request: URLRequest) throws -> (HTTPURLResponse, Data) {
         guard let handlerID = request.value(forHTTPHeaderField: MattermostMockURLProtocol.handlerIDHeader),
-              let handler = handlers[handlerID] else {
+            let handler = handlers[handlerID]
+        else {
             throw MattermostError.invalidHTTPResponse
         }
         return try handler(request)

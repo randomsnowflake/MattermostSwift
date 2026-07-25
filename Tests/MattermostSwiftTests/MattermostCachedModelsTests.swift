@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import MattermostSwift
 
 @MainActor
@@ -104,19 +105,19 @@ func cachedSyncCursorUpdatesInPlace() throws {
 func cachedSidebarCategoryRoundTripsThroughStore() throws {
     let store = try MattermostStore(inMemory: true)
     let categoryJSON = """
-    {
-      "id": "category-1",
-      "user_id": "user-1",
-      "team_id": "team-1",
-      "display_name": "Favorites",
-      "type": "favorites",
-      "sort_order": 5,
-      "channel_ids": ["channel-1", "channel-2"],
-      "sorting": "recent",
-      "muted": false,
-      "collapsed": true
-    }
-    """
+        {
+          "id": "category-1",
+          "user_id": "user-1",
+          "team_id": "team-1",
+          "display_name": "Favorites",
+          "type": "favorites",
+          "sort_order": 5,
+          "channel_ids": ["channel-1", "channel-2"],
+          "sorting": "recent",
+          "muted": false,
+          "collapsed": true
+        }
+        """
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     let category = try decoder.decode(MattermostSidebarCategory.self, from: Data(categoryJSON.utf8))

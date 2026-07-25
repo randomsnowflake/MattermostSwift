@@ -97,7 +97,7 @@ extension MattermostClient {
                     filename: "profile.png",
                     contentType: contentType,
                     data: data
-                ),
+                )
             ]
         )
     }
@@ -122,7 +122,7 @@ extension MattermostClient {
         try await httpClient.get(
             "/users",
             queryItems: [
-                URLQueryItem(name: "in_channel", value: channelID),
+                URLQueryItem(name: "in_channel", value: channelID)
             ] + Self.pageQueryItems(page: page, perPage: perPage)
         )
     }
@@ -190,7 +190,8 @@ extension MattermostClient {
     }
 
     /// Manually sets a user's presence status.
-    public func setStatus(userID: String, status: String, dndEndTime: Int64? = nil) async throws -> MattermostUserStatus {
+    public func setStatus(userID: String, status: String, dndEndTime: Int64? = nil) async throws -> MattermostUserStatus
+    {
         try await httpClient.put(
             "/users/\(userID)/status",
             body: MattermostUserStatusUpdateRequest(

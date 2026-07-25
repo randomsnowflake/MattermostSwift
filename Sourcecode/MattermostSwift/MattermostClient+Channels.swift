@@ -18,7 +18,7 @@ extension MattermostClient {
         try await httpClient.get(
             "/teams/\(teamID)/channels",
             queryItems: Self.pageQueryItems(page: page, perPage: perPage) + [
-                URLQueryItem(name: "include_deleted", value: String(includeDeleted)),
+                URLQueryItem(name: "include_deleted", value: String(includeDeleted))
             ]
         )
     }
@@ -33,17 +33,19 @@ extension MattermostClient {
         try await httpClient.get(
             "/teams/\(teamID)/channels/name/\(name)",
             queryItems: [
-                URLQueryItem(name: "include_deleted", value: String(includeDeleted)),
+                URLQueryItem(name: "include_deleted", value: String(includeDeleted))
             ]
         )
     }
 
     /// Resolves channel metadata by team name and URL-safe channel name.
-    public func channel(teamName: String, channelName: String, includeDeleted: Bool = false) async throws -> MattermostChannel {
+    public func channel(teamName: String, channelName: String, includeDeleted: Bool = false) async throws
+        -> MattermostChannel
+    {
         try await httpClient.get(
             "/teams/name/\(teamName)/channels/name/\(channelName)",
             queryItems: [
-                URLQueryItem(name: "include_deleted", value: String(includeDeleted)),
+                URLQueryItem(name: "include_deleted", value: String(includeDeleted))
             ]
         )
     }

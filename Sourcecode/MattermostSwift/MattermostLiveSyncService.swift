@@ -104,9 +104,9 @@ public enum MattermostLiveSyncEvent: Sendable {
     case backfillFailed(MattermostLiveSyncFailure)
 }
 
-public extension MattermostLiveSyncEvent {
+extension MattermostLiveSyncEvent {
     /// Lifecycle state for host apps that want one UI-friendly connection indicator.
-    var connectionState: MattermostLiveSyncConnectionState? {
+    public var connectionState: MattermostLiveSyncConnectionState? {
         switch self {
         case .connecting(let attempt):
             .connecting(attempt: attempt)
@@ -120,15 +120,17 @@ public extension MattermostLiveSyncEvent {
         case .backfillFailed(let failure):
             .failed(attempt: failure.attempt, message: failure.message)
         case .eventApplied,
-             .channelUnreadRefreshed,
-             .sidebarCategoriesRefreshed,
-             .threadStateRefreshed:
+            .channelUnreadRefreshed,
+            .sidebarCategoriesRefreshed,
+            .threadStateRefreshed:
             nil
         }
     }
 }
 
-typealias MattermostLiveSyncLifecycleEvents = @Sendable () -> AsyncThrowingStream<MattermostLiveEventStreamLifecycleEvent, Error>
+typealias MattermostLiveSyncLifecycleEvents = @Sendable () -> AsyncThrowingStream<
+    MattermostLiveEventStreamLifecycleEvent, Error
+>
 typealias MattermostLiveSyncBackfill = @MainActor @Sendable (
     _ store: MattermostStore,
     _ teamID: String?,
@@ -264,10 +266,12 @@ public struct MattermostLiveSyncService: Sendable {
                             } catch is CancellationError {
                                 throw CancellationError()
                             } catch {
-                                try Self.yield(.backfillFailed(MattermostLiveSyncFailure(
-                                    attempt: attempt,
-                                    message: Self.failureMessage(for: error)
-                                )), to: continuation)
+                                try Self.yield(
+                                    .backfillFailed(
+                                        MattermostLiveSyncFailure(
+                                            attempt: attempt,
+                                            message: Self.failureMessage(for: error)
+                                        )), to: continuation)
                             }
 
                         case .connected:
@@ -311,9 +315,10 @@ public struct MattermostLiveSyncService: Sendable {
 
                             var categoriesResult: [MattermostSidebarCategory]?
                             if options.refreshSidebarCategoriesOnPreferenceChange,
-                               let refreshSidebarCategories,
-                               let activeTeamID,
-                               typedEvent.invalidatesSidebarCategories {
+                                let refreshSidebarCategories,
+                                let activeTeamID,
+                                typedEvent.invalidatesSidebarCategories
+                            {
                                 do {
                                     let categories = try await refreshSidebarCategories(activeTeamID)
                                     if let activeUserID {
@@ -335,11 +340,12 @@ public struct MattermostLiveSyncService: Sendable {
 
                             var threadResult: MattermostThreadResponse?
                             if options.refreshThreadStateOnThreadEvent,
-                               let refreshThreadState,
-                               let threadRefresh = typedEvent.threadStateRefresh(
-                                   fallbackUserID: activeUserID,
-                                   fallbackTeamID: activeTeamID
-                               ) {
+                                let refreshThreadState,
+                                let threadRefresh = typedEvent.threadStateRefresh(
+                                    fallbackUserID: activeUserID,
+                                    fallbackTeamID: activeTeamID
+                                )
+                            {
                                 do {
                                     let thread = try await refreshThreadState(
                                         threadRefresh.userID,
@@ -455,7 +461,8 @@ public struct MattermostLiveSyncService: Sendable {
             return joinedChannels.map(\.id)
         }
 
-        return joinedChannels
+        return
+            joinedChannels
             .prefix(options.maxBackfillChannels)
             .map(\.id)
     }
@@ -519,9 +526,9 @@ public enum MattermostLiveEventStreamLifecycleEvent: Sendable {
     case reconnecting(attempt: Int, delay: Duration, failure: MattermostLiveEventStreamFailure? = nil)
 }
 
-public extension MattermostClient {
+extension MattermostClient {
     /// Creates a live sync coordinator for this client.
-    func liveSyncService() -> MattermostLiveSyncService {
+    public func liveSyncService() -> MattermostLiveSyncService {
         MattermostLiveSyncService(client: self)
     }
 }
@@ -537,8 +544,8 @@ private struct MattermostLiveSyncUnreadRefreshRequest: Equatable {
     let channelID: String
 }
 
-private extension MattermostTypedLiveEvent {
-    var requiresAuthoritativeWorkspaceRefresh: Bool {
+extension MattermostTypedLiveEvent {
+    fileprivate var requiresAuthoritativeWorkspaceRefresh: Bool {
         if case .cacheInvalidated = self {
             true
         } else {
@@ -546,7 +553,7 @@ private extension MattermostTypedLiveEvent {
         }
     }
 
-    var invalidatesSidebarCategories: Bool {
+    fileprivate var invalidatesSidebarCategories: Bool {
         switch self {
         case .preferencesChanged, .preferencesDeleted:
             true
@@ -555,14 +562,15 @@ private extension MattermostTypedLiveEvent {
         }
     }
 
-    func unreadRefreshes(
+    fileprivate func unreadRefreshes(
         options: MattermostLiveSyncOptions,
         fallbackUserID: String?
     ) -> [MattermostLiveSyncUnreadRefreshRequest] {
         switch self {
         case .channelViewed(let channelViewed) where options.refreshUnreadOnChannelViewed:
             guard let channelID = channelViewed.channelID,
-                  let userID = channelViewed.userID ?? fallbackUserID else {
+                let userID = channelViewed.userID ?? fallbackUserID
+            else {
                 return []
             }
             return [MattermostLiveSyncUnreadRefreshRequest(userID: userID, channelID: channelID)]
@@ -577,7 +585,8 @@ private extension MattermostTypedLiveEvent {
 
         case .postUnread(let invalidation) where options.refreshUnreadOnPostUnread:
             guard let channelID = invalidation.channelID,
-                  let userID = invalidation.userID ?? fallbackUserID else {
+                let userID = invalidation.userID ?? fallbackUserID
+            else {
                 return []
             }
             return [MattermostLiveSyncUnreadRefreshRequest(userID: userID, channelID: channelID)]
@@ -587,24 +596,25 @@ private extension MattermostTypedLiveEvent {
         }
     }
 
-    func threadStateRefresh(
+    fileprivate func threadStateRefresh(
         fallbackUserID: String?,
         fallbackTeamID: String?
     ) -> MattermostLiveSyncThreadStateRefreshRequest? {
         let threadEvent: MattermostThreadEvent
         switch self {
         case .response(let event),
-             .threadUpdated(let event),
-             .threadFollowChanged(let event),
-             .threadReadChanged(let event):
+            .threadUpdated(let event),
+            .threadFollowChanged(let event),
+            .threadReadChanged(let event):
             threadEvent = event
         default:
             return nil
         }
 
         guard let userID = (threadEvent.userID ?? fallbackUserID).nonEmpty,
-              let teamID = (threadEvent.teamID ?? fallbackTeamID).nonEmpty,
-              let threadID = (threadEvent.threadID ?? threadEvent.rootID ?? threadEvent.postID).nonEmpty else {
+            let teamID = (threadEvent.teamID ?? fallbackTeamID).nonEmpty,
+            let threadID = (threadEvent.threadID ?? threadEvent.rootID ?? threadEvent.postID).nonEmpty
+        else {
             return nil
         }
 

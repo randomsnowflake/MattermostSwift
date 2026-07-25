@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import MattermostSwift
 
 // Decoding coverage for the domain-split model files.
@@ -9,15 +10,15 @@ func decodesMattermostUser() throws {
     // MattermostUser has no custom CodingKeys, so the payload uses its exact
     // property names (camelCase) rather than the server's snake_case form.
     let payload = """
-    {
-        "id": "user123",
-        "username": "jdoe",
-        "email": "jdoe@example.com",
-        "firstName": "Jane",
-        "timezone": {"useAutomaticTimezone": "true"},
-        "lastPictureUpdate": 1700000000000
-    }
-    """
+        {
+            "id": "user123",
+            "username": "jdoe",
+            "email": "jdoe@example.com",
+            "firstName": "Jane",
+            "timezone": {"useAutomaticTimezone": "true"},
+            "lastPictureUpdate": 1700000000000
+        }
+        """
     let user = try JSONDecoder().decode(MattermostUser.self, from: Data(payload.utf8))
     #expect(user.id == "user123")
     #expect(user.username == "jdoe")
@@ -32,12 +33,12 @@ func decodesMattermostUserLastPictureUpdateFromSnakeCase() throws {
     // The production decoder converts the server's `last_picture_update`
     // snake_case key to `lastPictureUpdate` via `.convertFromSnakeCase`.
     let payload = """
-    {
-        "id": "user123",
-        "username": "jdoe",
-        "last_picture_update": 1700000000000
-    }
-    """
+        {
+            "id": "user123",
+            "username": "jdoe",
+            "last_picture_update": 1700000000000
+        }
+        """
     let user = try mattermostSnakeCaseDecoder.decode(MattermostUser.self, from: Data(payload.utf8))
     #expect(user.id == "user123")
     #expect(user.lastPictureUpdate == 1_700_000_000_000)
@@ -48,11 +49,11 @@ func decodesMattermostUserWithoutLastPictureUpdateAsNil() throws {
     // Servers that omit the field (or older versions) decode as nil because
     // the optional property uses `decodeIfPresent`.
     let payload = """
-    {
-        "id": "user123",
-        "username": "jdoe"
-    }
-    """
+        {
+            "id": "user123",
+            "username": "jdoe"
+        }
+        """
     let user = try mattermostSnakeCaseDecoder.decode(MattermostUser.self, from: Data(payload.utf8))
     #expect(user.lastPictureUpdate == nil)
 }
@@ -60,17 +61,17 @@ func decodesMattermostUserWithoutLastPictureUpdateAsNil() throws {
 @Test
 func decodesMattermostChannelAndComputedProps() throws {
     let payload = """
-    {
-        "id": "chan123",
-        "createAt": 1000,
-        "updateAt": 2000,
-        "teamId": "team1",
-        "name": "town-square",
-        "displayName": "Town Square",
-        "type": "O",
-        "deleteAt": 0
-    }
-    """
+        {
+            "id": "chan123",
+            "createAt": 1000,
+            "updateAt": 2000,
+            "teamId": "team1",
+            "name": "town-square",
+            "displayName": "Town Square",
+            "type": "O",
+            "deleteAt": 0
+        }
+        """
     let channel = try JSONDecoder().decode(MattermostChannel.self, from: Data(payload.utf8))
     #expect(channel.id == "chan123")
     #expect(channel.name == "town-square")
@@ -83,22 +84,22 @@ func decodesMattermostChannelAndComputedProps() throws {
 @Test
 func decodesMattermostPostAndComputedProps() throws {
     let payload = """
-    {
-        "id": "post123",
-        "createAt": 100,
-        "updateAt": 200,
-        "editAt": 300,
-        "deleteAt": 0,
-        "userId": "user123",
-        "channelId": "chan123",
-        "rootId": "",
-        "message": "hello world",
-        "type": "",
-        "replyCount": 4,
-        "lastReplyAt": 500,
-        "isFollowing": true
-    }
-    """
+        {
+            "id": "post123",
+            "createAt": 100,
+            "updateAt": 200,
+            "editAt": 300,
+            "deleteAt": 0,
+            "userId": "user123",
+            "channelId": "chan123",
+            "rootId": "",
+            "message": "hello world",
+            "type": "",
+            "replyCount": 4,
+            "lastReplyAt": 500,
+            "isFollowing": true
+        }
+        """
     let post = try JSONDecoder().decode(MattermostPost.self, from: Data(payload.utf8))
     #expect(post.id == "post123")
     #expect(post.message == "hello world")
@@ -115,27 +116,27 @@ func decodesMattermostPostAndComputedProps() throws {
 @Test
 func decodesMattermostPostEmbeddedMetadata() throws {
     let payload = """
-    {
-        "id": "post123",
-        "createAt": 100,
-        "updateAt": 200,
-        "editAt": 0,
-        "deleteAt": 0,
-        "userId": "user123",
-        "channelId": "chan123",
-        "rootId": "",
-        "message": "with files",
-        "type": "",
-        "metadata": {
-            "files": [
-                {"id": "file1", "name": "report.pdf", "extension": "pdf", "size": 1024, "mimeType": "application/pdf"}
-            ],
-            "reactions": [
-                {"userId": "user123", "postId": "post123", "emojiName": "thumbsup", "createAt": 100}
-            ]
+        {
+            "id": "post123",
+            "createAt": 100,
+            "updateAt": 200,
+            "editAt": 0,
+            "deleteAt": 0,
+            "userId": "user123",
+            "channelId": "chan123",
+            "rootId": "",
+            "message": "with files",
+            "type": "",
+            "metadata": {
+                "files": [
+                    {"id": "file1", "name": "report.pdf", "extension": "pdf", "size": 1024, "mimeType": "application/pdf"}
+                ],
+                "reactions": [
+                    {"userId": "user123", "postId": "post123", "emojiName": "thumbsup", "createAt": 100}
+                ]
+            }
         }
-    }
-    """
+        """
     let post = try JSONDecoder().decode(MattermostPost.self, from: Data(payload.utf8))
     #expect(post.postMetadata?.files?.count == 1)
     #expect(post.postMetadata?.files?.first?.name == "report.pdf")
@@ -150,22 +151,22 @@ func decodesMattermostPostEmbeddedMetadata() throws {
 func decodesMattermostPostWithMalformedMetadataAsNil() throws {
     // Malformed embedded metadata must never fail post decoding.
     let payload = """
-    {
-        "id": "post123",
-        "createAt": 100,
-        "updateAt": 200,
-        "editAt": 0,
-        "deleteAt": 0,
-        "userId": "user123",
-        "channelId": "chan123",
-        "rootId": "",
-        "message": "bad metadata",
-        "type": "",
-        "metadata": {
-            "files": [{"name": 42}]
+        {
+            "id": "post123",
+            "createAt": 100,
+            "updateAt": 200,
+            "editAt": 0,
+            "deleteAt": 0,
+            "userId": "user123",
+            "channelId": "chan123",
+            "rootId": "",
+            "message": "bad metadata",
+            "type": "",
+            "metadata": {
+                "files": [{"name": 42}]
+            }
         }
-    }
-    """
+        """
     let post = try JSONDecoder().decode(MattermostPost.self, from: Data(payload.utf8))
     #expect(post.id == "post123")
     #expect(post.postMetadata == nil)
@@ -174,15 +175,15 @@ func decodesMattermostPostWithMalformedMetadataAsNil() throws {
 @Test
 func decodesMattermostSidebarCategory() throws {
     let payload = """
-    {
-        "id": "cat123",
-        "userId": "user123",
-        "teamId": "team1",
-        "displayName": "Favorites",
-        "type": "custom",
-        "channelIds": ["chan1", "chan2"]
-    }
-    """
+        {
+            "id": "cat123",
+            "userId": "user123",
+            "teamId": "team1",
+            "displayName": "Favorites",
+            "type": "custom",
+            "channelIds": ["chan1", "chan2"]
+        }
+        """
     let category = try JSONDecoder().decode(MattermostSidebarCategory.self, from: Data(payload.utf8))
     #expect(category.id == "cat123")
     #expect(category.displayName == "Favorites")
@@ -194,14 +195,14 @@ func decodesMattermostSidebarCategory() throws {
 @Test
 func decodesMattermostChannelStatsWithServerKeys() throws {
     let payload = """
-    {
-        "channel_id": "chan123",
-        "member_count": 42,
-        "guest_count": 3,
-        "pinnedpost_count": 5,
-        "total_msg_count": 1000
-    }
-    """
+        {
+            "channel_id": "chan123",
+            "member_count": 42,
+            "guest_count": 3,
+            "pinnedpost_count": 5,
+            "total_msg_count": 1000
+        }
+        """
     let stats = try mattermostSnakeCaseDecoder.decode(MattermostChannelStats.self, from: Data(payload.utf8))
     #expect(stats.channelId == "chan123")
     #expect(stats.memberCount == 42)
@@ -215,18 +216,18 @@ func decodesChannelRootUnreadCounters() throws {
     // Decode via the production snake_case decoder so the test reflects real
     // wire data from CRT-enabled servers.
     let payload = """
-    {
-        "id": "chan123",
-        "team_id": "team1",
-        "name": "town-square",
-        "display_name": "Town Square",
-        "type": "O",
-        "total_msg_count": 1000,
-        "total_msg_count_root": 400,
-        "last_post_at": 5000,
-        "last_root_post_at": 4800
-    }
-    """
+        {
+            "id": "chan123",
+            "team_id": "team1",
+            "name": "town-square",
+            "display_name": "Town Square",
+            "type": "O",
+            "total_msg_count": 1000,
+            "total_msg_count_root": 400,
+            "last_post_at": 5000,
+            "last_root_post_at": 4800
+        }
+        """
     let channel = try mattermostSnakeCaseDecoder.decode(MattermostChannel.self, from: Data(payload.utf8))
     #expect(channel.id == "chan123")
     #expect(channel.totalMsgCount == 1000)
@@ -238,15 +239,15 @@ func decodesChannelRootUnreadCounters() throws {
 @Test
 func decodesChannelMemberRootCounters() throws {
     let payload = """
-    {
-        "channel_id": "chan123",
-        "user_id": "user123",
-        "msg_count": 100,
-        "mention_count": 3,
-        "msg_count_root": 40,
-        "mention_count_root": 1
-    }
-    """
+        {
+            "channel_id": "chan123",
+            "user_id": "user123",
+            "msg_count": 100,
+            "mention_count": 3,
+            "msg_count_root": 40,
+            "mention_count_root": 1
+        }
+        """
     let member = try mattermostSnakeCaseDecoder.decode(MattermostChannelMember.self, from: Data(payload.utf8))
     #expect(member.channelId == "chan123")
     #expect(member.userId == "user123")
@@ -259,13 +260,13 @@ func decodesChannelMemberRootCounters() throws {
 @Test
 func mattermostUserSessionDescriptionRedactsToken() throws {
     let payload = """
-    {
-      "id": "session-1",
-      "user_id": "user-1",
-      "expires_at": 12345,
-      "token": "super-secret-token"
-    }
-    """
+        {
+          "id": "session-1",
+          "user_id": "user-1",
+          "expires_at": 12345,
+          "token": "super-secret-token"
+        }
+        """
     let session = try mattermostSnakeCaseDecoder.decode(MattermostUserSession.self, from: Data(payload.utf8))
 
     #expect(session.token == "super-secret-token")
@@ -276,12 +277,12 @@ func mattermostUserSessionDescriptionRedactsToken() throws {
 @Test
 func decodesMattermostServerPingWithCustomKeys() throws {
     let payload = """
-    {
-        "status": "OK",
-        "ActiveSearchBackend": "database",
-        "AndroidLatestVersion": "2.0.0"
-    }
-    """
+        {
+            "status": "OK",
+            "ActiveSearchBackend": "database",
+            "AndroidLatestVersion": "2.0.0"
+        }
+        """
     let ping = try JSONDecoder().decode(MattermostServerPing.self, from: Data(payload.utf8))
     #expect(ping.status == "OK")
     #expect(ping.activeSearchBackend == "database")

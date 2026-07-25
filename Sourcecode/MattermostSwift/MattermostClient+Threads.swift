@@ -19,7 +19,7 @@ extension MattermostClient {
         // snake_case parameters used elsewhere. This matches Mattermost's
         // `GET /posts/{post_id}/thread` contract — do not "normalize" these to snake_case.
         var queryItems = [
-            URLQueryItem(name: "perPage", value: String(perPage)),
+            URLQueryItem(name: "perPage", value: String(perPage))
         ]
 
         if let fromPost, !fromPost.isEmpty {
@@ -43,7 +43,8 @@ extension MattermostClient {
         }
 
         if let collapsedThreadsExtended {
-            queryItems.append(URLQueryItem(name: "collapsedThreadsExtended", value: collapsedThreadsExtended ? "true" : "false"))
+            queryItems.append(
+                URLQueryItem(name: "collapsedThreadsExtended", value: collapsedThreadsExtended ? "true" : "false"))
         }
 
         return try await httpClient.get("/posts/\(postID)/thread", queryItems: queryItems)

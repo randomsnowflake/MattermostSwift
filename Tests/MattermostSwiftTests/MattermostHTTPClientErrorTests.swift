@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import MattermostSwift
 
 @Suite(.serialized)
@@ -224,17 +225,19 @@ struct MattermostHTTPClientErrorTests {
 
         let secret = try await client.generateMFA(userID: "user-id")
         let mfaStatus = try await client.activateMFA(userID: "user-id", code: "123456", activate: true)
-        let passwordStatus = try await client.changePassword(userID: "user-id", currentPassword: "old", newPassword: "new")
+        let passwordStatus = try await client.changePassword(
+            userID: "user-id", currentPassword: "old", newPassword: "new")
 
         #expect(secret.secret == "SECRET")
         #expect(secret.qrCode == "base64-qr")
         #expect(mfaStatus.isOK)
         #expect(passwordStatus.isOK)
-        #expect(requested.values == [
-            "POST https://mattermost.example.com/api/v4/users/user-id/mfa/generate",
-            "PUT https://mattermost.example.com/api/v4/users/user-id/mfa",
-            "PUT https://mattermost.example.com/api/v4/users/user-id/password",
-        ])
+        #expect(
+            requested.values == [
+                "POST https://mattermost.example.com/api/v4/users/user-id/mfa/generate",
+                "PUT https://mattermost.example.com/api/v4/users/user-id/mfa",
+                "PUT https://mattermost.example.com/api/v4/users/user-id/password",
+            ])
     }
 
     @Test
@@ -245,7 +248,9 @@ struct MattermostHTTPClientErrorTests {
             if request.url?.path.hasSuffix("/sessions") == true {
                 return try Self.response(
                     statusCode: 200,
-                    body: Data(#"[{"id":"session-id","user_id":"user-id","device_id":"ios","create_at":1000,"last_activity_at":2000,"props":{"platform":"ios"},"token":"session-token"}]"#.utf8),
+                    body: Data(
+                        #"[{"id":"session-id","user_id":"user-id","device_id":"ios","create_at":1000,"last_activity_at":2000,"props":{"platform":"ios"},"token":"session-token"}]"#
+                            .utf8),
                     request: request
                 )
             }
@@ -266,17 +271,20 @@ struct MattermostHTTPClientErrorTests {
         #expect(sessions.first?.props?["platform"] == .string("ios"))
         #expect(single.isOK)
         #expect(all.isOK)
-        #expect(requested.values == [
-            "GET https://mattermost.example.com/api/v4/users/user-id/sessions",
-            "POST https://mattermost.example.com/api/v4/users/user-id/sessions/revoke",
-            "POST https://mattermost.example.com/api/v4/users/user-id/sessions/revoke/all",
-        ])
+        #expect(
+            requested.values == [
+                "GET https://mattermost.example.com/api/v4/users/user-id/sessions",
+                "POST https://mattermost.example.com/api/v4/users/user-id/sessions/revoke",
+                "POST https://mattermost.example.com/api/v4/users/user-id/sessions/revoke/all",
+            ])
     }
 
     @Test
     func clientManagesChannelLifecycleEndpoints() async throws {
         let requested = MattermostRequestLog()
-        let channelJSON = Data(#"{"id":"channel-id","team_id":"team-id","name":"town","display_name":"Town","type":"P","delete_at":0}"#.utf8)
+        let channelJSON = Data(
+            #"{"id":"channel-id","team_id":"team-id","name":"town","display_name":"Town","type":"P","delete_at":0}"#
+                .utf8)
         let client = try await Self.makeClient { request in
             requested.append("\(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
             if request.url?.path.hasSuffix("/privacy") == true {
@@ -305,11 +313,12 @@ struct MattermostHTTPClientErrorTests {
         #expect(restored.id == "channel-id")
         #expect(privateChannel.type == "P")
         #expect(converted.id == "channel-id")
-        #expect(requested.values == [
-            "POST https://mattermost.example.com/api/v4/channels/channel-id/restore",
-            "PUT https://mattermost.example.com/api/v4/channels/channel-id/privacy",
-            "POST https://mattermost.example.com/api/v4/channels/gm-id/convert_to_channel",
-        ])
+        #expect(
+            requested.values == [
+                "POST https://mattermost.example.com/api/v4/channels/channel-id/restore",
+                "PUT https://mattermost.example.com/api/v4/channels/channel-id/privacy",
+                "POST https://mattermost.example.com/api/v4/channels/gm-id/convert_to_channel",
+            ])
     }
 
     @Test
@@ -324,10 +333,11 @@ struct MattermostHTTPClientErrorTests {
         _ = try await client.pinPost(id: "post-id")
         _ = try await client.unpinPost(id: "post-id")
 
-        #expect(requested.values == [
-            "POST https://mattermost.example.com/api/v4/posts/post-id/pin",
-            "POST https://mattermost.example.com/api/v4/posts/post-id/unpin",
-        ])
+        #expect(
+            requested.values == [
+                "POST https://mattermost.example.com/api/v4/posts/post-id/pin",
+                "POST https://mattermost.example.com/api/v4/posts/post-id/unpin",
+            ])
     }
 
     @Test
@@ -342,10 +352,11 @@ struct MattermostHTTPClientErrorTests {
         _ = try await client.setThreadFollowing(teamID: "team-id", threadID: "thread-id", following: true)
         _ = try await client.setThreadFollowing(teamID: "team-id", threadID: "thread-id", following: false)
 
-        #expect(requested.values == [
-            "PUT https://mattermost.example.com/api/v4/users/me/teams/team-id/threads/thread-id/following",
-            "DELETE https://mattermost.example.com/api/v4/users/me/teams/team-id/threads/thread-id/following",
-        ])
+        #expect(
+            requested.values == [
+                "PUT https://mattermost.example.com/api/v4/users/me/teams/team-id/threads/thread-id/following",
+                "DELETE https://mattermost.example.com/api/v4/users/me/teams/team-id/threads/thread-id/following",
+            ])
     }
 
     @Test
@@ -364,19 +375,23 @@ struct MattermostHTTPClientErrorTests {
             return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
         }
 
-        _ = try await client.setCustomStatus(MattermostCustomStatus(emoji: "coffee", text: "Deep work", duration: "one_hour"))
+        _ = try await client.setCustomStatus(
+            MattermostCustomStatus(emoji: "coffee", text: "Deep work", duration: "one_hour"))
         _ = try await client.clearCustomStatus()
 
-        #expect(requested.values == [
-            "PUT https://mattermost.example.com/api/v4/users/me/status/custom",
-            "DELETE https://mattermost.example.com/api/v4/users/me/status/custom",
-        ])
+        #expect(
+            requested.values == [
+                "PUT https://mattermost.example.com/api/v4/users/me/status/custom",
+                "DELETE https://mattermost.example.com/api/v4/users/me/status/custom",
+            ])
     }
 
     @Test
     func clientClampsChannelUsersPagination() async throws {
         let client = try await Self.makeClient { request in
-            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users?in_channel=channel-id&page=0&per_page=1")
+            #expect(
+                request.url?.absoluteString
+                    == "https://mattermost.example.com/api/v4/users?in_channel=channel-id&page=0&per_page=1")
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
 
@@ -388,7 +403,9 @@ struct MattermostHTTPClientErrorTests {
     @Test
     func clientClampsChannelMembersPagination() async throws {
         let client = try await Self.makeClient { request in
-            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/members?page=0&per_page=1")
+            #expect(
+                request.url?.absoluteString
+                    == "https://mattermost.example.com/api/v4/channels/channel-id/members?page=0&per_page=1")
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
 
@@ -400,7 +417,10 @@ struct MattermostHTTPClientErrorTests {
     @Test
     func clientClampsPublicChannelPagination() async throws {
         let client = try await Self.makeClient { request in
-            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/teams/team-id/channels?page=0&per_page=1&include_deleted=false")
+            #expect(
+                request.url?.absoluteString
+                    == "https://mattermost.example.com/api/v4/teams/team-id/channels?page=0&per_page=1&include_deleted=false"
+            )
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
 
@@ -412,7 +432,10 @@ struct MattermostHTTPClientErrorTests {
     @Test
     func clientClampsTeamMemberPagination() async throws {
         let client = try await Self.makeClient { request in
-            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/teams/team-id/members?page=0&per_page=1&exclude_deleted_users=true")
+            #expect(
+                request.url?.absoluteString
+                    == "https://mattermost.example.com/api/v4/teams/team-id/members?page=0&per_page=1&exclude_deleted_users=true"
+            )
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
 
@@ -429,7 +452,9 @@ struct MattermostHTTPClientErrorTests {
     @Test
     func clientClampsChannelPostsPagination() async throws {
         let client = try await Self.makeClient { request in
-            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/posts?page=0&per_page=1")
+            #expect(
+                request.url?.absoluteString
+                    == "https://mattermost.example.com/api/v4/channels/channel-id/posts?page=0&per_page=1")
             return try Self.response(statusCode: 200, body: Data(#"{"order":[],"posts":{}}"#.utf8), request: request)
         }
 
@@ -465,7 +490,9 @@ struct MattermostHTTPClientErrorTests {
     @Test
     func clientClampsCustomEmojiPagination() async throws {
         let client = try await Self.makeClient { request in
-            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/emoji?page=0&per_page=1&sort=name")
+            #expect(
+                request.url?.absoluteString == "https://mattermost.example.com/api/v4/emoji?page=0&per_page=1&sort=name"
+            )
             return try Self.response(statusCode: 200, body: Data("[]".utf8), request: request)
         }
 
@@ -485,26 +512,29 @@ struct MattermostHTTPClientErrorTests {
         )
 
         let client = try await Self.makeClient { request in
-            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id/posts?since=1780000000000")
-            let body = Data("""
-            {
-              "order": ["missed-post"],
-              "posts": {
-                "missed-post": {
-                  "id": "missed-post",
-                  "create_at": 1780000000100,
-                  "update_at": 1780000000200,
-                  "edit_at": 0,
-                  "delete_at": 0,
-                  "user_id": "user-id",
-                  "channel_id": "channel-id",
-                  "root_id": "",
-                  "message": "missed while socket was down",
-                  "type": ""
+            #expect(
+                request.url?.absoluteString
+                    == "https://mattermost.example.com/api/v4/channels/channel-id/posts?since=1780000000000")
+            let body = Data(
+                """
+                {
+                  "order": ["missed-post"],
+                  "posts": {
+                    "missed-post": {
+                      "id": "missed-post",
+                      "create_at": 1780000000100,
+                      "update_at": 1780000000200,
+                      "edit_at": 0,
+                      "delete_at": 0,
+                      "user_id": "user-id",
+                      "channel_id": "channel-id",
+                      "root_id": "",
+                      "message": "missed while socket was down",
+                      "type": ""
+                    }
+                  }
                 }
-              }
-            }
-            """.utf8)
+                """.utf8)
             return try Self.response(statusCode: 200, body: body, request: request)
         }
 
@@ -571,16 +601,17 @@ struct MattermostHTTPClientErrorTests {
                 #expect(!request.httpShouldHandleCookies)
                 let body = Data(#"{"id":"user-id","username":"alice"}"#.utf8)
                 let url = try #require(request.url)
-                let response = try #require(HTTPURLResponse(
-                    url: url,
-                    statusCode: 200,
-                    httpVersion: "HTTP/1.1",
-                    headerFields: [
-                        "Content-Type": "application/json",
-                        "Token": "header-session-token",
-                        "Set-Cookie": "MMAUTHTOKEN=cookie-session-token; Path=/; HttpOnly",
-                    ]
-                ))
+                let response = try #require(
+                    HTTPURLResponse(
+                        url: url,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: [
+                            "Content-Type": "application/json",
+                            "Token": "header-session-token",
+                            "Set-Cookie": "MMAUTHTOKEN=cookie-session-token; Path=/; HttpOnly",
+                        ]
+                    ))
                 return (response, body)
             }
         )
@@ -602,15 +633,16 @@ struct MattermostHTTPClientErrorTests {
                 #expect(!request.httpShouldHandleCookies)
                 let body = Data(#"{"id":"user-id","username":"alice"}"#.utf8)
                 let url = try #require(request.url)
-                let response = try #require(HTTPURLResponse(
-                    url: url,
-                    statusCode: 200,
-                    httpVersion: "HTTP/1.1",
-                    headerFields: [
-                        "Content-Type": "application/json",
-                        "Set-Cookie": "MMAUTHTOKEN=cookie-session-token; Path=/; HttpOnly",
-                    ]
-                ))
+                let response = try #require(
+                    HTTPURLResponse(
+                        url: url,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: [
+                            "Content-Type": "application/json",
+                            "Set-Cookie": "MMAUTHTOKEN=cookie-session-token; Path=/; HttpOnly",
+                        ]
+                    ))
                 return (response, body)
             }
         )
@@ -644,19 +676,20 @@ struct MattermostHTTPClientErrorTests {
             urlSession: await Self.urlSession { request in
                 let body = Data(#"{"id":"user-id","username":"alice"}"#.utf8)
                 let url = try #require(request.url)
-                let response = try #require(HTTPURLResponse(
-                    url: url,
-                    statusCode: 200,
-                    httpVersion: "HTTP/1.1",
-                    headerFields: [
-                        "Content-Type": "application/json",
-                        "Set-Cookie": [
-                            "MMUSERID=user-id; Path=/; Expires=Tue, 16 Jun 2037 13:00:00 GMT",
-                            "MMAUTHTOKEN=cookie-session-token; Path=/; Expires=Tue, 16 Jun 2037 13:00:00 GMT; HttpOnly",
-                            "MMCSRF=csrf-token; Path=/; Expires=Tue, 16 Jun 2037 13:00:00 GMT",
-                        ].joined(separator: ", "),
-                    ]
-                ))
+                let response = try #require(
+                    HTTPURLResponse(
+                        url: url,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: [
+                            "Content-Type": "application/json",
+                            "Set-Cookie": [
+                                "MMUSERID=user-id; Path=/; Expires=Tue, 16 Jun 2037 13:00:00 GMT",
+                                "MMAUTHTOKEN=cookie-session-token; Path=/; Expires=Tue, 16 Jun 2037 13:00:00 GMT; HttpOnly",
+                                "MMCSRF=csrf-token; Path=/; Expires=Tue, 16 Jun 2037 13:00:00 GMT",
+                            ].joined(separator: ", "),
+                        ]
+                    ))
                 return (response, body)
             }
         )

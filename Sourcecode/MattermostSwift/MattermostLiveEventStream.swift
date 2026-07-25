@@ -94,7 +94,8 @@ public struct MattermostLiveEventStream: Sendable {
                             return
                         }
                         let delay = policy.delay(for: attempt)
-                        try Self.yield(.reconnecting(attempt: attempt, delay: delay, failure: failure), to: continuation)
+                        try Self.yield(
+                            .reconnecting(attempt: attempt, delay: delay, failure: failure), to: continuation)
                         do {
                             try await Task.sleep(for: delay)
                         } catch {
@@ -196,10 +197,11 @@ public struct MattermostLiveEventStream: Sendable {
                 timeoutMessage: "Mattermost WebSocket ping timed out.",
                 onTimeout: {
                     webSocketTask.cancel(with: .goingAway, reason: nil)
+                },
+                operation: {
+                    try await self.sendPing(to: webSocketTask)
                 }
-            ) {
-                try await self.sendPing(to: webSocketTask)
-            }
+            )
             try Self.validateWebSocketTaskState(webSocketTask.state)
         }
     }
@@ -321,7 +323,6 @@ public struct MattermostLiveEventStream: Sendable {
         }
     }
 
-
     private func receiveEvent(from webSocketTask: URLSessionWebSocketTask) async throws -> MattermostLiveEvent? {
         do {
             return try await receiveEnvelope(from: webSocketTask).liveEvent
@@ -330,7 +331,9 @@ public struct MattermostLiveEventStream: Sendable {
         }
     }
 
-    private func receiveEnvelope(from webSocketTask: URLSessionWebSocketTask) async throws -> MattermostWebSocketEnvelope {
+    private func receiveEnvelope(from webSocketTask: URLSessionWebSocketTask) async throws
+        -> MattermostWebSocketEnvelope
+    {
         let message = try await receive(from: webSocketTask)
         let data: Data
         switch message {
@@ -345,7 +348,9 @@ public struct MattermostLiveEventStream: Sendable {
         return try mattermostSnakeCaseDecoder.decode(MattermostWebSocketEnvelope.self, from: data)
     }
 
-    private func send(_ message: URLSessionWebSocketTask.Message, to webSocketTask: URLSessionWebSocketTask) async throws {
+    private func send(_ message: URLSessionWebSocketTask.Message, to webSocketTask: URLSessionWebSocketTask)
+        async throws
+    {
         try await webSocketTask.send(message)
     }
 
@@ -487,7 +492,8 @@ public struct MattermostLiveEventReconnectPolicy: Equatable, Sendable {
     public func delay(for attempt: Int) -> Duration {
         let exponent = pow(multiplier, Double(max(0, attempt)))
         let computedSeconds = initialDelaySeconds * exponent
-        let delaySeconds = computedSeconds.isFinite
+        let delaySeconds =
+            computedSeconds.isFinite
             ? min(maxDelaySeconds, computedSeconds)
             : maxDelaySeconds
         let milliseconds = min(

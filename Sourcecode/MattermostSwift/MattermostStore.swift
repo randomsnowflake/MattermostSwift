@@ -199,22 +199,27 @@ public final class MattermostStore {
     public func replaceJoinedChannels(_ channels: [MattermostChannel], teamID: String) throws {
         try upsert(channels: channels)
         let retained = Set(channels.map(\.id))
-        let existing = try context.fetch(FetchDescriptor<MattermostCachedChannel>(
-            predicate: #Predicate { $0.teamId == teamID }
-        ))
+        let existing = try context.fetch(
+            FetchDescriptor<MattermostCachedChannel>(
+                predicate: #Predicate { $0.teamId == teamID }
+            ))
         for channel in existing where !retained.contains(channel.id) {
             let channelID = channel.id
             try deleteChannelContent(channelID: channelID)
-            for member in try context.fetch(FetchDescriptor<MattermostCachedChannelMember>(
-                predicate: #Predicate { $0.channelId == channelID }
-            )) {
+            for member in try context.fetch(
+                FetchDescriptor<MattermostCachedChannelMember>(
+                    predicate: #Predicate { $0.channelId == channelID }
+                ))
+            {
                 context.delete(member)
             }
             context.delete(channel)
         }
     }
 
-    public func markChannelDeleted(id: String, at deletedAt: Int64 = Int64(Date.now.timeIntervalSince1970 * 1000)) throws {
+    public func markChannelDeleted(id: String, at deletedAt: Int64 = Int64(Date.now.timeIntervalSince1970 * 1000))
+        throws
+    {
         if let cached = try cachedChannel(id: id, includeDeleted: true) {
             cached.markDeleted(at: deletedAt)
         }
@@ -271,13 +276,16 @@ public final class MattermostStore {
         teamID: String
     ) throws {
         try upsert(members: members)
-        let teamChannelIDs = Set(try context.fetch(FetchDescriptor<MattermostCachedChannel>(
-            predicate: #Predicate { $0.teamId == teamID }
-        )).map(\.id))
+        let teamChannelIDs = Set(
+            try context.fetch(
+                FetchDescriptor<MattermostCachedChannel>(
+                    predicate: #Predicate { $0.teamId == teamID }
+                )
+            ).map(\.id))
         let retained = Set(members.map(\.channelId))
         let existing = try cachedChannelMembers(userID: userID)
         for member in existing
-            where teamChannelIDs.contains(member.channelId) && !retained.contains(member.channelId) {
+        where teamChannelIDs.contains(member.channelId) && !retained.contains(member.channelId) {
             context.delete(member)
         }
     }
@@ -337,7 +345,9 @@ public final class MattermostStore {
     }
 
     @discardableResult
-    public func upsert(thread: MattermostThreadResponse, userID: String, teamID: String) throws -> MattermostCachedThread {
+    public func upsert(thread: MattermostThreadResponse, userID: String, teamID: String) throws
+        -> MattermostCachedThread
+    {
         if let post = thread.post {
             try upsert(post: post)
         }
@@ -360,7 +370,9 @@ public final class MattermostStore {
     }
 
     @discardableResult
-    private func upsertThreadState(_ thread: MattermostThreadResponse, userID: String, teamID: String) throws -> MattermostCachedThread {
+    private func upsertThreadState(_ thread: MattermostThreadResponse, userID: String, teamID: String) throws
+        -> MattermostCachedThread
+    {
         let id = MattermostCachedThread.cacheID(rootID: thread.id, userID: userID, teamID: teamID)
         if let cached = try cachedThreadState(id: id) {
             cached.apply(thread, userID: userID, teamID: teamID)
@@ -399,7 +411,8 @@ public final class MattermostStore {
         }
         var byID = Dictionary(existing.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for reaction in reactions {
-            let id = MattermostCachedReaction.cacheID(userID: reaction.userId, postID: reaction.postId, emojiName: reaction.emojiName)
+            let id = MattermostCachedReaction.cacheID(
+                userID: reaction.userId, postID: reaction.postId, emojiName: reaction.emojiName)
             if let cached = byID[id] {
                 cached.apply(reaction)
             } else {
@@ -478,9 +491,10 @@ public final class MattermostStore {
     ) throws {
         try upsert(sidebarCategories: categories)
         let retained = Set(categories.map(\.id))
-        let existing = try context.fetch(FetchDescriptor<MattermostCachedSidebarCategory>(
-            predicate: #Predicate { $0.userId == userID && $0.teamId == teamID }
-        ))
+        let existing = try context.fetch(
+            FetchDescriptor<MattermostCachedSidebarCategory>(
+                predicate: #Predicate { $0.userId == userID && $0.teamId == teamID }
+            ))
         for category in existing where !retained.contains(category.id) {
             context.delete(category)
         }
@@ -489,9 +503,10 @@ public final class MattermostStore {
     /// Removes unread rows for channels no longer present in an authoritative team response.
     public func reconcileChannelUnreads(userID: String, teamID: String, channelIDs: [String]) throws {
         let retained = Set(channelIDs)
-        let existing = try context.fetch(FetchDescriptor<MattermostCachedChannelUnread>(
-            predicate: #Predicate { $0.userId == userID && $0.teamId == teamID }
-        ))
+        let existing = try context.fetch(
+            FetchDescriptor<MattermostCachedChannelUnread>(
+                predicate: #Predicate { $0.userId == userID && $0.teamId == teamID }
+            ))
         for unread in existing where !retained.contains(unread.channelId) {
             context.delete(unread)
         }
@@ -551,9 +566,10 @@ public final class MattermostStore {
         if includeDeleted {
             descriptor = FetchDescriptor(predicate: #Predicate { $0.id == id })
         } else {
-            descriptor = FetchDescriptor(predicate: #Predicate {
-                $0.id == id && ($0.deleteAt == nil || $0.deleteAt == 0)
-            })
+            descriptor = FetchDescriptor(
+                predicate: #Predicate {
+                    $0.id == id && ($0.deleteAt == nil || $0.deleteAt == 0)
+                })
         }
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
@@ -573,20 +589,22 @@ public final class MattermostStore {
             )
         }
         if let teamID {
-            return try context.fetch(FetchDescriptor(
-                predicate: #Predicate {
-                    $0.teamId == teamID && ($0.deleteAt == nil || $0.deleteAt == 0)
-                },
-                sortBy: sort
-            ))
+            return try context.fetch(
+                FetchDescriptor(
+                    predicate: #Predicate {
+                        $0.teamId == teamID && ($0.deleteAt == nil || $0.deleteAt == 0)
+                    },
+                    sortBy: sort
+                ))
         }
         if includeDeleted {
             return try context.fetch(FetchDescriptor(sortBy: sort))
         }
-        return try context.fetch(FetchDescriptor(
-            predicate: #Predicate { $0.deleteAt == nil || $0.deleteAt == 0 },
-            sortBy: sort
-        ))
+        return try context.fetch(
+            FetchDescriptor(
+                predicate: #Predicate { $0.deleteAt == nil || $0.deleteAt == 0 },
+                sortBy: sort
+            ))
     }
 
     /// Returns immutable channel values that can safely be retained or sent to another actor.
@@ -732,7 +750,9 @@ public final class MattermostStore {
         return try context.fetch(descriptor).first
     }
 
-    public func cachedThreadStates(userID: String? = nil, teamID: String? = nil, unreadOnly: Bool = false) throws -> [MattermostCachedThread] {
+    public func cachedThreadStates(userID: String? = nil, teamID: String? = nil, unreadOnly: Bool = false) throws
+        -> [MattermostCachedThread]
+    {
         var descriptor = FetchDescriptor<MattermostCachedThread>(
             sortBy: [SortDescriptor(\MattermostCachedThread.lastReplyAt, order: .reverse)]
         )
@@ -816,9 +836,11 @@ public final class MattermostStore {
         for post in posts {
             context.delete(post)
         }
-        for unread in try context.fetch(FetchDescriptor<MattermostCachedChannelUnread>(
-            predicate: #Predicate { $0.channelId == channelID }
-        )) {
+        for unread in try context.fetch(
+            FetchDescriptor<MattermostCachedChannelUnread>(
+                predicate: #Predicate { $0.channelId == channelID }
+            ))
+        {
             context.delete(unread)
         }
         try deleteCachedPostContent(postIDs: posts.map(\.id))
@@ -828,16 +850,23 @@ public final class MattermostStore {
         guard !postIDs.isEmpty else {
             return
         }
-        for reaction in try fetchInBatches(ids: postIDs, descriptor: { chunkIDs in
-            FetchDescriptor<MattermostCachedReaction>(predicate: #Predicate { chunkIDs.contains($0.postId) })
-        }) {
+        for reaction in try fetchInBatches(
+            ids: postIDs,
+            descriptor: { chunkIDs in
+                FetchDescriptor<MattermostCachedReaction>(predicate: #Predicate { chunkIDs.contains($0.postId) })
+            })
+        {
             context.delete(reaction)
         }
-        for file in try fetchInBatches(ids: postIDs, descriptor: { chunkIDs in
-            FetchDescriptor<MattermostCachedFile>(predicate: #Predicate { file in
-                if let pid = file.postId { return chunkIDs.contains(pid) } else { return false }
+        for file in try fetchInBatches(
+            ids: postIDs,
+            descriptor: { chunkIDs in
+                FetchDescriptor<MattermostCachedFile>(
+                    predicate: #Predicate { file in
+                        if let pid = file.postId { return chunkIDs.contains(pid) } else { return false }
+                    })
             })
-        }) {
+        {
             context.delete(file)
         }
     }
@@ -917,7 +946,8 @@ public final class MattermostStore {
             if let post {
                 try upsert(post: post)
             } else if let postID = liveEvent.stringData("post_id") ?? liveEvent.stringData("postId") {
-                let deletedAt = liveEvent.int64Data("delete_at")
+                let deletedAt =
+                    liveEvent.int64Data("delete_at")
                     ?? liveEvent.int64Data("deleteAt")
                     ?? liveEvent.int64Data("update_at")
                     ?? liveEvent.int64Data("updateAt")
@@ -958,7 +988,8 @@ public final class MattermostStore {
         case .channelDeleted(let channel, let channelID):
             if let channel {
                 try upsert(channel: channel)
-                try markChannelDeleted(id: channel.id, at: channel.deleteAt ?? Int64(Date.now.timeIntervalSince1970 * 1000))
+                try markChannelDeleted(
+                    id: channel.id, at: channel.deleteAt ?? Int64(Date.now.timeIntervalSince1970 * 1000))
                 try deleteChannelContent(channelID: channel.id)
             } else if let channelID {
                 try markChannelDeleted(id: channelID)
@@ -973,18 +1004,18 @@ public final class MattermostStore {
                 try upsert(user: user)
             }
         case .hello,
-             .typing,
-             .channelViewed,
-             .multipleChannelsViewed,
-             .preferencesChanged,
-             .preferencesDeleted,
-             .postUnread,
-             .response,
-             .threadUpdated,
-             .threadFollowChanged,
-             .threadReadChanged,
-             .cacheInvalidated,
-             .unknown:
+            .typing,
+            .channelViewed,
+            .multipleChannelsViewed,
+            .preferencesChanged,
+            .preferencesDeleted,
+            .postUnread,
+            .response,
+            .threadUpdated,
+            .threadFollowChanged,
+            .threadReadChanged,
+            .cacheInvalidated,
+            .unknown:
             break
         }
 

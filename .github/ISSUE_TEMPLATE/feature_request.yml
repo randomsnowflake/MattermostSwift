@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose an SDK API or tooling improvement.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: Describe the application behavior this change would enable.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed API or behavior
+      description: Include relevant Mattermost API v4 endpoints and server-version constraints when known.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and the roadmap for this request.
+          required: true
+        - label: I have not included credentials or private Mattermost data.
+          required: true

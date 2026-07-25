@@ -1,0 +1,67 @@
+name: Bug report
+description: Report reproducible SDK behavior.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report a problem. Remove credentials and private server data from all output.
+  - type: input
+    id: sdk-version
+    attributes:
+      label: MattermostSwift version
+      description: Provide a release tag or commit SHA.
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: input
+    id: server-version
+    attributes:
+      label: Mattermost server version
+      description: This is essential because API behavior varies between Mattermost releases.
+      placeholder: 10.8.1
+    validations:
+      required: true
+  - type: input
+    id: toolchain
+    attributes:
+      label: Swift and Xcode versions
+      description: Include the output of `swift --version` and `xcodebuild -version`, where applicable.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: macOS 15.5 or iOS 18.5
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Explain what happened and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest code sample or command sequence that reproduces the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Remove tokens, cookies, credentials, private URLs, user data, and server identifiers.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: I removed secrets and private Mattermost data from this report.
+          required: true

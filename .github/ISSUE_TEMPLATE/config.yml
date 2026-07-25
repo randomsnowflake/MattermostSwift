@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Mattermost server support
+    url: https://forum.mattermost.com/
+    about: Ask about Mattermost server configuration or behavior in the Mattermost community.

@@ -152,7 +152,8 @@ extension MattermostSwiftCLI {
         let environment = ProcessInfo.processInfo.environment
         let session = try await MattermostClient.loginFromEnvironment(environment)
         guard let rawURL = environment["MATTERMOST_URL"],
-              let serverURL = URL(string: rawURL) else {
+            let serverURL = URL(string: rawURL)
+        else {
             throw MattermostError.missingEnvironmentVariable("MATTERMOST_URL")
         }
 
@@ -376,7 +377,7 @@ extension MattermostSwiftCLI {
                 "marker": .string(marker),
                 "ok": .bool(true),
                 "count": .number(1),
-            ]),
+            ])
         ]
         let post = try await client.sendPost(channelID: channelID, message: marker, props: props)
         var deletedPost = false
@@ -455,7 +456,9 @@ extension MattermostSwiftCLI {
         print("preferences: \(preferences.count)")
         print("first-category: \(firstCategory ?? "-")")
         print("category-preferences: \(categoryPreferences.count)")
-        print("decoded-preferences: \(preferences.allSatisfy { !$0.userId.isEmpty && !$0.category.isEmpty && !$0.name.isEmpty })")
+        print(
+            "decoded-preferences: \(preferences.allSatisfy { !$0.userId.isEmpty && !$0.category.isEmpty && !$0.name.isEmpty })"
+        )
     }
 
     static func runPreferenceRoundTripTest(client: MattermostClient) async throws {
@@ -503,11 +506,12 @@ extension MattermostSwiftCLI {
     static func runSearchTest(client: MattermostClient) async throws {
         let channelID = try resolvedChannelID(nil)
         let channel = try await client.channel(id: channelID)
-        let teamID = if let channelTeamID = channel.teamId, !channelTeamID.isEmpty {
-            channelTeamID
-        } else {
-            try await loadTeamID(client: client)
-        }
+        let teamID =
+            if let channelTeamID = channel.teamId, !channelTeamID.isEmpty {
+                channelTeamID
+            } else {
+                try await loadTeamID(client: client)
+            }
         let marker = "mmswifttestsearch\(Int(Date.now.timeIntervalSince1970))"
         var post: MattermostPost?
 
@@ -818,7 +822,8 @@ extension MattermostSwiftCLI {
                 throw CLIError.usage("Deleted post remained in visible cached channel posts.")
             }
             guard let cursor, cursor.lastSyncAt >= (cachedPost?.deleteAt ?? 0) else {
-                throw CLIError.usage("Deletion backfill did not advance the channel post cursor to the delete timestamp.")
+                throw CLIError.usage(
+                    "Deletion backfill did not advance the channel post cursor to the delete timestamp.")
             }
 
             print("channel: \(channelID)")
@@ -1095,10 +1100,12 @@ extension MattermostSwiftCLI {
                 )
             }
             guard secondBackfill.postSyncs.flatMap(\.posts).contains(where: { $0.id == createdPost.id }) else {
-                throw CLIError.usage("All-channel reconnect backfill did not return the post created while disconnected.")
+                throw CLIError.usage(
+                    "All-channel reconnect backfill did not return the post created while disconnected.")
             }
             guard cachedPost?.id == createdPost.id else {
-                throw CLIError.usage("All-channel reconnect backfill did not cache the post created while disconnected.")
+                throw CLIError.usage(
+                    "All-channel reconnect backfill did not cache the post created while disconnected.")
             }
             guard reconnectAttempts == [0] else {
                 throw CLIError.usage("All-channel reconnect lifecycle did not emit the expected reconnecting attempt.")
@@ -1178,9 +1185,10 @@ extension MattermostSwiftCLI {
                 throw error
             }
             guard cleanup.deletedPosts == createdPostIDs.count,
-                  cleanup.deletedCategory,
-                  cleanup.deletedChannel,
-                  cleanup.restoredOrder else {
+                cleanup.deletedCategory,
+                cleanup.deletedChannel,
+                cleanup.restoredOrder
+            else {
                 throw CLIError.usage("Forced cleanup verification left temporary e2e resources behind.")
             }
 
@@ -1256,7 +1264,6 @@ extension MattermostSwiftCLI {
             print("event-received: false")
         }
     }
-
 
     static func runChannelTest(client: MattermostClient) async throws {
         let teamID = try await loadTeamID(client: client)
@@ -1529,7 +1536,8 @@ extension MattermostSwiftCLI {
         }
 
         let count = latestResults?.orderedPosts.count ?? 0
-        throw CLIError.usage("Timed out waiting for Mattermost search to index post \(postID); latest result count: \(count).")
+        throw CLIError.usage(
+            "Timed out waiting for Mattermost search to index post \(postID); latest result count: \(count).")
     }
 
     static func optionalTypingEvent(
@@ -1550,7 +1558,6 @@ extension MattermostSwiftCLI {
         }
     }
 
-
     static func resolvedStoreURL() throws -> URL {
         let fileManager = FileManager.default
         let url: URL
@@ -1562,7 +1569,8 @@ extension MattermostSwiftCLI {
                 fileURLWithPath: fileManager.currentDirectoryPath,
                 isDirectory: true
             )
-            url = currentDirectory
+            url =
+                currentDirectory
                 .appendingPathComponent(".mattermostswift", isDirectory: true)
                 .appendingPathComponent("MattermostSwift.sqlite")
                 .standardizedFileURL
@@ -1625,10 +1633,11 @@ extension MattermostSwiftCLI {
             deletedChannel = false
         }
 
-        let restoredOrder = (try? await client.updateSidebarCategoryOrder(
-            teamID: teamID,
-            order: originalCategoryOrder.filter { $0 != categoryID }
-        )) != nil
+        let restoredOrder =
+            (try? await client.updateSidebarCategoryOrder(
+                teamID: teamID,
+                order: originalCategoryOrder.filter { $0 != categoryID }
+            )) != nil
 
         return E2ECleanupResult(
             deletedPosts: deletedPosts,
@@ -1639,11 +1648,10 @@ extension MattermostSwiftCLI {
     }
 
     static func isActiveTestChannel(_ channel: MattermostChannel) -> Bool {
-        !channel.isDeleted && (
-            isTestResourceName(channel.name)
+        !channel.isDeleted
+            && (isTestResourceName(channel.name)
                 || isTestResourceName(channel.displayName)
-                || isTestResourceName(channel.purpose ?? "")
-        )
+                || isTestResourceName(channel.purpose ?? ""))
     }
 
     static func isTestSidebarCategory(_ category: MattermostSidebarCategory) -> Bool {

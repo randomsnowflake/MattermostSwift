@@ -102,7 +102,8 @@ extension MattermostClient {
             updatedCategories.append(updatedDestination)
         }
 
-        for category in categories where category.id != destination.id && category.isCustom && category.channelIds.contains(channelID) {
+        for category in categories
+        where category.id != destination.id && category.isCustom && category.channelIds.contains(channelID) {
             let channelIDs = category.channelIds.filter { $0 != channelID }
             let updatedSource = try await updateSidebarCategory(
                 teamID: teamID,

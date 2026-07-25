@@ -52,8 +52,9 @@ actor LiveEventRecorder {
     func typingEvent(channelID: String, userID: String) -> MattermostTypingEvent? {
         for event in events {
             guard case .typing(let typing) = try? event.typedEvent(),
-                  typing.channelID == channelID,
-                  typing.userID == userID else {
+                typing.channelID == channelID,
+                typing.userID == userID
+            else {
                 continue
             }
             return typing
@@ -103,8 +104,9 @@ actor LiveSyncRecorder {
     func appliedPost(id: String) -> MattermostPost? {
         for event in events {
             guard case .eventApplied(_, let typedEvent) = event,
-                  case .posted(let post) = typedEvent,
-                  post.id == id else {
+                case .posted(let post) = typedEvent,
+                post.id == id
+            else {
                 continue
             }
             return post

@@ -201,11 +201,12 @@ extension MattermostSwiftCLI {
             )
             printThreads(threads)
         case .listPreferences(let category):
-            let preferences = if let category {
-                try await client.preferences(category: category)
-            } else {
-                try await client.preferences()
-            }
+            let preferences =
+                if let category {
+                    try await client.preferences(category: category)
+                } else {
+                    try await client.preferences()
+                }
             printPreferences(preferences)
         case .preferencesTest:
             try await runPreferencesTest(client: client)

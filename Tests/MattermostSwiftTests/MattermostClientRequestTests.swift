@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import MattermostSwift
 
 @Suite(.serialized)
@@ -38,7 +39,9 @@ struct MattermostClientRequestTests {
         let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/channels/channel-id")
             #expect(request.httpMethod == "GET")
-            let body = Data(#"{"id":"channel-id","team_id":"team-id","name":"town-square","display_name":"Town Square","type":"O"}"#.utf8)
+            let body = Data(
+                #"{"id":"channel-id","team_id":"team-id","name":"town-square","display_name":"Town Square","type":"O"}"#
+                    .utf8)
             return try Self.response(statusCode: 200, body: body, request: request)
         }
 
@@ -58,9 +61,10 @@ struct MattermostClientRequestTests {
             #expect(body?["channel_id"] as? String == "channel-id")
             #expect(body?["message"] as? String == "hello world")
             #expect(body?["root_id"] as? String == "root-id")
-            let responseBody = Data(#"""
-            {"id":"post-id","create_at":1780000000000,"update_at":1780000000000,"edit_at":0,"delete_at":0,"user_id":"user-id","channel_id":"channel-id","root_id":"root-id","message":"hello world","type":""}
-            """#.utf8)
+            let responseBody = Data(
+                #"""
+                {"id":"post-id","create_at":1780000000000,"update_at":1780000000000,"edit_at":0,"delete_at":0,"user_id":"user-id","channel_id":"channel-id","root_id":"root-id","message":"hello world","type":""}
+                """#.utf8)
             return try Self.response(statusCode: 201, body: responseBody, request: request)
         }
 
@@ -98,7 +102,8 @@ struct MattermostClientRequestTests {
         let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/user-id/image")
             #expect(request.httpMethod == "POST")
-            #expect(request.value(forHTTPHeaderField: "Content-Type")?.hasPrefix("multipart/form-data; boundary=") == true)
+            #expect(
+                request.value(forHTTPHeaderField: "Content-Type")?.hasPrefix("multipart/form-data; boundary=") == true)
             let text = String(decoding: try Self.bodyData(from: request), as: UTF8.self)
             #expect(text.contains(#"Content-Disposition: form-data; name="image"; filename="profile.png""#))
             #expect(text.contains("Content-Type: image/png"))
@@ -118,10 +123,15 @@ struct MattermostClientRequestTests {
     @Test
     func markThreadReadUsesMillisecondTimestampPath() async throws {
         let client = try await Self.makeClient { request in
-            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/teams/team-id/threads/thread-id/read/1780000000123")
+            #expect(
+                request.url?.absoluteString
+                    == "https://mattermost.example.com/api/v4/users/me/teams/team-id/threads/thread-id/read/1780000000123"
+            )
             #expect(request.httpMethod == "PUT")
             #expect(request.httpBody == nil)
-            let responseBody = Data(#"{"id":"thread-id","reply_count":4,"last_reply_at":1780000000123,"last_viewed_at":1780000000123,"participants":[],"post":null,"unread_replies":0,"unread_mentions":0,"is_urgent":false,"delete_at":0,"is_following":true}"#.utf8)
+            let responseBody = Data(
+                #"{"id":"thread-id","reply_count":4,"last_reply_at":1780000000123,"last_viewed_at":1780000000123,"participants":[],"post":null,"unread_replies":0,"unread_mentions":0,"is_urgent":false,"delete_at":0,"is_following":true}"#
+                    .utf8)
             return try Self.response(statusCode: 200, body: responseBody, request: request)
         }
 

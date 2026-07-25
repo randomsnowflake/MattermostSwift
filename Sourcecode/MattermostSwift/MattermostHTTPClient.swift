@@ -96,8 +96,9 @@ struct MattermostHTTPClient: Sendable {
         let (temporaryURL, response) = try await urlSession.download(for: request)
         let httpResponse = try validate(Data(), response)
         if let maximumSize,
-           let length = httpResponse.value(forHTTPHeaderField: "Content-Length").flatMap(Int64.init),
-           length > maximumSize {
+            let length = httpResponse.value(forHTTPHeaderField: "Content-Length").flatMap(Int64.init),
+            length > maximumSize
+        {
             throw MattermostError.fileTooLarge(limit: maximumSize)
         }
         let size = try temporaryURL.resourceValues(forKeys: [.fileSizeKey]).fileSize.map(Int64.init) ?? 0
@@ -105,7 +106,8 @@ struct MattermostHTTPClient: Sendable {
             throw MattermostError.fileTooLarge(limit: maximumSize!)
         }
         let fileManager = FileManager.default
-        try fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fileManager.createDirectory(
+            at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         if fileManager.fileExists(atPath: destinationURL.path) {
             try fileManager.removeItem(at: destinationURL)
         }
@@ -218,8 +220,9 @@ struct MattermostHTTPClient: Sendable {
                     throw error
                 }
                 guard attempt <= Self.maxTransientRetries,
-                      Self.isTransient(error),
-                      Self.allowsAutomaticRetry(for: request) else {
+                    Self.isTransient(error),
+                    Self.allowsAutomaticRetry(for: request)
+                else {
                     throw MattermostError.transportFailure(error.localizedDescription)
                 }
                 try await Task.sleep(for: .milliseconds(200 * attempt))
@@ -248,16 +251,16 @@ struct MattermostHTTPClient: Sendable {
 
         return switch path {
         case _ where path.hasSuffix("/users/mfa"),
-             _ where path.hasSuffix("/users/ids"),
-             _ where path.hasSuffix("/users/usernames"),
-             _ where path.hasSuffix("/users/search"),
-             _ where path.hasSuffix("/users/status/ids"),
-             _ where path.hasSuffix("/channels/stats/member_count"),
-             _ where path.hasSuffix("/channels/search"),
-             _ where path.hasSuffix("/channels/group/search"),
-             _ where path.hasSuffix("/emoji/search"),
-             _ where path.hasSuffix("/posts/search"),
-             _ where path.hasSuffix("/members/ids"):
+            _ where path.hasSuffix("/users/ids"),
+            _ where path.hasSuffix("/users/usernames"),
+            _ where path.hasSuffix("/users/search"),
+            _ where path.hasSuffix("/users/status/ids"),
+            _ where path.hasSuffix("/channels/stats/member_count"),
+            _ where path.hasSuffix("/channels/search"),
+            _ where path.hasSuffix("/channels/group/search"),
+            _ where path.hasSuffix("/emoji/search"),
+            _ where path.hasSuffix("/posts/search"),
+            _ where path.hasSuffix("/members/ids"):
             true
         default:
             false
@@ -275,26 +278,27 @@ struct MattermostHTTPClient: Sendable {
         if let urlError = error as? URLError {
             switch urlError.code {
             case .networkConnectionLost, .timedOut, .cannotConnectToHost,
-                 .dnsLookupFailed, .notConnectedToInternet:
+                .dnsLookupFailed, .notConnectedToInternet:
                 return true
             default:
                 break
             }
         }
         let nsError = error as NSError
-        return nsError.domain == NSPOSIXErrorDomain && nsError.code == 57 // ENOTCONN
+        return nsError.domain == NSPOSIXErrorDomain && nsError.code == 57  // ENOTCONN
     }
-
 
     func makeRequest(
         endpoint: String,
         method: String,
         queryItems: [URLQueryItem] = []
     ) throws -> URLRequest {
-        guard var components = URLComponents(
-            url: configuration.apiBaseURL.appending(path: endpoint.mattermostTrimmingLeadingSlashes),
-            resolvingAgainstBaseURL: false
-        ) else {
+        guard
+            var components = URLComponents(
+                url: configuration.apiBaseURL.appending(path: endpoint.mattermostTrimmingLeadingSlashes),
+                resolvingAgainstBaseURL: false
+            )
+        else {
             throw MattermostError.invalidEndpoint(endpoint)
         }
 
@@ -403,7 +407,6 @@ struct MattermostHTTPClient: Sendable {
         return bodyURL
     }
 
-
     private func decodeMattermostAPIError(from data: Data) -> MattermostAPIError? {
         guard !data.isEmpty else {
             return nil
@@ -456,8 +459,8 @@ private struct MattermostAPIError: Decodable, Sendable {
     let message: String?
 }
 
-private extension String {
-    var multipartQuotedStringEscaped: String {
+extension String {
+    fileprivate var multipartQuotedStringEscaped: String {
         var escaped = ""
         escaped.reserveCapacity(count)
 
@@ -478,8 +481,8 @@ private extension String {
 
 }
 
-private extension Data {
-    mutating func appendString(_ string: String) {
+extension Data {
+    fileprivate mutating func appendString(_ string: String) {
         append(contentsOf: string.utf8)
     }
 }

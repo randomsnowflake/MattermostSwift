@@ -85,7 +85,9 @@ extension MattermostSwiftCLI {
         let suffix = String(Int(Date.now.timeIntervalSince1970 * 1000))
         let newName = name ?? "mmswift-test-renamed-\(suffix)"
         guard isSafeTestChannelName(newName) else {
-            throw CLIError.usage("New test channel names must start with mmswift-test and contain only lowercase letters, numbers, and hyphens.")
+            throw CLIError.usage(
+                "New test channel names must start with mmswift-test and contain only lowercase letters, numbers, and hyphens."
+            )
         }
 
         let renamed = try await client.patchChannel(
@@ -107,7 +109,8 @@ extension MattermostSwiftCLI {
 
         let channel = try await client.channel(id: channelID)
         guard isTestChannel(channel) else {
-            throw CLIError.usage("Refusing to archive a channel that does not look like a MattermostSwift test channel.")
+            throw CLIError.usage(
+                "Refusing to archive a channel that does not look like a MattermostSwift test channel.")
         }
 
         let status = try await client.deleteChannel(id: channelID)

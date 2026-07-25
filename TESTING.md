@@ -8,6 +8,29 @@ Run local package tests:
 scripts/test-unit.sh
 ```
 
+Run the same strict formatter check enforced by CI:
+
+```sh
+scripts/lint.sh
+```
+
+Run a single XCTest case or method:
+
+```sh
+swift test --filter MattermostClientTests
+swift test --filter MattermostClientTests/testCurrentUserRequest
+```
+
+Generate an LCOV coverage report:
+
+```sh
+scripts/test-coverage.sh
+```
+
+The coverage script runs `swift test --enable-code-coverage`, discovers SwiftPM's platform-specific
+test bundle and profile instead of assuming a fixed architecture/build path, and exports
+`coverage.lcov` with Xcode's `xcrun llvm-cov`. CI uploads the non-empty report as a build artifact.
+
 The current unit tests cover:
 
 - server URL normalization,

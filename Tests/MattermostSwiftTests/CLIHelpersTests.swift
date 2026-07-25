@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import MattermostSwiftCLI
 
 @Suite("CLI helper logic")
@@ -16,7 +17,8 @@ struct CLIHelpersTests {
 
     @Test("contentType falls back for unknown extensions")
     func contentTypeFallback() {
-        #expect(MattermostSwiftCLI.contentType(for: URL(fileURLWithPath: "/tmp/archive.zip")) == "application/octet-stream")
+        #expect(
+            MattermostSwiftCLI.contentType(for: URL(fileURLWithPath: "/tmp/archive.zip")) == "application/octet-stream")
         #expect(MattermostSwiftCLI.contentType(for: URL(fileURLWithPath: "/tmp/noext")) == "application/octet-stream")
     }
 
@@ -42,8 +44,12 @@ struct CLIHelpersTests {
         #expect(Command(arguments: ["check"]) == .check)
         #expect(Command(arguments: ["get-user", "abc123"]) == .getUser(userID: "abc123"))
         #expect(Command(arguments: ["get-user"]) == .getUser(userID: "me"))
-        #expect(Command(arguments: ["send-message", "hello", "world"]) == .sendMessage(channelID: nil, message: "hello world"))
-        #expect(Command(arguments: ["send-message", "--channel", "chan", "hello", "world"]) == .sendMessage(channelID: "chan", message: "hello world"))
+        #expect(
+            Command(arguments: ["send-message", "hello", "world"])
+                == .sendMessage(channelID: nil, message: "hello world"))
+        #expect(
+            Command(arguments: ["send-message", "--channel", "chan", "hello", "world"])
+                == .sendMessage(channelID: "chan", message: "hello world"))
         #expect(Command(arguments: []) == .help)
         #expect(Command(arguments: ["totally-unknown-command"]) == .help)
     }

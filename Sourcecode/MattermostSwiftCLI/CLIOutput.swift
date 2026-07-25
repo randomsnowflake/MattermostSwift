@@ -299,7 +299,9 @@ extension MattermostSwiftCLI {
         print("unread-threads: \(threadList.totalUnreadThreads)")
         print("unread-mentions: \(threadList.totalUnreadMentions)")
         for thread in threadList.threads {
-            print("\(thread.id)\treplies:\(thread.replyCount)\tunread:\(thread.unreadReplies)\tmentions:\(thread.unreadMentions)\turgent:\(thread.isUrgent)")
+            print(
+                "\(thread.id)\treplies:\(thread.replyCount)\tunread:\(thread.unreadReplies)\tmentions:\(thread.unreadMentions)\turgent:\(thread.isUrgent)"
+            )
         }
     }
 

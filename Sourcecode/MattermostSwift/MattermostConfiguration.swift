@@ -25,13 +25,15 @@ public struct MattermostConfiguration: Sendable {
         }
 
         if normalizedServerURL.scheme == "http",
-           !allowInsecureHTTP,
-           !normalizedServerURL.isLoopbackHost {
+            !allowInsecureHTTP,
+            !normalizedServerURL.isLoopbackHost
+        {
             throw MattermostError.insecureServerURL(serverURL.absoluteString)
         }
         if normalizedServerURL.scheme == "http",
-           allowInsecureHTTP,
-           !normalizedServerURL.isLoopbackHost {
+            allowInsecureHTTP,
+            !normalizedServerURL.isLoopbackHost
+        {
             fputs(
                 "MattermostSwift: allowInsecureHTTP=true with non-loopback host \(normalizedServerURL.host() ?? "?") sends bearer tokens in cleartext.\n",
                 stderr
@@ -51,15 +53,15 @@ public enum MattermostAuthentication: Sendable, Equatable {
     case bearerToken(String)
 }
 
-private extension URL {
-    var isLoopbackHost: Bool {
+extension URL {
+    fileprivate var isLoopbackHost: Bool {
         guard let host = host()?.lowercased() else {
             return false
         }
         return host == "localhost" || host == "127.0.0.1" || host == "::1" || host.hasSuffix(".localhost")
     }
 
-    var normalizedMattermostServerURL: URL {
+    fileprivate var normalizedMattermostServerURL: URL {
         var components = URLComponents(url: self, resolvingAgainstBaseURL: false)
         components?.path = path.removingMattermostAPIPath.mattermostTrimmingTrailingSlashes
         components?.query = nil
@@ -67,7 +69,7 @@ private extension URL {
         return components?.url ?? self
     }
 
-    func mattermostWebSocketURL() throws -> URL {
+    fileprivate func mattermostWebSocketURL() throws -> URL {
         let webSocketBaseURL = appending(path: "api/v4/websocket")
         guard var components = URLComponents(url: webSocketBaseURL, resolvingAgainstBaseURL: false) else {
             throw MattermostError.invalidEndpoint("/websocket")
@@ -89,8 +91,8 @@ private extension URL {
     }
 }
 
-private extension String {
-    var removingMattermostAPIPath: String {
+extension String {
+    fileprivate var removingMattermostAPIPath: String {
         let pathComponents = split(separator: "/", omittingEmptySubsequences: true).map(String.init)
 
         for index in pathComponents.indices where pathComponents[index] == "api" {

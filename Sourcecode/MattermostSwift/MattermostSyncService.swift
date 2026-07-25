@@ -311,9 +311,9 @@ public struct MattermostSyncService: Sendable {
     }
 }
 
-public extension MattermostClient {
+extension MattermostClient {
     /// Creates a high-level sync coordinator for this client.
-    func syncService() -> MattermostSyncService {
+    public func syncService() -> MattermostSyncService {
         MattermostSyncService(client: self)
     }
 }

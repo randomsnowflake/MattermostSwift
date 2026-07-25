@@ -15,12 +15,36 @@ concurrency:
 
 jobs:
   build-and-test:
-    runs-on: macos-15
-    timeout-minutes: 30
+    name: Build and test (${{ matrix.toolchain }})
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.experimental }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - toolchain: Xcode 16.4
+            runner: macos-15
+            xcode-path: /Applications/Xcode_16.4.app
+            experimental: false
+            coverage: true
+          - toolchain: latest stable Xcode
+            runner: macos-latest
+            xcode-path: ""
+            experimental: true
+            coverage: false
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode 16.4
-        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+      - name: Select pinned Xcode
+        if: matrix.xcode-path != ''
+        run: sudo xcode-select --switch "${{ matrix.xcode-path }}"
+      - name: Record toolchain
+        id: toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+          toolchain_hash="$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)"
+          echo "cache-key=$toolchain_hash" >> "$GITHUB_OUTPUT"
       - name: Cache SwiftPM build products
         uses: actions/cache@v4
         with:
@@ -28,14 +52,33 @@ jobs:
             .build
             ~/.cache/org.swift.swiftpm
             ~/.swiftpm
-          key: ${{ runner.os }}-xcode16.4-swiftpm-${{ hashFiles('Package.swift', 'Package.resolved') }}
-          restore-keys: ${{ runner.os }}-xcode16.4-swiftpm-
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.cache-key }}-swiftpm-${{ hashFiles('Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.cache-key }}-swiftpm-
+      - name: Enforce swift-format
+        run: scripts/lint.sh
+      - name: Unit tests with coverage
+        if: matrix.coverage
+        run: scripts/test-coverage.sh
+      - name: Upload LCOV coverage
+        if: matrix.coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov-${{ runner.arch }}
+          path: coverage.lcov
+          if-no-files-found: error
+          retention-days: 14
       - name: Unit tests
+        if: ${{ !matrix.coverage }}
         run: scripts/test-unit.sh
-      - name: Build for generic iOS device
-        run: xcodebuild -scheme MattermostSwift -destination 'generic/platform=iOS' -skipPackagePluginValidation build
-      - name: Build DocC without warnings
-        run: xcodebuild docbuild -scheme MattermostSwift -destination 'generic/platform=iOS' OTHER_SWIFT_FLAGS='-warnings-as-errors'
+      - name: Build release CLI for macOS
+        run: swift build --configuration release --product MattermostSwiftCLI
+      - name: Build for generic macOS
+        run: xcodebuild -scheme MattermostSwift -destination 'generic/platform=macOS' -skipPackagePluginValidation build
+      - name: Build for generic iOS with Swift warnings as errors
+        run: xcodebuild -scheme MattermostSwift -destination 'generic/platform=iOS' -skipPackagePluginValidation SWIFT_TREAT_WARNINGS_AS_ERRORS=YES build
+      - name: Build DocC with DocC warnings as errors
+        run: xcodebuild -scheme MattermostSwift -destination 'generic/platform=iOS' -skipPackagePluginValidation OTHER_DOCC_FLAGS='--warnings-as-errors' docbuild
       - name: Block committed token signatures and private artifacts
         run: scripts/security-scan.sh --strict
 

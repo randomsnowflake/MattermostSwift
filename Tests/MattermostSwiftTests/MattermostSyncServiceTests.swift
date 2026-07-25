@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import MattermostSwift
 
 @MainActor
@@ -78,9 +79,15 @@ func syncServiceResolvesTeamByNameAndInferredChannels() async throws {
     )
 
     #expect(namedResult.teamID == "team-1")
-    #expect(namedResult.channels.map(\.id) == ["channel-1", "channel-2", "channel-3", "channel-4", "channel-5", "channel-6"])
+    #expect(
+        namedResult.channels.map(\.id) == [
+            "channel-1", "channel-2", "channel-3", "channel-4", "channel-5", "channel-6",
+        ])
     #expect(inferredResult.teamID == "team-1")
-    #expect(inferredResult.channels.map(\.id) == ["channel-1", "channel-2", "channel-3", "channel-4", "channel-5", "channel-6"])
+    #expect(
+        inferredResult.channels.map(\.id) == [
+            "channel-1", "channel-2", "channel-3", "channel-4", "channel-5", "channel-6",
+        ])
 }
 
 @MainActor
@@ -133,11 +140,14 @@ private final class MattermostSyncServiceRequestTracker: @unchecked Sendable {
         case "/api/v4/users/me/teams/team-1/channels", "/api/v4/users/me/channels":
             body = channelsJSON
         case "/api/v4/channels/channel-1/members/me":
-            body = #"{"channel_id":"channel-1","user_id":"user-1","roles":"channel_user","last_viewed_at":10,"msg_count":3,"mention_count":1}"#
+            body =
+                #"{"channel_id":"channel-1","user_id":"user-1","roles":"channel_user","last_viewed_at":10,"msg_count":3,"mention_count":1}"#
         case "/api/v4/users/user-1/teams/team-1/channels/members":
-            body = #"[{"channel_id":"channel-1","user_id":"user-1","roles":"channel_user"},{"channel_id":"channel-2","user_id":"user-1","roles":"channel_user"}]"#
+            body =
+                #"[{"channel_id":"channel-1","user_id":"user-1","roles":"channel_user"},{"channel_id":"channel-2","user_id":"user-1","roles":"channel_user"}]"#
         case "/api/v4/users/me/teams/team-1/channels/categories":
-            body = #"{"order":["category-1"],"categories":[{"id":"category-1","user_id":"user-1","team_id":"team-1","display_name":"Favorites","type":"favorites","sort_order":1,"channel_ids":["channel-1"]}]}"#
+            body =
+                #"{"order":["category-1"],"categories":[{"id":"category-1","user_id":"user-1","team_id":"team-1","display_name":"Favorites","type":"favorites","sort_order":1,"channel_ids":["channel-1"]}]}"#
         default:
             if path == "/api/v4/users", absoluteString.contains("in_channel=channel-1") {
                 body = #"[{"id":"user-1","username":"alice"},{"id":"user-2","username":"bob"}]"#
@@ -171,7 +181,8 @@ private final class MattermostSyncServiceRequestTracker: @unchecked Sendable {
     private func postListJSON(ids: [String]) -> String {
         let posts = ids.map { id in
             let timestamp = id == "post-1" ? 10 : id == "post-2" ? 20 : 30
-            return #""\#(id)":{"id":"\#(id)","create_at":\#(timestamp),"update_at":\#(timestamp),"edit_at":0,"delete_at":0,"user_id":"user-1","channel_id":"channel-1","root_id":"","message":"\#(id)","type":""}"#
+            return
+                #""\#(id)":{"id":"\#(id)","create_at":\#(timestamp),"update_at":\#(timestamp),"edit_at":0,"delete_at":0,"user_id":"user-1","channel_id":"channel-1","root_id":"","message":"\#(id)","type":""}"#
         }
         let order = ids.map { #""\#($0)""# }.joined(separator: ",")
         return #"{"order":[\#(order)],"posts":{\#(posts.joined(separator: ","))}}"#

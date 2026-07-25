@@ -401,13 +401,17 @@ public struct MattermostLiveBroadcast: Decodable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let snakeContainer = try decoder.container(keyedBy: SnakeCodingKeys.self)
-        omitUsers = Self.decodeStringArray(from: container, forKey: .omitUsers)
+        omitUsers =
+            Self.decodeStringArray(from: container, forKey: .omitUsers)
             ?? Self.decodeStringArray(from: snakeContainer, forKey: .omitUsers)
-        userId = Self.decodeString(from: container, forKey: .userId)
+        userId =
+            Self.decodeString(from: container, forKey: .userId)
             ?? Self.decodeString(from: snakeContainer, forKey: .userId)
-        channelId = Self.decodeString(from: container, forKey: .channelId)
+        channelId =
+            Self.decodeString(from: container, forKey: .channelId)
             ?? Self.decodeString(from: snakeContainer, forKey: .channelId)
-        teamId = Self.decodeString(from: container, forKey: .teamId)
+        teamId =
+            Self.decodeString(from: container, forKey: .teamId)
             ?? Self.decodeString(from: snakeContainer, forKey: .teamId)
     }
 
@@ -469,9 +473,10 @@ public enum MattermostJSONValue: Codable, Equatable, Sendable {
             // `Int64(Double)` traps on a finite value outside Int64's range, so bound the
             // magnitude (< 2^63) as well as guarding NaN/infinity before converting.
             guard value.isFinite,
-                  value >= -9_223_372_036_854_775_808.0,
-                  value < 9_223_372_036_854_775_808.0,
-                  value.rounded(.towardZero) == value else {
+                value >= -9_223_372_036_854_775_808.0,
+                value < 9_223_372_036_854_775_808.0,
+                value.rounded(.towardZero) == value
+            else {
                 return nil
             }
             return Int64(value)
@@ -537,8 +542,8 @@ public enum MattermostJSONValue: Codable, Equatable, Sendable {
     }
 }
 
-private extension MattermostJSONValue {
-    var jsonObject: Any {
+extension MattermostJSONValue {
+    fileprivate var jsonObject: Any {
         switch self {
         case .string(let value):
             value

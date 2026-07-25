@@ -55,7 +55,7 @@ extension MattermostClient {
                 filename: nil,
                 contentType: nil,
                 data: Data(channelID.utf8)
-            ),
+            )
         ]
         if let clientID, !clientID.isEmpty {
             parts.append(

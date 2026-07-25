@@ -4,11 +4,13 @@ import Foundation
 
 extension MattermostClient {
     /// Lists custom emoji metadata.
-    public func customEmoji(page: Int = 0, perPage: Int = 60, sort: String = "name") async throws -> [MattermostCustomEmoji] {
+    public func customEmoji(page: Int = 0, perPage: Int = 60, sort: String = "name") async throws
+        -> [MattermostCustomEmoji]
+    {
         try await httpClient.get(
             "/emoji",
             queryItems: Self.pageQueryItems(page: page, perPage: perPage) + [
-                URLQueryItem(name: "sort", value: sort),
+                URLQueryItem(name: "sort", value: sort)
             ]
         )
     }
@@ -36,7 +38,7 @@ extension MattermostClient {
         try await httpClient.get(
             "/emoji/autocomplete",
             queryItems: [
-                URLQueryItem(name: "name", value: name),
+                URLQueryItem(name: "name", value: name)
             ]
         )
     }

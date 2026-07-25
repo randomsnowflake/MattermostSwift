@@ -15,9 +15,8 @@ public struct MattermostClient: Sendable {
     ) {
         self.configuration = configuration
         self.urlSession = urlSession
-        self.webSocketURLSession = webSocketURLSession ?? (
-            urlSession === URLSession.mattermost ? .mattermostLiveEvents : urlSession
-        )
+        self.webSocketURLSession =
+            webSocketURLSession ?? (urlSession === URLSession.mattermost ? .mattermostLiveEvents : urlSession)
         httpClient = MattermostHTTPClient(configuration: configuration, urlSession: urlSession)
     }
 
@@ -66,7 +65,7 @@ public struct MattermostClient: Sendable {
     }
 }
 
-public extension MattermostClient {
+extension MattermostClient {
     /// Logs in with a username/email and password, returning the user plus session token.
     ///
     /// Mattermost browser clients can authenticate from the `MMAUTHTOKEN` cookie that is set
@@ -74,7 +73,7 @@ public extension MattermostClient {
     /// bearer token, so the SDK accepts either the documented `Token` response header or the
     /// official `MMAUTHTOKEN` cookie. The SDK does not store the returned token. Host apps are
     /// responsible for secure storage.
-    static func login(
+    public static func login(
         serverURL: URL,
         loginID: String,
         password: String,
@@ -100,7 +99,8 @@ public extension MattermostClient {
             )
         )
         request.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
-        let response: MattermostHTTPResponse<MattermostUser> = try await httpClient.performWithResponse(request: request)
+        let response: MattermostHTTPResponse<MattermostUser> = try await httpClient.performWithResponse(
+            request: request)
         if let sessionToken = response.httpResponse.mattermostSessionToken() {
             return MattermostSession(
                 user: response.value,
@@ -118,7 +118,7 @@ public extension MattermostClient {
     /// - `MATTERMOST_URL`
     /// - `MATTERMOST_USERNAME`
     /// - `MATTERMOST_PASSWORD`
-    static func loginFromEnvironment(
+    public static func loginFromEnvironment(
         _ environment: [String: String] = ProcessInfo.processInfo.environment,
         urlSession: URLSession = .mattermost
     ) async throws -> MattermostSession {
@@ -148,7 +148,7 @@ public extension MattermostClient {
     /// Required:
     /// - `MATTERMOST_URL`
     /// - `MATTERMOST_TOKEN`, or `MATTERMOST_AUTH_TOKEN` as a local compatibility alias
-    static func liveFromEnvironment(
+    public static func liveFromEnvironment(
         _ environment: [String: String] = ProcessInfo.processInfo.environment
     ) throws -> MattermostClient {
         guard let rawURL = environment["MATTERMOST_URL"], !rawURL.isEmpty else {
@@ -157,15 +157,16 @@ public extension MattermostClient {
         guard let serverURL = URL(string: rawURL) else {
             throw MattermostError.invalidServerURL(rawURL)
         }
-        guard let token = environment["MATTERMOST_TOKEN"].nonEmpty ?? environment["MATTERMOST_AUTH_TOKEN"].nonEmpty else {
+        guard let token = environment["MATTERMOST_TOKEN"].nonEmpty ?? environment["MATTERMOST_AUTH_TOKEN"].nonEmpty
+        else {
             throw MattermostError.missingEnvironmentVariable("MATTERMOST_TOKEN")
         }
         return try MattermostClient(serverURL: serverURL, token: token)
     }
 }
 
-private extension HTTPURLResponse {
-    func mattermostSessionToken() -> (token: String, source: MattermostSessionTokenSource)? {
+extension HTTPURLResponse {
+    fileprivate func mattermostSessionToken() -> (token: String, source: MattermostSessionTokenSource)? {
         if let token = authenticationToken.nonEmpty {
             return (token, .responseHeader)
         }
@@ -177,11 +178,11 @@ private extension HTTPURLResponse {
         return nil
     }
 
-    var authenticationToken: String? {
+    fileprivate var authenticationToken: String? {
         value(forHTTPHeaderField: "Token")
     }
 
-    var mattermostAuthCookieToken: String? {
+    fileprivate var mattermostAuthCookieToken: String? {
         guard let url else {
             return nil
         }
@@ -212,13 +213,13 @@ extension String {
     }
 }
 
-public extension URLSession {
+extension URLSession {
     /// URLSession preconfigured with finite request/resource timeouts for Mattermost.
     ///
     /// `URLSession.shared` uses a 7-day resource timeout, which lets a stalled server hang a
     /// request indefinitely. This session caps a single request at 30s and a full transfer
     /// (e.g. a file download) at 5 minutes.
-    static let mattermost: URLSession = {
+    public static let mattermost: URLSession = {
         // The SDK is token-authenticated; it deliberately does not inherit a host app's
         // browser cookie jar or persist login cookies between accounts.
         let configuration = URLSessionConfiguration.ephemeral
@@ -235,7 +236,7 @@ public extension URLSession {
     /// to WebSocket tasks and completes a healthy socket on that cadence. Live events keep
     /// Foundation's seven-day resource default instead; heartbeat liveness still detects a
     /// dead socket within seconds and reconnects it through the normal stream policy.
-    static let mattermostLiveEvents: URLSession = {
+    public static let mattermostLiveEvents: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 30
         configuration.httpShouldSetCookies = false

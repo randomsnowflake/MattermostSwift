@@ -16,6 +16,7 @@ xcuserdata/
 *.log
 *.trace
 *.xcresult
+coverage.lcov
 
 # Local stores and generated runtime state.
 *.sqlite

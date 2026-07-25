@@ -1,25 +1,26 @@
 import Foundation
 import Testing
+
 @testable import MattermostSwift
 
 @Test
 func liveEventDecodesCoreFieldsAndBroadcast() throws {
     let json = """
-    {
-      "event": "typing",
-      "data": {
-        "user_id": "user-1",
-        "parent_id": "root-1"
-      },
-      "broadcast": {
-        "omit_users": null,
-        "user_id": "user-1",
-        "channel_id": "channel-1",
-        "team_id": "team-1"
-      },
-      "seq": 7
-    }
-    """
+        {
+          "event": "typing",
+          "data": {
+            "user_id": "user-1",
+            "parent_id": "root-1"
+          },
+          "broadcast": {
+            "omit_users": null,
+            "user_id": "user-1",
+            "channel_id": "channel-1",
+            "team_id": "team-1"
+          },
+          "seq": 7
+        }
+        """
 
     let event = try mattermostSnakeCaseDecoder.decode(
         MattermostLiveEvent.self,
@@ -46,11 +47,11 @@ func liveEventDecodesCoreFieldsAndBroadcast() throws {
 @Test
 func liveBroadcastDecodesOmitUsersAndToleratesMissingKeys() throws {
     let json = """
-    {
-      "omit_users": ["a", "b"],
-      "channel_id": "channel-9"
-    }
-    """
+        {
+          "omit_users": ["a", "b"],
+          "channel_id": "channel-9"
+        }
+        """
 
     let broadcast = try mattermostSnakeCaseDecoder.decode(
         MattermostLiveBroadcast.self,
@@ -66,13 +67,13 @@ func liveBroadcastDecodesOmitUsersAndToleratesMissingKeys() throws {
 @Test
 func liveBroadcastToleratesUnexpectedFieldTypes() throws {
     let json = """
-    {
-      "omit_users": "a",
-      "user_id": true,
-      "channel_id": 42,
-      "team_id": null
-    }
-    """
+        {
+          "omit_users": "a",
+          "user_id": true,
+          "channel_id": 42,
+          "team_id": null
+        }
+        """
 
     let broadcast = try mattermostSnakeCaseDecoder.decode(
         MattermostLiveBroadcast.self,
@@ -88,13 +89,13 @@ func liveBroadcastToleratesUnexpectedFieldTypes() throws {
 @Test
 func liveBroadcastDecodesWithPlainDecoder() throws {
     let json = """
-    {
-      "omit_users": ["a"],
-      "user_id": "user-1",
-      "channel_id": "channel-1",
-      "team_id": "team-1"
-    }
-    """
+        {
+          "omit_users": ["a"],
+          "user_id": "user-1",
+          "channel_id": "channel-1",
+          "team_id": "team-1"
+        }
+        """
 
     let broadcast = try JSONDecoder().decode(MattermostLiveBroadcast.self, from: Data(json.utf8))
 
@@ -107,15 +108,15 @@ func liveBroadcastDecodesWithPlainDecoder() throws {
 @Test
 func jsonValueDecodesMixedTypes() throws {
     let json = """
-    {
-      "text": "hello",
-      "count": 42,
-      "flag": true,
-      "missing": null,
-      "tags": ["x", 1, false],
-      "nested": { "key": "value" }
-    }
-    """
+        {
+          "text": "hello",
+          "count": 42,
+          "flag": true,
+          "missing": null,
+          "tags": ["x", 1, false],
+          "nested": { "key": "value" }
+        }
+        """
 
     let decoded = try mattermostSnakeCaseDecoder.decode(
         [String: MattermostJSONValue].self,
@@ -132,18 +133,19 @@ func jsonValueDecodesMixedTypes() throws {
 
 @Test
 func jsonValuePreservesIntegerBoundariesWithoutDoubleRounding() throws {
-    let input = Data("""
-    {
-      "before": 9007199254740991,
-      "at": 9007199254740992,
-      "after": 9007199254740993,
-      "minimum": -9223372036854775808,
-      "maximum": 9223372036854775807,
-      "unsignedMaximum": 18446744073709551615,
-      "fraction": 1.5,
-      "exponent": 1e20
-    }
-    """.utf8)
+    let input = Data(
+        """
+        {
+          "before": 9007199254740991,
+          "at": 9007199254740992,
+          "after": 9007199254740993,
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807,
+          "unsignedMaximum": 18446744073709551615,
+          "fraction": 1.5,
+          "exponent": 1e20
+        }
+        """.utf8)
 
     let decoded = try JSONDecoder().decode([String: MattermostJSONValue].self, from: input)
 
@@ -167,8 +169,8 @@ func jsonValuePreservesIntegerBoundariesWithoutDoubleRounding() throws {
 @Test
 func typedEventMapsHelloAndCacheInvalidation() throws {
     let helloJSON = """
-    { "event": "hello", "data": {}, "seq": 0 }
-    """
+        { "event": "hello", "data": {}, "seq": 0 }
+        """
     let hello = try mattermostSnakeCaseDecoder.decode(
         MattermostLiveEvent.self,
         from: Data(helloJSON.utf8)
@@ -176,13 +178,13 @@ func typedEventMapsHelloAndCacheInvalidation() throws {
     #expect(try hello.typedEvent() == .hello)
 
     let postUnreadJSON = """
-    {
-      "event": "post_unread",
-      "data": { "channel_id": "channel-1", "post_id": "post-1" },
-      "broadcast": { "user_id": "user-1", "team_id": "team-1" },
-      "seq": 3
-    }
-    """
+        {
+          "event": "post_unread",
+          "data": { "channel_id": "channel-1", "post_id": "post-1" },
+          "broadcast": { "user_id": "user-1", "team_id": "team-1" },
+          "seq": 3
+        }
+        """
     let postUnread = try mattermostSnakeCaseDecoder.decode(
         MattermostLiveEvent.self,
         from: Data(postUnreadJSON.utf8)
@@ -212,14 +214,14 @@ func typedEventMapsUnknownNamesWithoutThrowing() throws {
 @Test
 func webSocketEnvelopeToleratesWrongTypedFields() throws {
     let json = """
-    {
-      "event": "typing",
-      "data": "not an object",
-      "broadcast": {
-        "channel_id": 42
-      }
-    }
-    """
+        {
+          "event": "typing",
+          "data": "not an object",
+          "broadcast": {
+            "channel_id": 42
+          }
+        }
+        """
 
     let envelope = try mattermostSnakeCaseDecoder.decode(
         MattermostWebSocketEnvelope.self,
@@ -235,20 +237,20 @@ func webSocketEnvelopeToleratesWrongTypedFields() throws {
 @Test
 func multipleChannelsViewedDecodesChannelTimes() throws {
     let json = """
-    {
-      "event": "multiple_channels_viewed",
-      "data": {
-        "channel_times": {
-          "channel-1": 1751234567890,
-          "channel-2": 1751234567891
+        {
+          "event": "multiple_channels_viewed",
+          "data": {
+            "channel_times": {
+              "channel-1": 1751234567890,
+              "channel-2": 1751234567891
+            }
+          },
+          "broadcast": {
+            "user_id": "user-1"
+          },
+          "seq": 3
         }
-      },
-      "broadcast": {
-        "user_id": "user-1"
-      },
-      "seq": 3
-    }
-    """
+        """
 
     let event = try mattermostSnakeCaseDecoder.decode(
         MattermostLiveEvent.self,
@@ -265,14 +267,14 @@ func multipleChannelsViewedDecodesChannelTimes() throws {
 @Test
 func multipleChannelsViewedToleratesMissingChannelTimes() throws {
     let json = """
-    {
-      "event": "multiple_channels_viewed",
-      "data": {},
-      "broadcast": {
-        "user_id": "user-1"
-      }
-    }
-    """
+        {
+          "event": "multiple_channels_viewed",
+          "data": {},
+          "broadcast": {
+            "user_id": "user-1"
+          }
+        }
+        """
 
     let event = try mattermostSnakeCaseDecoder.decode(
         MattermostLiveEvent.self,

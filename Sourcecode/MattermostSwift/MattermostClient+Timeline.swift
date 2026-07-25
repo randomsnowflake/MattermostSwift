@@ -39,10 +39,10 @@ extension MattermostClient {
     }
 }
 
-public extension MattermostClient {
+extension MattermostClient {
     /// Backfills posts for a channel using the store cursor and updates that cursor.
     @MainActor
-    func syncChannelPosts(
+    public func syncChannelPosts(
         channelID: String,
         to store: MattermostStore,
         perPage: Int = 60,
@@ -129,7 +129,7 @@ public extension MattermostClient {
 
     /// Syncs a channel or thread timeline into the store and updates its cursor.
     @MainActor
-    func syncTimeline(
+    public func syncTimeline(
         _ target: MattermostTimelineTarget,
         to store: MattermostStore,
         request: MattermostTimelineRequest = MattermostTimelineRequest(),

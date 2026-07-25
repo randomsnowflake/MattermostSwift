@@ -6,6 +6,11 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Added strict DocC diagnostic enforcement, LCOV coverage artifacts, swift-format linting,
+  pinned/current toolchain CI coverage, release CLI and generic macOS builds, and a secure
+  tag-driven GitHub Release workflow.
+- Added issue and pull request templates, GitHub Actions Dependabot updates, and expanded
+  contributor guidance for endpoint placement, formatting, focused tests, and public APIs.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,

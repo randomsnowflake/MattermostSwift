@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import MattermostSwift
 
 @Test
@@ -119,13 +120,14 @@ func liveSyncEventsExposeConnectionStateForHostUI() async throws {
         }
     }
 
-    #expect(states == [
-        .connecting(attempt: 0),
-        .connected(teamID: "team-1", backfilledChannelCount: 0),
-        .reconnecting(attempt: 0, delay: .milliseconds(250)),
-        .connecting(attempt: 1),
-        .connected(teamID: "team-1", backfilledChannelCount: 0),
-    ])
+    #expect(
+        states == [
+            .connecting(attempt: 0),
+            .connected(teamID: "team-1", backfilledChannelCount: 0),
+            .reconnecting(attempt: 0, delay: .milliseconds(250)),
+            .connecting(attempt: 1),
+            .connected(teamID: "team-1", backfilledChannelCount: 0),
+        ])
     #expect(states.map(\.isRecovering) == [true, false, true, true, false])
 }
 
@@ -169,14 +171,17 @@ func liveSyncEmitsBackfillFailureWithoutTerminating() async throws {
         }
     }
 
-    #expect(failure == MattermostLiveSyncFailure(
-        attempt: 2,
-        message: "backfill failed for test"
-    ))
-    #expect(states == [
-        .connecting(attempt: 2),
-        .failed(attempt: 2, message: "backfill failed for test"),
-    ])
+    #expect(
+        failure
+            == MattermostLiveSyncFailure(
+                attempt: 2,
+                message: "backfill failed for test"
+            ))
+    #expect(
+        states == [
+            .connecting(attempt: 2),
+            .failed(attempt: 2, message: "backfill failed for test"),
+        ])
     #expect(states.map(\.isRecovering) == [true, false])
 }
 
@@ -245,10 +250,11 @@ func liveSyncReconnectBackfillMergesPostsMissedWhileDisconnected() async throws 
     let cursor = try #require(try store.cachedSyncCursor(scope: "channel-posts:channel-1"))
 
     #expect(backfillAttempts == 2)
-    #expect(backfilledPostIDs == [
-        ["before-disconnect"],
-        ["missed-while-disconnected"],
-    ])
+    #expect(
+        backfilledPostIDs == [
+            ["before-disconnect"],
+            ["missed-while-disconnected"],
+        ])
     #expect(cachedPost.message == "missed while disconnected")
     #expect(cursor.lastSyncAt == 210)
     #expect(cursor.lastItemID == "missed-while-disconnected")
@@ -276,7 +282,8 @@ func liveSyncBackfillChannelSelectionSupportsAllJoinedChannels() {
     )
     let explicit = MattermostLiveSyncService.backfillChannelIDs(
         from: channels,
-        options: MattermostLiveSyncOptions(channelIDs: ["explicit-1", "explicit-2"], backfillAllJoinedChannelPosts: true, maxBackfillChannels: 1)
+        options: MattermostLiveSyncOptions(
+            channelIDs: ["explicit-1", "explicit-2"], backfillAllJoinedChannelPosts: true, maxBackfillChannels: 1)
     )
 
     #expect(capped == ["channel-1", "channel-2"])
@@ -295,20 +302,23 @@ func liveSyncAppliesInjectedLifecycleEventsToStore() async throws {
     let store = try MattermostStore(inMemory: true)
     let posted = MattermostLiveEvent(
         event: "posted",
-        data: ["post": .string("""
-        {
-          "id": "post-1",
-          "create_at": 1,
-          "update_at": 2,
-          "edit_at": 0,
-          "delete_at": 0,
-          "user_id": "user-1",
-          "channel_id": "channel-1",
-          "root_id": "",
-          "message": "hello from live sync",
-          "type": ""
-        }
-        """)],
+        data: [
+            "post": .string(
+                """
+                {
+                  "id": "post-1",
+                  "create_at": 1,
+                  "update_at": 2,
+                  "edit_at": 0,
+                  "delete_at": 0,
+                  "user_id": "user-1",
+                  "channel_id": "channel-1",
+                  "root_id": "",
+                  "message": "hello from live sync",
+                  "type": ""
+                }
+                """)
+        ],
         broadcast: nil,
         seq: 1
     )
@@ -426,7 +436,7 @@ func liveSyncRefreshesUnreadForMultipleChannelsViewed() async throws {
             "channel_times": .object([
                 "channel-2": .integer(200),
                 "channel-1": .integer(100),
-            ]),
+            ])
         ],
         broadcast: MattermostLiveBroadcast(
             omitUsers: nil,
@@ -510,20 +520,23 @@ func liveSyncAppliesEventBeforeRefreshFailureAndContinues() async throws {
     )
     let posted = MattermostLiveEvent(
         event: "posted",
-        data: ["post": .string("""
-        {
-          "id": "post-after-refresh-failure",
-          "create_at": 10,
-          "update_at": 10,
-          "edit_at": 0,
-          "delete_at": 0,
-          "user_id": "user-1",
-          "channel_id": "channel-1",
-          "root_id": "",
-          "message": "still applied",
-          "type": ""
-        }
-        """)],
+        data: [
+            "post": .string(
+                """
+                {
+                  "id": "post-after-refresh-failure",
+                  "create_at": 10,
+                  "update_at": 10,
+                  "edit_at": 0,
+                  "delete_at": 0,
+                  "user_id": "user-1",
+                  "channel_id": "channel-1",
+                  "root_id": "",
+                  "message": "still applied",
+                  "type": ""
+                }
+                """)
+        ],
         broadcast: nil,
         seq: 21
     )
@@ -628,7 +641,7 @@ func liveSyncRefreshesThreadStateOnThreadInvalidation() async throws {
                         locale: nil,
                         timezone: nil,
                         lastPictureUpdate: nil
-                    ),
+                    )
                 ],
                 post: MattermostPost(
                     id: threadID,

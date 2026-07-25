@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select Xcode 16.4
+        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+      - name: Extract changelog notes
+        run: scripts/release-notes.sh "$GITHUB_REF_NAME" >release-notes.md
+      - name: Enforce swift-format
+        run: scripts/lint.sh
+      - name: Unit tests
+        run: scripts/test-unit.sh
+      - name: Build release CLI for macOS
+        run: swift build --configuration release --product MattermostSwiftCLI
+      - name: Build for generic macOS
+        run: xcodebuild -scheme MattermostSwift -destination 'generic/platform=macOS' -skipPackagePluginValidation build
+      - name: Build DocC with DocC warnings as errors
+        run: xcodebuild -scheme MattermostSwift -destination 'generic/platform=iOS' -skipPackagePluginValidation OTHER_DOCC_FLAGS='--warnings-as-errors' docbuild
+      - name: Block committed token signatures and private artifacts
+        run: scripts/security-scan.sh --strict
+      - name: Upload verified release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$GITHUB_REF_NAME" --notes-file release-notes.md

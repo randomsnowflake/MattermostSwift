@@ -46,11 +46,14 @@ Before a public tag:
 
 1. Ensure `CHANGELOG.md` has an entry for the version.
 2. Ensure README installation examples use the intended semver requirement.
-3. Run `scripts/test-unit.sh`.
+3. Run `scripts/lint.sh` and `scripts/test-unit.sh`.
 4. Run live/e2e scripts only when credentials and a safe test workspace are available.
 5. Confirm `git status --short` is clean after committing.
-6. Create a fully qualified semantic version tag, such as `0.1.1`.
-7. Push the tag so Swift Package Index and SwiftPM can discover the release.
+6. Create a fully qualified semantic version tag with the workflow prefix, such as `v0.1.1`.
+   The corresponding changelog heading omits the prefix: `## 0.1.1`.
+7. Push the tag. The release workflow validates lint, tests, release builds, DocC diagnostics,
+   and the matching changelog section before publishing a GitHub Release. The tag also makes the
+   version discoverable by Swift Package Index and SwiftPM.
 
 Do not move or recreate an existing release tag unless the user explicitly asks for that history rewrite.
 

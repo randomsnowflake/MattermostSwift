@@ -9,7 +9,9 @@ extension MattermostClient {
     }
 
     /// Lists memberships for users in a channel.
-    public func channelMembers(channelID: String, page: Int = 0, perPage: Int = 60) async throws -> [MattermostChannelMember] {
+    public func channelMembers(channelID: String, page: Int = 0, perPage: Int = 60) async throws
+        -> [MattermostChannelMember]
+    {
         try await httpClient.get(
             "/channels/\(channelID)/members",
             queryItems: Self.pageQueryItems(page: page, perPage: perPage)
