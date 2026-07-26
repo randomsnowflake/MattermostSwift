@@ -287,3 +287,65 @@ func decodesMattermostServerPingWithCustomKeys() throws {
     #expect(ping.activeSearchBackend == "database")
     #expect(ping.androidLatestVersion == "2.0.0")
 }
+
+@Test
+func decodesMattermostServerPingWithDriftedKeyCasingAndSeparators() throws {
+    let payload = """
+    {
+        "STATUS": "OK",
+        "active_search_backend": "database",
+        "DATABASESTATUS": "OK",
+        "file_store_status": "OK",
+        "IOSLatestVersion": "2.0.0",
+        "ios_min_version": "1.0.0",
+        "ANDROIDLATESTVERSION": "3.0.0",
+        "android_min_version": "2.0.0"
+    }
+    """
+    let ping = try JSONDecoder().decode(MattermostServerPing.self, from: Data(payload.utf8))
+
+    #expect(ping.status == "OK")
+    #expect(ping.activeSearchBackend == "database")
+    #expect(ping.databaseStatus == "OK")
+    #expect(ping.filestoreStatus == "OK")
+    #expect(ping.iosLatestVersion == "2.0.0")
+    #expect(ping.iosMinVersion == "1.0.0")
+    #expect(ping.androidLatestVersion == "3.0.0")
+    #expect(ping.androidMinVersion == "2.0.0")
+}
+
+@Test
+func decodesMattermostClientConfigWithDriftedKeyCasingAndSeparators() throws {
+    let payload = """
+    {
+        "build_number": "100",
+        "BUILDHASH": "abc123",
+        "build_date": "2026-07-25",
+        "BUILD_ENTERPRISE_READY": "true",
+        "collapsed_threads": "true",
+        "ENABLEFILE": "true",
+        "enable_file_attachments": "true",
+        "ENABLECUSTOMEMOJI": "true",
+        "enable_incoming_webhooks": "true",
+        "ENABLEOUTGOINGWEBHOOKS": "true",
+        "enable_post_username_override": "true",
+        "ENABLEPOSTICONOVERRIDE": "true",
+        "site_name": "Mattermost"
+    }
+    """
+    let config = try JSONDecoder().decode(MattermostClientConfig.self, from: Data(payload.utf8))
+
+    #expect(config.buildNumber == "100")
+    #expect(config.buildHash == "abc123")
+    #expect(config.buildDate == "2026-07-25")
+    #expect(config.buildEnterpriseReady == "true")
+    #expect(config.collapsedThreads == "true")
+    #expect(config.enableFile == "true")
+    #expect(config.enableFileAttachments == "true")
+    #expect(config.enableCustomEmoji == "true")
+    #expect(config.enableIncomingWebhooks == "true")
+    #expect(config.enableOutgoingWebhooks == "true")
+    #expect(config.enablePostUsernameOverride == "true")
+    #expect(config.enablePostIconOverride == "true")
+    #expect(config.siteName == "Mattermost")
+}
