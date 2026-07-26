@@ -11,6 +11,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
   `Hashable` for use in SwiftUI navigation and hash-based collections.
 - `MattermostLiveSyncEvent` now conforms to `Equatable`, enabling direct comparison
   in host-app live-sync reducer tests.
+- Redacted bearer tokens from the textual and debug descriptions of `MattermostSession`,
+  `MattermostAuthentication`, and `MattermostConfiguration`.
+- Server ping and client-configuration decoding now tolerates key casing and separator drift across Mattermost releases.
 - Cached thread inbox rows are now removed when their root posts are pruned or their channel
   content is deleted, preventing stale unread threads and unbounded cache growth.
 - Channel deletion now removes cached channel memberships, preventing live
