@@ -267,7 +267,6 @@ public struct MattermostLiveEventStream: Sendable {
             .seconds(15),
             timeoutMessage: "Mattermost WebSocket authentication timed out."
         ) {
-            let authSequence = 1
             let token: String
             switch self.configuration.authentication {
             case .none:
@@ -276,39 +275,56 @@ public struct MattermostLiveEventStream: Sendable {
                 token = bearerToken
             }
 
-            let auth = MattermostWebSocketAuthentication(
-                seq: authSequence,
-                action: "authentication_challenge",
-                data: MattermostWebSocketAuthenticationData(token: token)
-            )
-            // Must be a TEXT frame: Mattermost silently drops the socket right after `hello`
-            // if the authentication_challenge arrives as a binary frame.
-            let payload = try mattermostSnakeCaseEncoder.encode(auth)
-            try await self.send(.string(String(decoding: payload, as: UTF8.self)), to: webSocketTask)
+            let envelopes = MattermostWebSocketEnvelopeSequence {
+                try await self.receiveEnvelope(from: webSocketTask)
+            }
+            return try await Self.performAuthenticationHandshake(
+                token: token,
+                envelopes: envelopes
+            ) { frame in
+                // Must be a TEXT frame: Mattermost silently drops the socket right after
+                // `hello` if the authentication_challenge arrives as a binary frame.
+                try await self.send(.string(frame), to: webSocketTask)
+            }
+        }
+    }
 
-            var pendingEvents: [MattermostLiveEvent] = []
-            while !Task.isCancelled {
-                let envelope = try await self.receiveEnvelope(from: webSocketTask)
+    static func performAuthenticationHandshake<Envelopes: AsyncSequence & Sendable>(
+        token: String,
+        authSequence: Int = 1,
+        envelopes: Envelopes,
+        sendAuthenticationFrame: @escaping @Sendable (String) async throws -> Void
+    ) async throws -> [MattermostLiveEvent] where Envelopes.Element == MattermostWebSocketEnvelope {
+        let auth = MattermostWebSocketAuthentication(
+            seq: authSequence,
+            action: "authentication_challenge",
+            data: MattermostWebSocketAuthenticationData(token: token)
+        )
+        let payload = try mattermostSnakeCaseEncoder.encode(auth)
+        try await sendAuthenticationFrame(String(decoding: payload, as: UTF8.self))
 
-                if let event = envelope.liveEvent {
-                    pendingEvents.append(event)
-                    if event.event == "hello" {
-                        return pendingEvents
-                    }
-                }
-
-                if envelope.seqReply == authSequence {
-                    if envelope.status == "OK" {
-                        return pendingEvents
-                    }
-
-                    let message = envelope.error?.message ?? envelope.status ?? "authentication failed"
-                    throw MattermostError.transportFailure("Mattermost WebSocket authentication failed: \(message)")
+        var pendingEvents: [MattermostLiveEvent] = []
+        for try await envelope in envelopes {
+            if let event = envelope.liveEvent {
+                pendingEvents.append(event)
+                if event.event == MattermostLiveEventName.hello.rawValue {
+                    return pendingEvents
                 }
             }
 
-            throw CancellationError()
+            guard envelope.seqReply == authSequence else { continue }
+            if envelope.status == "OK" {
+                return pendingEvents
+            }
+
+            let message = envelope.error?.message ?? envelope.status ?? "authentication failed"
+            throw MattermostError.transportFailure("Mattermost WebSocket authentication failed: \(message)")
         }
+
+        try Task.checkCancellation()
+        throw MattermostError.transportFailure(
+            "Mattermost WebSocket closed before authentication completed."
+        )
     }
 
     private static let connectionStabilityWindow: Duration = .seconds(30)
@@ -518,12 +534,21 @@ public struct MattermostLiveEventReconnectPolicy: Equatable, Sendable {
         return attempt < maxRetries
     }
 
+    /// Returns a full-jitter reconnect delay from zero through the capped exponential backoff.
     public func delay(for attempt: Int) -> Duration {
+        delay(for: attempt, jitterFraction: .random(in: 0...1))
+    }
+
+    func delay(for attempt: Int, jitterFraction: Double) -> Duration {
         let exponent = pow(multiplier, Double(max(0, attempt)))
         let computedSeconds = initialDelaySeconds * exponent
-        let delaySeconds = computedSeconds.isFinite
+        let baseDelaySeconds = computedSeconds.isFinite
             ? min(maxDelaySeconds, computedSeconds)
             : maxDelaySeconds
+        let normalizedJitter = jitterFraction.isFinite
+            ? min(1, max(0, jitterFraction))
+            : 0
+        let delaySeconds = baseDelaySeconds * normalizedJitter
         let milliseconds = min(
             Self.maximumDelayMilliseconds,
             max(0, Int(delaySeconds * 1_000))
@@ -545,6 +570,24 @@ private struct MattermostWebSocketAuthentication: Encodable, Sendable {
 
 private struct MattermostWebSocketAuthenticationData: Encodable, Sendable {
     let token: String
+}
+
+private struct MattermostWebSocketEnvelopeSequence: AsyncSequence, Sendable {
+    typealias Element = MattermostWebSocketEnvelope
+
+    let nextEnvelope: @Sendable () async throws -> MattermostWebSocketEnvelope?
+
+    func makeAsyncIterator() -> AsyncIterator {
+        AsyncIterator(nextEnvelope: nextEnvelope)
+    }
+
+    struct AsyncIterator: AsyncIteratorProtocol {
+        let nextEnvelope: @Sendable () async throws -> MattermostWebSocketEnvelope?
+
+        mutating func next() async throws -> MattermostWebSocketEnvelope? {
+            try await nextEnvelope()
+        }
+    }
 }
 
 struct MattermostWebSocketEnvelope: Decodable, Sendable {
@@ -619,7 +662,9 @@ struct MattermostWebSocketError: Decodable, Sendable {
     let message: String?
 }
 
-/// Shared snake_case coders reused by API and WebSocket payload handling.
+/// Shared JSON coders reused by API and WebSocket payload handling.
+let mattermostPlainDecoder = JSONDecoder()
+
 let mattermostSnakeCaseDecoder: JSONDecoder = {
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
