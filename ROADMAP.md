@@ -23,7 +23,9 @@
 - User lookup, channel users, and presence status lookup.
 - File upload, attach-to-post, metadata, and download.
 - WebSocket connection, authentication, tolerant event decoding, and a live posted/edit/delete event e2e check.
-- Reconnecting WebSocket event stream wrapper with configurable exponential backoff.
+- Host-provided URLSession trust delegates for both SDK-created REST and WebSocket sessions, plus
+  a bounded 256-event pre-authentication WebSocket queue.
+- Reconnecting WebSocket event stream wrapper with configurable, capped full-jitter exponential backoff.
 - Typed WebSocket event helpers for posts, thread update/read/follow signals, unread invalidation, reactions, typing, presence, and channel-viewed events.
 - Channel detail lookup by id/name, public team channel discovery, channel statistics/timezone/member-count lookup, channel membership read/list/by-ids/add/remove, unread counts, view/read marking, typed notify props read/update, create, rename, and archive APIs.
 - Direct message channel open, group message channel open, and read-only group message channel search APIs.
@@ -33,16 +35,24 @@
 - Sidebar channel move/reorder helpers and a live sidebar move e2e check.
 - User preference list/load/save/delete APIs with a read-only live preference decode probe and temporary save/load/delete round-trip verification.
 - SwiftData cache foundation for teams, users, statuses, channels, posts, reactions, files, sidebar categories, and sync cursors.
+- Conditional GET support for cacheable workspace sync lists, with scoped persisted ETags,
+  ordered cached membership, HTTP 304 reuse, and explicit exclusion of posts and unread counts.
+- Restrictive SDK and CLI cache-directory permissions with configurable iOS file protection for the SwiftData store and SQLite sidecar files.
 - SwiftData cache for current-user channel membership/read state and active-channel unread counts.
 - Store merging for common live post, reaction, unread invalidation, and presence events.
 - Store merging for live channel updates/deletes, channel member updates, user updates, and sidebar preference invalidation refreshes.
 - Timestamp-aware cache merge policy for posts and channels so older payloads cannot overwrite newer edits or resurrect deleted/archived state.
 - Deletion reconciliation for cached posts now handles `post_deleted` live events without embedded post bodies when the event includes post id/timestamp data, and cached timeline reads can filter deleted tombstones for host UI lists.
 - Cursor-based channel post sync helper.
-- Public `MattermostSyncService` facade for joined-team/current-user hydration, paginated channel post sync, joined-channel membership sync, all joined-channel unread refresh, sidebar category sync, and cache-count reporting.
+- Public `MattermostSyncService` facade for joined-team/current-user hydration, complete paginated channel-user hydration, paginated channel post sync, joined-channel membership sync, all joined-channel unread refresh, sidebar category sync, and cache-count reporting.
 - Public service facades for server capability probing, users, channels, posts, threads, timelines, files, reactions, search, notifications, sidebar categories, typing, preferences, emoji, and sync over the proven endpoint methods.
 - Public `MattermostLiveSyncService` facade that emits live-sync lifecycle events with host-visible connection-state projection, reports non-cancellation backfill failures while keeping the lifecycle alive for later reconnect retry, runs connect/reconnect backfill with capped-by-default and opt-in all-joined-channel modes, applies WebSocket events into SwiftData, refreshes unread counts from `channel_viewed`/`multiple_channels_viewed`/`post_unread` events where possible, refreshes per-user thread state from thread invalidation events where possible, and has a live CLI posted-event cache check.
-- Unit-tested live-sync reconnect orchestration using an injected lifecycle stream, including fresh backfill on every connecting event, deterministic missed-post recovery through cursor backfill, connection-state projection, backfill failure diagnostics, backfill channel selection, event application into SwiftData, unread refresh on `post_unread` and multi-channel viewed invalidations, and thread-state refresh on thread invalidation.
+- Unit-tested live-sync reconnect orchestration using an injected lifecycle stream, including
+  deterministic rapid-gap suppression, long-gap and first-connect backfill, configurable/disabled
+  gap filtering, missed-post recovery through cursor backfill, connection-state projection,
+  backfill failure diagnostics, backfill channel selection, event application into SwiftData,
+  unread refresh on `post_unread` and multi-channel viewed invalidations, and thread-state refresh
+  on thread invalidation.
 - Live CLI reconnect-backfill check that seeds a channel post cursor, creates a temporary post after that cursor, runs `syncChannelPosts`, verifies the post is returned and cached, and cleans up the temporary post.
 - Live CLI deletion-backfill check that caches a temporary post, advances the cursor, deletes the post while disconnected, then verifies cursor backfill returns the deletion tombstone, marks the cached post deleted, filters it from visible cached reads, and advances the cursor.
 - Live CLI live-sync reconnect simulation that drives `MattermostLiveSyncService` through connecting/reconnecting/connecting lifecycle events, creates a temporary post while disconnected, verifies the reconnect backfill returns and caches it, and cleans up the post.
@@ -55,6 +65,8 @@
 - Forced-failure cleanup CLI check that creates temporary e2e resources, simulates an intermediate failure, proves the shared cleanup helper deletes the post/category/channel and restores sidebar order, and runs in `scripts/test-e2e.sh`.
 - Read-only e2e residue audit that fails if active `MattermostSwift` temporary channels or sidebar categories remain on the live server after mutating checks.
 - DocC quick-start article covering token auth, password login token source, cache hydration, unified timelines, live sync, all-channel reconnect backfill, and credential ownership.
+- DocC Keychain guidance with a device-bound token example and an explicit warning against
+  `UserDefaults`/`@AppStorage` credential storage.
 - Expanded symbol-level DocC comments across the public service facades so host apps can discover the intended high-level API without reading endpoint wrappers first.
 - Library force-unwrap audit: the reusable `MattermostSwift` target has no `try!`, `as!`, or forced optional unwraps in production code.
 - Pagination hardening: post/channel search, channel users, channel posts, and custom emoji list requests clamp invalid page and per-page inputs before hitting the REST API.
