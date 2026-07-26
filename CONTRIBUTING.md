@@ -7,7 +7,7 @@ Thanks for helping improve MattermostSwift.
 Use a recent Xcode/Swift toolchain that supports Swift 6 packages. The package currently declares:
 
 - Swift tools version: `6.0`
-- Platforms: iOS 18 and macOS 15
+- Library platforms: iOS 18, macOS 15, tvOS 18, watchOS 11, and visionOS 2
 - Products: `MattermostSwift` and `MattermostSwiftCLI`
 
 Run unit tests before opening a pull request:

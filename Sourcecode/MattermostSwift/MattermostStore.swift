@@ -3,8 +3,11 @@ import SwiftData
 
 /// SwiftData-backed cache for Mattermost objects used by app targets and the CLI.
 ///
-/// Every member is main-actor isolated. Keep managed cache models on that actor; use the
-/// immutable snapshot readers when values need to cross an actor boundary.
+/// Every store operation is main-actor isolated and uses the container's main context. This
+/// includes fetches, sync/live-sync writes, and retention helpers; the store does not provide a
+/// background `ModelContext`. Run potentially large scans only when a main-thread hitch is
+/// acceptable. Keep managed cache models on that actor; use the immutable snapshot readers when
+/// values need to cross an actor boundary.
 ///
 /// Mutation methods stage changes in ``context`` but don't persist them automatically. Call
 /// ``save()`` after a group of direct mutations. Higher-level sync APIs that document a save
@@ -16,16 +19,16 @@ import SwiftData
 /// named by their parameters. Readers with `includeDeleted: false` hide channel and post
 /// tombstones; passing `true` exposes them for reconciliation and diagnostics.
 ///
-/// Host apps own retention policy. Use pruning helpers such as
-/// `prunePosts(channelID:keepCount:)` and `deleteChannelContent(channelID:)` during
-/// background maintenance or channel lifecycle events to keep long-lived stores bounded.
+/// Host apps own retention policy. A practical cadence is to prune after initial hydration and
+/// then about once per day during an app-controlled idle window. Delete channel content when a
+/// channel leaves the host's retention scope.
 @MainActor
 public final class MattermostStore {
     private static let batchedFetchIDLimit = 500
 
     /// The versioned SwiftData schema used by MattermostSwift cache containers.
     public static var schema: Schema {
-        Schema(versionedSchema: MattermostCacheSchemaV1.self)
+        Schema(versionedSchema: MattermostCacheSchemaV2.self)
     }
 
     /// The model container that owns this store's cache.
@@ -40,12 +43,23 @@ public final class MattermostStore {
         context = container.mainContext
     }
 
-    /// Creates a versioned Mattermost cache container.
+    /// Creates a versioned, SwiftData-backed Mattermost cache.
+    ///
+    /// Disk-backed stores default to owner-only directory permissions. On iOS they
+    /// also use complete-until-first-user-authentication file protection. Hosts can
+    /// choose a stricter policy, or preserve a shared directory's existing policy,
+    /// through `security`.
+    ///
     /// - Parameters:
     ///   - inMemory: When `true` and `url` is `nil`, keeps the store only in memory.
     ///   - url: An explicit persistent-store URL. When supplied, this takes precedence over
     ///     `inMemory`.
-    public convenience init(inMemory: Bool = false, url: URL? = nil) throws {
+    ///   - security: Filesystem security for disk-backed stores.
+    public convenience init(
+        inMemory: Bool = false,
+        url: URL? = nil,
+        security: MattermostStoreSecurityOptions = .init()
+    ) throws {
         let schema = Self.schema
         let configuration: ModelConfiguration
         if let url {
@@ -67,11 +81,25 @@ public final class MattermostStore {
             )
         }
 
+        if !configuration.isStoredInMemoryOnly {
+            try MattermostStoreFilesystemSecurity.prepareStoreDirectory(
+                for: configuration.url,
+                options: security
+            )
+        }
+
         let container = try ModelContainer(
             for: schema,
             migrationPlan: MattermostCacheMigrationPlan.self,
             configurations: [configuration]
         )
+
+        if !configuration.isStoredInMemoryOnly {
+            try MattermostStoreFilesystemSecurity.secureStoreFiles(
+                at: configuration.url,
+                options: security
+            )
+        }
         self.init(container: container)
     }
 
@@ -263,11 +291,6 @@ public final class MattermostStore {
         for channel in existing where !retained.contains(channel.id) {
             let channelID = channel.id
             try deleteChannelContent(channelID: channelID)
-            for member in try context.fetch(FetchDescriptor<MattermostCachedChannelMember>(
-                predicate: #Predicate { $0.channelId == channelID }
-            )) {
-                context.delete(member)
-            }
             context.delete(channel)
         }
     }
@@ -860,7 +883,9 @@ public final class MattermostStore {
     /// Returns immutable post values that can safely be retained or sent to another actor.
     ///
     /// `includeDeleted` has the same tombstone behavior as
-    /// ``cachedPosts(channelID:limit:includeDeleted:)``.
+    /// ``cachedPosts(channelID:limit:includeDeleted:)``. Post props and metadata remain as raw
+    /// JSON on each snapshot. Use the snapshot's throwing decode helpers only when a consumer
+    /// needs those values.
     public func cachedPostSnapshots(
         channelID: String,
         limit: Int? = nil,
@@ -993,12 +1018,14 @@ public final class MattermostStore {
         }
     }
 
-    /// Permanently removes older cached posts and their cached reactions and files.
+    /// Permanently removes older cached posts and their cached reactions, files, and thread rows.
     /// - Parameters:
     ///   - channelID: The channel whose cache to bound.
     ///   - keepCount: The number of newest rows to retain. Negative values are treated as zero.
     ///
     /// Tombstones count toward `keepCount`. The deletions remain staged until ``save()``.
+    /// This method scans the channel on the main actor. Call it only when a main-thread hitch is
+    /// acceptable, such as an app-controlled idle window.
     public func prunePosts(channelID: String, keepCount: Int = 200) throws {
         let keepCount = max(0, keepCount)
         let posts = try cachedPosts(channelID: channelID, includeDeleted: true)
@@ -1009,10 +1036,13 @@ public final class MattermostStore {
         }
     }
 
-    /// Permanently deletes a channel's cached posts, unreads, reactions, and files.
+    /// Permanently deletes a channel's cached posts, unreads, reactions, files, members, and
+    /// thread rows.
     ///
-    /// This method preserves the channel row and channel memberships. It is not a tombstone
-    /// operation. The deletions remain staged until ``save()``.
+    /// This method preserves the channel row and is not a tombstone operation. The deletions
+    /// remain staged until ``save()``. It scans the channel on the main actor, so call it only
+    /// when a main-thread hitch is acceptable, typically when the channel leaves the host's
+    /// retention scope.
     public func deleteChannelContent(channelID: String) throws {
         let posts = try cachedPosts(channelID: channelID, includeDeleted: true)
 
@@ -1023,6 +1053,11 @@ public final class MattermostStore {
             predicate: #Predicate { $0.channelId == channelID }
         )) {
             context.delete(unread)
+        }
+        for member in try context.fetch(FetchDescriptor<MattermostCachedChannelMember>(
+            predicate: #Predicate { $0.channelId == channelID }
+        )) {
+            context.delete(member)
         }
         try deleteCachedPostContent(postIDs: posts.map(\.id))
     }
@@ -1042,6 +1077,11 @@ public final class MattermostStore {
             })
         }) {
             context.delete(file)
+        }
+        for thread in try fetchInBatches(ids: postIDs, descriptor: { chunkIDs in
+            FetchDescriptor<MattermostCachedThread>(predicate: #Predicate { chunkIDs.contains($0.rootId) })
+        }) {
+            context.delete(thread)
         }
     }
 
@@ -1119,6 +1159,37 @@ public final class MattermostStore {
         return cursor
     }
 
+    func cachedETag(scope: String) throws -> MattermostCacheETag? {
+        var descriptor = FetchDescriptor<MattermostCacheETag>(
+            predicate: #Predicate { $0.scope == scope }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    @discardableResult
+    func setETag(
+        scope: String,
+        value: String,
+        itemIDs: [String]
+    ) throws -> MattermostCacheETag {
+        if let cached = try cachedETag(scope: scope) {
+            cached.value = value
+            cached.itemIDs = itemIDs
+            return cached
+        }
+
+        let cached = MattermostCacheETag(scope: scope, value: value, itemIDs: itemIDs)
+        context.insert(cached)
+        return cached
+    }
+
+    func removeETag(scope: String) throws {
+        if let cached = try cachedETag(scope: scope) {
+            context.delete(cached)
+        }
+    }
+
     /// Decodes and stages cache changes for a supported WebSocket event.
     ///
     /// The returned typed event lets callers handle UI-specific behavior. Unsupported or
@@ -1127,25 +1198,43 @@ public final class MattermostStore {
     /// tombstone when the post is known. All changes remain staged until ``save()``.
     @discardableResult
     public func apply(liveEvent: MattermostLiveEvent) throws -> MattermostTypedLiveEvent {
+        try applyReportingMutation(liveEvent: liveEvent).typedEvent
+    }
+
+    // Report mutation from the same exhaustive switch that applies the event so live-sync
+    // persistence cannot drift from this method's no-op cases.
+    func applyReportingMutation(
+        liveEvent: MattermostLiveEvent
+    ) throws -> MattermostLiveEventApplication {
         let typedEvent = try liveEvent.typedEvent()
+        let mutatesStore: Bool
 
         switch typedEvent {
         case .posted(let post), .postEdited(let post):
             try upsert(post: post)
+            mutatesStore = true
         case .postDeleted(let post):
             if let post {
                 try upsert(post: post)
+                mutatesStore = true
             } else if let postID = liveEvent.stringData("post_id") ?? liveEvent.stringData("postId") {
+                let cachedPostExists = try cachedPost(id: postID) != nil
                 let deletedAt = liveEvent.int64Data("delete_at")
                     ?? liveEvent.int64Data("deleteAt")
                     ?? liveEvent.int64Data("update_at")
                     ?? liveEvent.int64Data("updateAt")
                     ?? Int64(Date.now.timeIntervalSince1970 * 1000)
                 try markPostDeleted(id: postID, at: deletedAt)
+                mutatesStore = cachedPostExists
+            } else {
+                mutatesStore = false
             }
         case .reactionAdded(let reaction):
             if let reaction {
                 try upsert(reaction: reaction)
+                mutatesStore = true
+            } else {
+                mutatesStore = false
             }
         case .reactionRemoved(let reaction):
             if let reaction {
@@ -1154,7 +1243,11 @@ public final class MattermostStore {
                     postID: reaction.postId,
                     emojiName: reaction.emojiName
                 )
+                let cachedReactionExists = try cachedReaction(id: id) != nil
                 try deleteCachedReaction(id: id)
+                mutatesStore = cachedReactionExists
+            } else {
+                mutatesStore = false
             }
         case .statusChange(let statusChange):
             if let userID = statusChange.userID, let status = statusChange.status {
@@ -1169,27 +1262,45 @@ public final class MattermostStore {
                 } else {
                     context.insert(cachedStatus)
                 }
+                mutatesStore = true
+            } else {
+                mutatesStore = false
             }
         case .channelCreated(let channel), .channelUpdated(let channel):
             if let channel {
                 try upsert(channel: channel)
+                mutatesStore = true
+            } else {
+                mutatesStore = false
             }
         case .channelDeleted(let channel, let channelID):
             if let channel {
                 try upsert(channel: channel)
                 try markChannelDeleted(id: channel.id, at: channel.deleteAt ?? Int64(Date.now.timeIntervalSince1970 * 1000))
                 try deleteChannelContent(channelID: channel.id)
+                mutatesStore = true
             } else if let channelID {
+                let cachedChannelExists = try cachedChannel(id: channelID, includeDeleted: true) != nil
+                let cachedContentExists = !(try cachedPosts(channelID: channelID, includeDeleted: true)).isEmpty
                 try markChannelDeleted(id: channelID)
                 try deleteChannelContent(channelID: channelID)
+                mutatesStore = cachedChannelExists || cachedContentExists
+            } else {
+                mutatesStore = false
             }
         case .channelMemberUpdated(let member):
             if let member {
                 try upsert(member: member)
+                mutatesStore = true
+            } else {
+                mutatesStore = false
             }
         case .userUpdated(let user):
             if let user {
                 try upsert(user: user)
+                mutatesStore = true
+            } else {
+                mutatesStore = false
             }
         case .hello,
              .typing,
@@ -1204,9 +1315,17 @@ public final class MattermostStore {
              .threadReadChanged,
              .cacheInvalidated,
              .unknown:
-            break
+            mutatesStore = false
         }
 
-        return typedEvent
+        return MattermostLiveEventApplication(
+            typedEvent: typedEvent,
+            mutatesStore: mutatesStore
+        )
     }
+}
+
+struct MattermostLiveEventApplication {
+    let typedEvent: MattermostTypedLiveEvent
+    let mutatesStore: Bool
 }

@@ -68,13 +68,21 @@ The library never stores credentials and never logs token values.
 - Factory methods for concept-specific facades: `MattermostUserService`, `MattermostTeamService`, `MattermostChannelService`, `MattermostPostService`, `MattermostThreadService`, `MattermostTimelineService`, `MattermostFileService`, `MattermostReactionService`, `MattermostSearchService`, `MattermostNotificationService`, `MattermostSidebarCategoryService`, `MattermostTypingService`, `MattermostPreferenceService`, `MattermostEmojiService`, `MattermostSyncService`, and `MattermostLiveSyncService`.
 
 HTTP and WebSocket requests set a browser-shaped macOS Safari `User-Agent`, matching the deployment reality that Mattermost's official desktop app is an Electron/browser wrapper and reducing the chance that a fronting edge layer classifies compiled SDK traffic as unusual automation. Transport uses native `URLSession` and `URLSessionWebSocketTask` only.
+Hosts that require certificate pinning can provide a `URLSessionDelegate`; SDK-created REST and
+WebSocket sessions both retain and use it for authentication challenges while preserving their
+different resource-timeout policies. Explicitly injected sessions remain responsible for their own
+delegates.
 
-`MattermostLiveEventStream` uses `URLSessionWebSocketTask`. `events()` is a single authenticated connection, while `lifecycleEvents(policy:)` reconnects with exponential backoff and emits connecting/reconnecting notices for sync orchestration.
+`MattermostLiveEventStream` uses `URLSessionWebSocketTask`. `events()` is a single authenticated connection, while `lifecycleEvents(policy:)` reconnects with full-jitter exponential backoff and emits connecting/reconnecting notices for sync orchestration. Each retry delay is sampled uniformly from zero through the attempt's capped exponential base so clients recovering from the same outage do not reconnect in lockstep. Malformed event frames remain nonfatal: the receive loop skips them, emits `eventDecodeFailed` with structured failure details through the lifecycle stream, and continues reading the same connection.
+Events received before `hello` or the authentication reply are capped at 256; overflow reports
+`MattermostError.liveEventGap` so reconnect/backfill can reconcile instead of allowing handshake
+memory growth.
 
 Public models are intentionally small and stable while the first flow hardens:
 
 - `MattermostUser`
 - `MattermostSession`
+- `MattermostAPIErrorBody`
 - `MattermostUserStatus`
 - `MattermostTeam`
 - `MattermostTeamMember`
@@ -105,17 +113,61 @@ Public models are intentionally small and stable while the first flow hardens:
 - `MattermostCacheInvalidationEvent`
 - `MattermostThreadEvent`
 
-`MattermostStore` is a `@MainActor` SwiftData wrapper for local cache/persistence. It exposes app-friendly model classes for cached teams, users, statuses, channels, channel deletion/archive state, channel membership/read state, unread counts, per-user thread inbox state, posts, reactions, files, sidebar categories, and sync cursors. It can also merge common typed live events into the cache, including post edits/deletes, reactions, unread invalidations, presence changes, channel updates/deletes, channel member updates, and user updates.
+`MattermostStore` is a `@MainActor` SwiftData wrapper for local cache/persistence. Its context is `ModelContainer.mainContext`; there is no background `ModelActor` or secondary `ModelContext`. Consequently every store fetch and mutation is main-actor isolated, including timeline sync, `MattermostSyncService.sync`, live-sync backfill/event application, `prunePosts`, and `deleteChannelContent`. Network requests suspend while awaiting responses, but SwiftData fetches and writes resume on the main actor. Host apps must schedule large sync or retention passes where a main-thread hitch is acceptable. The recommended retention cadence is to prune after initial hydration and then about once per day during an app-controlled idle window, and to delete channel content when a channel leaves the host's retention scope. Immutable `MattermostCachedUserSnapshot`, `MattermostCachedChannelSnapshot`, and `MattermostCachedPostSnapshot` values are the `Sendable` boundary for using cached values from other actors; they do not move store work off the main actor. Immutable post snapshots copy cached props and metadata as raw JSON without decoding on the main actor; their throwing accessors decode those payloads on demand after the snapshot crosses into the consumer's actor.
+
+The store exposes app-friendly model classes for cached teams, users, statuses, channels, channel deletion/archive state, channel membership/read state, unread counts, per-user thread inbox state, posts, reactions, files, sidebar categories, and sync cursors. Its internal cache metadata also stores ETags plus ordered item IDs for conditional sync lists. The V2 cache schema adds that metadata through an additive lightweight migration from V1. It can also merge common typed live events into the cache, including post edits/deletes, reactions, unread invalidations, presence changes, channel updates/deletes, channel member updates, and user updates. Disk-backed stores use owner-only directory permissions by default, and iOS applies complete-until-first-user-authentication protection to the store directory and SQLite files. `MattermostStoreSecurityOptions` lets a host choose stricter protection or preserve a shared directory's host-managed policy; macOS hosts must provide volume-level at-rest protection such as FileVault.
 
 The client's `timeline(_:request:)`/`syncTimeline(_:to:)` methods give host apps one API shape for channel timelines and thread timelines. `MattermostTimelineTarget.channel(id:)` loads and caches channel post pages; `MattermostTimelineTarget.thread(rootPostID:)` loads and caches a root/reply thread, with request options for `fromPost`, `fromCreateAt`, direction, and collapsed-thread query flags. The target also owns the cache cursor scope so timeline sync and offline reads can avoid ad hoc string keys in app code.
 
-`MattermostSyncService` is the first high-level sync facade. It hydrates joined team metadata, current user, current-user status, joined channels, current-user channel memberships, all joined-channel unread counts, optional channel users, optional paginated channel posts, sidebar categories, and team/channel cursor records. `MattermostClient.syncChannelPosts(channelID:to:perPage:maxPages:)` remains available for targeted timeline backfill using the store cursor: the first pass pages recent channel history, while later passes use Mattermost's `since` timestamp query once per sync to fetch updates created or modified after the stored cursor. The service is still deliberately bounded and does not yet reconcile every possible server-side deletion across every channel.
+`MattermostSyncService` is the first high-level sync facade. It hydrates joined team metadata, current user, current-user status, joined channels, current-user channel memberships, all joined-channel unread counts, optional fully paginated channel users, optional paginated channel posts, sidebar categories, and team/channel cursor records. Channel-user hydration continues until Mattermost returns a short profile page, so channels larger than the 60-user request size are cached completely. Joined-team, joined-channel, and sidebar-category list requests use persisted ETags scoped by endpoint and parameters. A later `304 Not Modified` returns the precisely ordered cached membership for that scope and skips list reconciliation writes. Posts and unread counts do not send conditional validators. `MattermostClient.syncChannelPosts(channelID:to:perPage:maxPages:)` remains available for targeted timeline backfill using the store cursor: the first pass pages recent channel history, while later passes use Mattermost's `since` timestamp query once per sync to fetch updates created or modified after the stored cursor. The service is still deliberately bounded for post history and does not yet reconcile every possible server-side deletion across every channel.
 
 The cache merge policy is server timestamp last-write-wins where Mattermost exposes timestamps. Cached posts compare `create_at`, `update_at`, `edit_at`, and `delete_at`; cached channels compare `create_at`, `update_at`, and `delete_at`. Older payloads are ignored so a delayed REST page or WebSocket event cannot overwrite a newer edit or resurrect a deleted/archived item. Post deletion events without an embedded post can still tombstone an existing cached post from the event id/timestamp, and cached timeline reads can include tombstones for sync/debug views or filter them for normal message lists. Objects without useful server timestamps still use straightforward upsert semantics.
 
-`MattermostLiveSyncService` builds on the raw stream and sync service. Before each socket connection attempt it runs REST backfill, optionally across joined channel timelines, then applies typed live events into `MattermostStore` as they arrive. Reconnect backfill uses each channel's stored post cursor, so posts created or modified while the socket was down can be fetched through Mattermost's `since` query and merged before live event consumption resumes. It emits `MattermostLiveSyncEvent` values so host apps can show connecting, backfilled, event-applied, unread-refreshed, sidebar-refreshed, thread-state-refreshed, reconnecting, and backfill-failed states; each lifecycle event also exposes a derived `connectionState` for host UI indicators. A non-cancellation REST-backfill failure yields a non-secret diagnostic and the lifecycle continues, allowing a later reconnect to retry; cancellation terminates the stream. `channel_viewed`, `multiple_channels_viewed`, and `post_unread` events refresh channel unread counts when configured, using the current synced user as a fallback when the WebSocket payload omits a user id and refreshing every channel named by a multi-channel event. Thread events such as `response`, `thread_updated`, `thread_follow_changed`, and `thread_read_changed` trigger a targeted `GET /api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}` refresh when enough user/team/thread context is available, then upsert the returned per-user thread state and root post/participants. Replies themselves continue to enter the cache through normal `posted` events. Preference events trigger a sidebar category refresh for the active team when configured. The current policy is still intentionally simple: backfill is page/channel bounded by default, but hosts can opt into `backfillAllJoinedChannelPosts` for a full joined-channel missed-event sweep on connect/reconnect. Conflict handling remains server-timestamp last-write-wins through normal cache upserts. Its reconnect orchestration, missed-post cursor recovery, connection-state projection, backfill failure diagnostics, channel-selection policy, unread invalidation refresh, and thread-state invalidation refresh are unit-tested with an injected lifecycle stream so backfill-on-each-connect behavior can be proven without forcing a real network drop.
+Host-driven post retention pruning and channel-content deletion remove dependent cached reactions,
+files, and per-user thread inbox rows rooted at the removed posts. Thread rows do not duplicate a
+channel identifier, so cleanup resolves them through the deleted root-post identifiers.
 
-The internal REST layer decodes Mattermost snake_case payloads and maps errors into `MattermostError`.
+`MattermostLiveSyncService` builds on the raw stream and sync service. It always runs REST backfill before the first socket connection, optionally across joined channel timelines, then applies typed live events into `MattermostStore` as they arrive. Reconnects run that backfill only after a configurable meaningful disconnect gap (10 seconds by default); hosts can tune the threshold or disable filtering to backfill every reconnect. Reconnect backfill uses each channel's stored post cursor, so posts created or modified while the socket was down can be fetched through Mattermost's `since` query and merged before live event consumption resumes. It emits `MattermostLiveSyncEvent` values so host apps can show connecting, connected-without-backfill, backfilled, event-applied, unread-refreshed, sidebar-refreshed, thread-state-refreshed, reconnecting, and failure states; each lifecycle event also exposes a derived `connectionState` for host UI indicators. A malformed event payload is skipped and reported through `eventApplyFailed`, preserving stream continuity when a server introduces JSON schema drift. Non-cancellation backfill, unread, sidebar-category, and thread-state refresh failures are also reported without ending the lifecycle, while cancellation still terminates the stream. `channel_viewed`, `multiple_channels_viewed`, and `post_unread` events refresh channel unread counts when configured, using the current synced user as a fallback when the WebSocket payload omits a user id and refreshing every channel named by a multi-channel event. Thread events such as `response`, `thread_updated`, `thread_follow_changed`, and `thread_read_changed` trigger a targeted `GET /api/v4/users/{user_id}/teams/{team_id}/threads/{thread_id}` refresh when enough user/team/thread context is available, then upsert the returned per-user thread state and root post/participants. Replies themselves continue to enter the cache through normal `posted` events. Preference events trigger a sidebar category refresh for the active team when configured. The current policy is still intentionally simple: backfill is page/channel bounded by default, but hosts can opt into `backfillAllJoinedChannelPosts` for a full joined-channel missed-event sweep on qualifying reconnects. Conflict handling remains server-timestamp last-write-wins through normal cache upserts. Its reconnect orchestration, deterministic rapid/long-gap decisions, missed-post cursor recovery, connection-state projection, failure diagnostics, channel-selection policy, unread invalidation refresh, and thread-state invalidation refresh are unit-tested with an injected lifecycle stream so reconnect behavior can be proven without forcing a real network drop.
+
+### Host app lifecycle contract
+
+Live stream lifetime belongs to the host rather than to UIKit, AppKit, or SwiftUI inside the
+package. Hosts must run `MattermostLiveEventStream` or `MattermostLiveSyncService` iteration only
+while the owning scene is active. On background transition, cancel and discard the consuming
+task. Async-stream termination propagates cancellation through live-sync refresh/backfill work and
+the reconnect loop to `MattermostLiveEventStream`, whose connection scope closes the
+`URLSessionWebSocketTask` with `.goingAway`. On activation, create a new sequence and consuming
+task. For live sync, the first `.connecting` lifecycle event runs authoritative REST backfill
+before socket event delivery, which reconciles the cache for the period spent backgrounded.
+
+This teardown/reconnect contract is intentionally explicit instead of maintaining a reduced
+heartbeat in an iOS background task. iOS normally suspends backgrounded processes, and keeping a
+stream alive with `beginBackgroundTask` would spend a finite background window on heartbeats,
+reconnect attempts, and potentially full backfills. Multi-scene hosts should apply the policy per
+owning scene or centralize ownership and keep the stream only while at least one relevant scene is
+active.
+
+### Network-cost policy
+
+The default REST and WebSocket configurations allow constrained and expensive network access.
+Bulk post history and live-sync backfill therefore continue on Low Data Mode and personal-hotspot
+paths. This is a deliberate reliability choice for the current transport boundary: all REST
+operations share the client's injected `URLSession`, so applying
+`allowsConstrainedNetworkAccess = false` only at that session would also block authentication,
+message sends, and small unread/thread/sidebar refreshes. It would surface a transport failure on
+a constrained path; it does not by itself provide a resumable bulk-transfer scheduler.
+
+A host may impose a whole-REST network-cost policy by injecting a constrained-disallowing REST
+session into `MattermostClient` and supplying a separate, unconstrained
+`webSocketURLSession`. A future bulk-history transport would require explicit request
+classification plus retry/resume semantics before the SDK can safely constrain only pagination
+and reconnect backfill.
+
+The internal REST layer decodes Mattermost snake_case payloads and maps errors into
+`MattermostError`. Safe methods and explicitly audited read-only POST endpoints retry HTTP 429
+and 503 responses at most twice, honoring numeric `Retry-After` delays and otherwise using bounded
+backoff. Mutating requests are not replayed; HTTP 429 ultimately maps to the dedicated
+`MattermostError.rateLimited(retryAfter:)` case.
 
 ## Expansion Rules
 

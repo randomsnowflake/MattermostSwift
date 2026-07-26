@@ -9,6 +9,75 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 - Added curated DocC guides for authentication, pagination, caching, live sync, and error handling;
   documented the complete main-actor `MattermostStore` API and public SwiftData cache-model
   contracts; and corrected the README cache example for Swift 6 strict concurrency.
+- Added and documented the supported app-lifecycle contract for live events and live sync: hosts cancel the
+  consuming task on background and create a fresh stream on activation, triggering normal
+  connect-time backfill. Also made explicit the deliberate default of allowing bulk REST history
+  on Low Data Mode/expensive paths and documented the injectable whole-REST alternative.
+- `MattermostSwiftCLI --help` and empty invocations now print help without requiring
+  Mattermost credentials. Unknown or malformed commands report a specific diagnostic
+  on stderr and exit with status 2 instead of printing help and exiting successfully.
+- Declared tvOS 18, watchOS 11, and visionOS 2 support alongside iOS 18 and macOS 15,
+  with CI builds for every supported Apple platform and documentation of the current Linux limits.
+- Workspace sync now persists scoped ETags for joined-team, joined-channel, and sidebar-category
+  lists, sends `If-None-Match` on later syncs, and treats HTTP 304 as cached unchanged data.
+  Post timelines and unread-count requests remain unconditional.
+- Channel-user cache hydration now fetches every profile page instead of silently stopping at
+  the first 60 users.
+- Live sync now skips the full REST backfill after reconnect gaps shorter than 10 seconds by
+  default, while always backfilling the first connection. Hosts can tune
+  `MattermostLiveSyncOptions.minimumBackfillGap` or set it to `nil` to backfill every reconnect;
+  skipped backfills emit `.connected` once the socket connection succeeds.
+- Live-sync channel backfill and bulk unread refresh now share the sync service's width-8 bounded
+  concurrency, reducing reconnect and mark-all-read latency while preserving cancellation and
+  channel/user result association.
+- Added a host-provided `URLSessionDelegate` hook for server-trust evaluation on both default REST
+  and WebSocket sessions, with matching session factories for direct URLSession construction.
+- Bounded WebSocket events buffered during authentication to 256; overflow now reports
+  `MattermostError.liveEventGap` and requires normal reconnect reconciliation.
+- Added concrete Keychain token-storage guidance using
+  `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` and warned against `UserDefaults`/`@AppStorage`.
+- Live sync now skips and reports malformed WebSocket events instead of terminating the stream,
+  and surfaces unread, sidebar-category, and thread-state refresh failures to host apps.
+- Malformed WebSocket event frames now emit an `eventDecodeFailed` lifecycle signal before
+  being skipped, preserving the connection while exposing wire-format failures to host apps.
+- WebSocket reconnect backoff now uses full jitter from zero through the capped exponential
+  delay, preventing clients affected by the same outage from retrying in lockstep.
+- Safe REST reads and audited read-only POST requests now retry HTTP 429 and 503 responses
+  with bounded backoff, honoring numeric `Retry-After` values. Mutations are never replayed,
+  and exhausted HTTP 429 responses surface as `MattermostError.rateLimited(retryAfter:)`.
+- **Breaking:** `MattermostError.httpStatus` now includes a third `apiError` associated value.
+  `MattermostAPIErrorBody` preserves Mattermost error IDs, detailed errors, request IDs, and body
+  status codes; `MattermostError` also provides `isUnauthorized`, `isForbidden`, and `isNotFound`.
+  Existing `httpStatus` pattern matches must accept the new associated value.
+- **Breaking:** `MattermostLiveSyncFailure` now carries error and underlying-error domain/code
+  identity in addition to its attempt and message, and preserves a typed `MattermostError` when
+  available. Its public initializer now requires structured error identity, and backfill failures
+  populate it from the thrown error.
+- Batched channel-member cleanup when authoritative joined-channel sync removes multiple channels,
+  and reused a shared plain JSON decoder for multi-channel viewed timestamps.
+- Disk-backed `MattermostStore` caches and CLI cache directories now use owner-only permissions
+  by default. iOS stores apply configurable file protection to the directory and SQLite files,
+  while macOS hosts retain responsibility for volume-level encryption.
+- Corrected the `MattermostStore` threading documentation: all store, sync, live-sync, and
+  retention work uses the main actor, with host guidance for scheduling potentially expensive
+  pruning and channel cleanup.
+- Live sync now skips SwiftData saves for non-mutating events such as typing indicators and
+  coalesces event application plus refresh results into at most one save per applied event.
+- **Source-breaking:** `MattermostCachedPostSnapshot` now exposes `propsJSON` and
+  `metadataJSON` instead of eagerly decoded `props` and `metadata`. Snapshot creation performs no
+  JSON decoding; call the new throwing `decodedProps()` and `decodedMetadata()` methods on demand.
+- Public channel, post, user, team, timeline-target, sidebar-category, thread, file,
+  reaction, custom-emoji, and immutable cache-snapshot value types now conform to
+  `Hashable` for use in SwiftUI navigation and hash-based collections.
+- `MattermostLiveSyncEvent` now conforms to `Equatable`, enabling direct comparison
+  in host-app live-sync reducer tests.
+- Redacted bearer tokens from the textual and debug descriptions of `MattermostSession`,
+  `MattermostAuthentication`, and `MattermostConfiguration`.
+- Server ping and client-configuration decoding now tolerates key casing and separator drift across Mattermost releases.
+- Cached thread inbox rows are now removed when their root posts are pruned or their channel
+  content is deleted, preventing stale unread threads and unbounded cache growth.
+- Channel deletion now removes cached channel memberships, preventing live
+  `channel_deleted` events from leaving orphaned membership rows.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,

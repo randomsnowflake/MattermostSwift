@@ -14,6 +14,7 @@ private let mattermostCachedPostDecoder = JSONDecoder()
 ///
 /// Instances returned by ``MattermostStore`` belong to its main context and main-actor
 /// isolation. Use ``MattermostCachedUserSnapshot`` when the value must cross actors.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedUser {
     @Attribute(.unique) public var id: String = ""
@@ -54,6 +55,7 @@ public final class MattermostCachedUser {
 ///
 /// The unique identity is `userId`. Mutate and retain managed instances only on the
 /// ``MattermostStore`` main actor.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedUserStatus {
     @Attribute(.unique) public var userId: String = ""
@@ -101,6 +103,7 @@ public final class MattermostCachedUserStatus {
 /// SwiftData row containing cached Mattermost team metadata.
 ///
 /// Instances are managed by the ``MattermostStore`` main context.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedTeam {
     @Attribute(.unique) public var id: String = ""
@@ -133,6 +136,7 @@ public final class MattermostCachedTeam {
 /// Channel updates use server timestamps so an older payload can't overwrite a newer edit or
 /// resurrect a deleted channel. A positive `deleteAt` is a tombstone; normal
 /// ``MattermostStore`` channel readers hide tombstones unless `includeDeleted` is `true`.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedChannel {
     #Index<MattermostCachedChannel>([\.teamId])
@@ -210,6 +214,7 @@ public final class MattermostCachedChannel {
 /// `id` is the stable channel/user composite key produced by
 /// ``cacheID(channelID:userID:)``. Instances are managed by the ``MattermostStore`` main
 /// context.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedChannelMember {
     #Index<MattermostCachedChannelMember>([\.userId])
@@ -267,6 +272,7 @@ public final class MattermostCachedChannelMember {
 ///
 /// `id` is the stable channel/user composite key produced by
 /// ``cacheID(channelID:userID:)``. Root counters support collapsed reply threads.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedChannelUnread {
     #Index<MattermostCachedChannelUnread>([\.userId])
@@ -310,6 +316,7 @@ public final class MattermostCachedChannelUnread {
 ///
 /// This is per-user state, not the cached root/reply post collection. Use
 /// ``MattermostStore/cachedThread(rootID:includeDeleted:)`` to read the posts themselves.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedThread {
     #Index<MattermostCachedThread>([\.userId, \.teamId])
@@ -389,6 +396,7 @@ public final class MattermostCachedThread {
 /// arbitrary server JSON; prefer ``decodedProps()`` and ``decodedMetadata()`` over parsing those
 /// storage strings directly. Instances belong to the ``MattermostStore`` main context; use
 /// ``MattermostCachedPostSnapshot`` when values must cross actors.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedPost {
     #Index<MattermostCachedPost>([\.channelId], [\.channelId, \.createAt], [\.rootId])
@@ -515,6 +523,7 @@ public final class MattermostCachedPost {
 ///
 /// `id` is the stable post/user/emoji composite key produced by
 /// ``cacheID(userID:postID:emojiName:)``.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedReaction {
     #Index<MattermostCachedReaction>([\.postId])
@@ -552,6 +561,7 @@ public final class MattermostCachedReaction {
 /// SwiftData row containing cached metadata for an uploaded Mattermost file.
 ///
 /// This model stores metadata only; file bytes remain outside the SwiftData cache.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedFile {
     #Index<MattermostCachedFile>([\.postId])
@@ -607,6 +617,7 @@ public final class MattermostCachedFile {
 /// SwiftData row containing a user/team sidebar category and its ordered channel IDs.
 ///
 /// Instances are managed by the ``MattermostStore`` main context.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedSidebarCategory {
     #Index<MattermostCachedSidebarCategory>([\.teamId])
@@ -651,6 +662,7 @@ public final class MattermostCachedSidebarCategory {
 ///
 /// Cursor timestamps are Mattermost server milliseconds. Advance a cursor only after all data
 /// through that point has been staged, and save the data and cursor together.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostSyncCursor {
     @Attribute(.unique) public var scope: String = ""
@@ -662,5 +674,19 @@ public final class MattermostSyncCursor {
         self.scope = scope
         self.lastSyncAt = lastSyncAt
         self.lastItemID = lastItemID
+    }
+}
+
+/// A server validator and the ordered cache membership for one conditional list request.
+@Model
+final class MattermostCacheETag {
+    @Attribute(.unique) var scope: String = ""
+    var value: String = ""
+    var itemIDs: [String] = []
+
+    init(scope: String, value: String, itemIDs: [String]) {
+        self.scope = scope
+        self.value = value
+        self.itemIDs = itemIDs
     }
 }

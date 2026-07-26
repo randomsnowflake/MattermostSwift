@@ -1,5 +1,10 @@
 import Foundation
 
+enum MattermostConditionalResponse<Value: Sendable>: Sendable {
+    case modified(value: Value, etag: String?)
+    case notModified
+}
+
 struct MattermostHTTPClient: Sendable {
     private let configuration: MattermostConfiguration
     private let urlSession: URLSession
@@ -23,6 +28,34 @@ struct MattermostHTTPClient: Sendable {
         }
 
         return try mattermostSnakeCaseDecoder.decode(Response.self, from: data)
+    }
+
+    func conditionalGet<Response: Decodable & Sendable>(
+        _ endpoint: String,
+        queryItems: [URLQueryItem] = [],
+        etag: String?
+    ) async throws -> MattermostConditionalResponse<Response> {
+        var request = try makeRequest(endpoint: endpoint, method: "GET", queryItems: queryItems)
+        let hasValidator = etag.map { !$0.isEmpty } ?? false
+        if let etag, hasValidator {
+            request.setValue(etag, forHTTPHeaderField: "If-None-Match")
+        }
+        let (data, response) = try await loadData(for: request)
+        let httpResponse = try validate(data, response, allowsNotModified: hasValidator)
+
+        if httpResponse.statusCode == 304 {
+            return .notModified
+        }
+        guard !data.isEmpty else {
+            throw MattermostError.emptyResponse
+        }
+
+        let responseETag = httpResponse.value(forHTTPHeaderField: "ETag")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        return .modified(
+            value: try mattermostSnakeCaseDecoder.decode(Response.self, from: data),
+            etag: responseETag
+        )
     }
 
     func post<Request: Encodable & Sendable, Response: Decodable & Sendable>(
@@ -187,15 +220,26 @@ struct MattermostHTTPClient: Sendable {
         )
     }
 
-    private func validate(_ data: Data, _ response: URLResponse) throws -> HTTPURLResponse {
+    private func validate(
+        _ data: Data,
+        _ response: URLResponse,
+        allowsNotModified: Bool = false
+    ) throws -> HTTPURLResponse {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw MattermostError.invalidHTTPResponse
         }
 
-        guard (200..<300).contains(httpResponse.statusCode) else {
+        if httpResponse.statusCode == 429 {
+            throw MattermostError.rateLimited(retryAfter: Self.retryAfter(from: httpResponse))
+        }
+
+        let isNotModified = allowsNotModified && httpResponse.statusCode == 304
+        guard (200..<300).contains(httpResponse.statusCode) || isNotModified else {
+            let apiError = decodeMattermostAPIError(from: data)
             throw MattermostError.httpStatus(
                 code: httpResponse.statusCode,
-                message: decodeMattermostAPIError(from: data)?.message
+                message: apiError?.message,
+                apiError: apiError
             )
         }
 
@@ -204,30 +248,58 @@ struct MattermostHTTPClient: Sendable {
 
     // Native async transport. `URLSession.data(for:)` propagates Task cancellation
     // (it cancels the underlying data task). Safe requests and explicitly audited
-    // read-only POST endpoints retry a transient keep-alive socket reset; a mutation may
-    // have committed before its response was lost, so other POST/PUT/PATCH/DELETE requests
-    // are never replayed automatically.
+    // read-only POST endpoints retry transient transport errors and retryable HTTP
+    // statuses; a mutation may have committed before its response was lost, so other
+    // POST/PUT/PATCH/DELETE requests are never replayed automatically.
     private func loadData(for request: URLRequest) async throws -> (Data, URLResponse) {
         var attempt = 0
         while true {
+            let result: (Data, URLResponse)
             do {
-                return try await urlSession.data(for: request)
+                result = try await urlSession.data(for: request)
             } catch {
-                attempt += 1
                 if Self.isCancellation(error) {
                     throw error
                 }
-                guard attempt <= Self.maxTransientRetries,
+                guard attempt < Self.maxTransientRetries,
                       Self.isTransient(error),
                       Self.allowsAutomaticRetry(for: request) else {
                     throw MattermostError.transportFailure(error.localizedDescription)
                 }
+                attempt += 1
                 try await Task.sleep(for: .milliseconds(200 * attempt))
+                continue
             }
+
+            if let httpResponse = result.1 as? HTTPURLResponse,
+               Self.isRetryableStatus(httpResponse.statusCode),
+               attempt < Self.maxTransientRetries,
+               Self.allowsAutomaticRetry(for: request) {
+                attempt += 1
+                let retryAfter = Self.retryAfter(from: httpResponse) ?? Double(attempt) * 0.5
+                try await Task.sleep(for: .seconds(retryAfter))
+                continue
+            }
+
+            return result
         }
     }
 
     private static let maxTransientRetries = 2
+
+    private static func isRetryableStatus(_ code: Int) -> Bool {
+        code == 429 || code == 503
+    }
+
+    private static func retryAfter(from response: HTTPURLResponse) -> TimeInterval? {
+        guard let header = response.value(forHTTPHeaderField: "Retry-After"),
+              let delay = TimeInterval(header.trimmingCharacters(in: .whitespacesAndNewlines)),
+              delay.isFinite,
+              delay >= 0 else {
+            return nil
+        }
+        return delay
+    }
 
     private static func allowsAutomaticRetry(for request: URLRequest) -> Bool {
         switch request.httpMethod?.uppercased() {
@@ -404,11 +476,11 @@ struct MattermostHTTPClient: Sendable {
     }
 
 
-    private func decodeMattermostAPIError(from data: Data) -> MattermostAPIError? {
+    private func decodeMattermostAPIError(from data: Data) -> MattermostAPIErrorBody? {
         guard !data.isEmpty else {
             return nil
         }
-        return try? mattermostSnakeCaseDecoder.decode(MattermostAPIError.self, from: data)
+        return try? mattermostSnakeCaseDecoder.decode(MattermostAPIErrorBody.self, from: data)
     }
 }
 
@@ -450,10 +522,6 @@ struct MattermostMultipartFilePart: Sendable, MattermostMultipartPartProtocol {
         }
         return value
     }
-}
-
-private struct MattermostAPIError: Decodable, Sendable {
-    let message: String?
 }
 
 private extension String {
