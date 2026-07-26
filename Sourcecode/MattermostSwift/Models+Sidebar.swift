@@ -20,7 +20,7 @@ public struct MattermostSidebarCategoryList: Decodable, Equatable, Sendable {
 }
 
 /// Sidebar category metadata for a user's team sidebar.
-public struct MattermostSidebarCategory: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostSidebarCategory: Decodable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let userId: String?
     public let teamId: String?

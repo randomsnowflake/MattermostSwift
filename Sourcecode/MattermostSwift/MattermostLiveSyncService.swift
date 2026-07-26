@@ -93,7 +93,7 @@ public struct MattermostLiveSyncFailure: Equatable, Sendable {
 }
 
 /// Events emitted by `MattermostLiveSyncService`.
-public enum MattermostLiveSyncEvent: Sendable {
+public enum MattermostLiveSyncEvent: Equatable, Sendable {
     case connecting(attempt: Int)
     case backfilled(MattermostLiveBackfillResult)
     case eventApplied(MattermostLiveEvent, MattermostTypedLiveEvent)

@@ -205,11 +205,6 @@ public final class MattermostStore {
         for channel in existing where !retained.contains(channel.id) {
             let channelID = channel.id
             try deleteChannelContent(channelID: channelID)
-            for member in try context.fetch(FetchDescriptor<MattermostCachedChannelMember>(
-                predicate: #Predicate { $0.channelId == channelID }
-            )) {
-                context.delete(member)
-            }
             context.delete(channel)
         }
     }
@@ -693,6 +688,9 @@ public final class MattermostStore {
     }
 
     /// Returns immutable post values that can safely be retained or sent to another actor.
+    ///
+    /// Post props and metadata remain as raw JSON on each snapshot. Use the snapshot's
+    /// throwing decode helpers only when a consumer needs those values.
     public func cachedPostSnapshots(
         channelID: String,
         limit: Int? = nil,
@@ -821,6 +819,11 @@ public final class MattermostStore {
         )) {
             context.delete(unread)
         }
+        for member in try context.fetch(FetchDescriptor<MattermostCachedChannelMember>(
+            predicate: #Predicate { $0.channelId == channelID }
+        )) {
+            context.delete(member)
+        }
         try deleteCachedPostContent(postIDs: posts.map(\.id))
     }
 
@@ -839,6 +842,11 @@ public final class MattermostStore {
             })
         }) {
             context.delete(file)
+        }
+        for thread in try fetchInBatches(ids: postIDs, descriptor: { chunkIDs in
+            FetchDescriptor<MattermostCachedThread>(predicate: #Predicate { chunkIDs.contains($0.rootId) })
+        }) {
+            context.delete(thread)
         }
     }
 
