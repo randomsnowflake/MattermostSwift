@@ -4,6 +4,9 @@
 
 - Swift Package with `MattermostSwift` library and `MattermostSwiftCLI` executable.
 - Declared and CI-verified library support for iOS 18, macOS 15, tvOS 18, watchOS 11, and visionOS 2.
+- Argument-parser-based CLI with generated help/version/completions, diagnostics grouped
+  under `diag`, global lossless JSON output, TTY-gated progress, and binary-terminal
+  safety.
 - Source layout under `Sourcecode/`.
 - Personal access token REST authentication.
 - Username/password login API and `login-test` CLI probe that sends the official web-client login header and extracts the session token from either the documented Mattermost `Token` response header or the official `MMAUTHTOKEN` browser session cookie.

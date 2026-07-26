@@ -17,6 +17,11 @@ The library supports iOS 18, macOS 15, tvOS 18, watchOS 11, and visionOS 2. Linu
 supported because the cache uses SwiftData and live events use the Apple Foundation WebSocket
 transport.
 
+Public response models used by the command-line and persistence workflows conform to
+`Codable`. Use `JSONEncoder` to persist complete values—including post newlines, props,
+metadata, and preference values—and the package's normal decoder configuration when
+reading server-shaped snake-case payloads.
+
 ## Authenticate
 
 ### Essentials
@@ -311,7 +316,12 @@ let options = MattermostLiveSyncOptions(
 )
 ```
 
-The CLI includes live reconnect checks for this path: `reconnect-backfill-test` proves cursor-based missed-post recovery directly through REST sync, `live-sync-reconnect-test` drives `MattermostLiveSyncService` through a reconnect lifecycle while verifying the second backfill returns and caches a post created while disconnected, and `all-channel-reconnect-test` repeats that reconnect proof with `backfillAllJoinedChannelPosts` enabled.
+The CLI includes live reconnect checks for this path under `diag`:
+`diag reconnect-backfill-test` proves cursor-based missed-post recovery directly through
+REST sync, `diag live-sync-reconnect-test` drives `MattermostLiveSyncService` through a
+reconnect lifecycle while verifying the second backfill returns and caches a post
+created while disconnected, and `diag all-channel-reconnect-test` repeats that reconnect
+proof with `backfillAllJoinedChannelPosts` enabled.
 
 ### Stop live sync while backgrounded
 

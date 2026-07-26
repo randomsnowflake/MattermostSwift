@@ -337,6 +337,47 @@ export MATTERMOST_PASSWORD="password"
 `MATTERMOST_USERNAME` and `MATTERMOST_PASSWORD` are optional and are used only by `login-test`. Password login sends Mattermost's browser-style `X-Requested-With: XMLHttpRequest` login header and returns a `MattermostSession` from the `Token` response header when present, or from Mattermost's `MMAUTHTOKEN` session cookie when a deployment follows the browser/webapp path.
 `notify-props-test` is read-only; it loads channel membership and prints the typed per-channel notification properties plus the raw server keys.
 
+## Command-Line Harness
+
+`MattermostSwiftCLI` uses `swift-argument-parser` for generated root and per-command
+help, validation, version output, and shell completions. The dependency is attached only
+to the executable target; applications that depend on the `MattermostSwift` library do
+not inherit it.
+
+```sh
+swift run MattermostSwiftCLI --help
+swift run MattermostSwiftCLI send-message --help
+swift run MattermostSwiftCLI --version
+swift run MattermostSwiftCLI --generate-completion-script zsh
+```
+
+Options can appear before, between, or after positional arguments. For example, both of
+these send the same message:
+
+```sh
+swift run MattermostSwiftCLI send-message --channel CHANNEL_ID hello world
+swift run MattermostSwiftCLI send-message hello --channel CHANNEL_ID world
+```
+
+Pass the global `--json` flag in any position for stable, lossless machine output.
+Model-backed commands encode their complete model or result shape, preserving characters
+such as tabs and newlines. Multi-record streams and legacy diagnostic summaries use
+newline-delimited JSON; diagnostic prose records have the stable shape
+`{"text":"…"}`.
+
+```sh
+swift run MattermostSwiftCLI --json me | jq -r '.id'
+swift run MattermostSwiftCLI channel-info --json | jq -r '.teamId'
+swift run MattermostSwiftCLI list-posts --json | jq -r '.[].message'
+```
+
+Live-server and mutating verification commands are grouped under `diag`; run
+`swift run MattermostSwiftCLI diag --help` to list them. Long sync, all-channel
+backfill, and stream waits report progress only when standard error is a terminal, so
+redirected stdout remains pipe-clean. `download-file` writes raw bytes only to a pipe or
+redirect; provide a destination path when running it in a terminal. Under `--json`, a
+pathless download is represented losslessly as base64.
+
 ## Live Test Warning
 
 `scripts/test-live.sh` and `scripts/test-e2e.sh` run against a real Mattermost server. Some e2e flows create, edit, delete, archive, upload, move sidebar items, change preferences, and send WebSocket-visible events. Run them only against a workspace and account where that activity is expected.

@@ -53,8 +53,13 @@ The current unit tests cover:
 - complete channel-user profile hydration across mocked multi-page responses,
 - SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, dependent thread cleanup during post pruning and channel-content deletion, timestamp merge policy, sync cursors, conditional-list ETags, and configurable disk-store permissions/file protection,
 - restrictive default and custom CLI cache-directory creation,
-- CLI parser diagnostics plus real executable-process verification that credential-free help writes
-  to stdout with status 0 and malformed invocations write only to stderr with status 2.
+- argument-parser coverage across representative commands and the nested `diag` tree,
+  including flags in every position, required/typed value failures, generated root and
+  per-command help, version output, and real executable-process verification that
+  credential-free help writes to stdout with status 0 and malformed invocations write only
+  to stderr with status 2,
+- stable/lossless JSON encoding, Codable round trips for message newlines and props, and
+  deterministic TTY progress/binary-output guards.
 
 ## Live Verification
 
@@ -71,6 +76,9 @@ Run:
 ```sh
 scripts/test-live.sh
 ```
+
+The live script requires `jq`. It consumes `MattermostSwiftCLI --json` for user and
+channel identifiers instead of scraping human output with `awk`.
 
 The current live script verifies:
 
@@ -113,6 +121,32 @@ history checks:
 scripts/test-e2e.sh
 ```
 
-It creates posts/files/channels/sidebar categories with `mmswift-test-` or `MattermostSwift Test` markers, edits and reads one post back, soft-deletes all created posts, verifies a root/reply thread, verifies unified channel/thread timeline loading and SwiftData sync, verifies post update fetching through the `since` timestamp query, verifies post props round-trip and cache preservation, verifies adding/listing/removing a reaction, verifies search finds a newly-created marker post before cleanup, verifies file upload/attach/download, verifies that the live WebSocket stream receives `posted`, `post_edited`, and `post_deleted` events for a mutating post flow, verifies that `MattermostLiveSyncService` applies a newly-created posted event into SwiftData, verifies live cursor-based reconnect backfill by creating a post after a stored cursor and confirming the next backfill caches it, verifies cursor-based deletion reconciliation by deleting a cached post after the stored cursor and confirming backfill marks it deleted and filters it from visible cached reads, verifies service-level live-sync reconnect by creating a post between injected reconnect lifecycle events and confirming the reconnect backfill caches it, verifies opt-in all-joined-channel reconnect backfill by sweeping every joined channel after a simulated disconnect and confirming the missed post is cached, verifies forced-failure cleanup of temporary posts/categories/channels/sidebar order, verifies typing publication and opportunistically reports whether the current server echoes the event to the sender, verifies the explicit `create-test-channel`, `rename-test-channel`, and `archive-channel` commands, verifies channel create/rename/read-state/view/archive behavior, verifies sidebar category create/rename/order/delete behavior, verifies moving a test channel into a test sidebar category, and finishes with a read-only residue audit that fails if active temporary test channels or sidebar categories remain. Thread-specific WebSocket events are currently covered deterministically by unit decoding tests because their delivery depends on server collapsed-thread/follow state.
+It invokes diagnostic commands through `MattermostSwiftCLI diag`. It creates
+posts/files/channels/sidebar categories with `mmswift-test-` or `MattermostSwift Test`
+markers, edits and reads one post back, soft-deletes all created posts, verifies a
+root/reply thread, verifies unified channel/thread timeline loading and SwiftData sync,
+verifies post update fetching through the `since` timestamp query, verifies post props
+round-trip and cache preservation, verifies adding/listing/removing a reaction, verifies
+search finds a newly-created marker post before cleanup, verifies file
+upload/attach/download, verifies that the live WebSocket stream receives `posted`,
+`post_edited`, and `post_deleted` events for a mutating post flow, verifies that
+`MattermostLiveSyncService` applies a newly-created posted event into SwiftData, verifies
+live cursor-based reconnect backfill by creating a post after a stored cursor and
+confirming the next backfill caches it, verifies cursor-based deletion reconciliation by
+deleting a cached post after the stored cursor and confirming backfill marks it deleted
+and filters it from visible cached reads, verifies service-level live-sync reconnect by
+creating a post between injected reconnect lifecycle events and confirming the reconnect
+backfill caches it, verifies opt-in all-joined-channel reconnect backfill by sweeping
+every joined channel after a simulated disconnect and confirming the missed post is
+cached, verifies forced-failure cleanup of temporary posts/categories/channels/sidebar
+order, verifies typing publication and opportunistically reports whether the current
+server echoes the event to the sender, verifies the explicit `create-test-channel`,
+`rename-test-channel`, and `archive-channel` commands, verifies channel
+create/rename/read-state/view/archive behavior, verifies sidebar category
+create/rename/order/delete behavior, verifies moving a test channel into a test sidebar
+category, and finishes with a read-only residue audit that fails if active temporary test
+channels or sidebar categories remain. Thread-specific WebSocket events are currently
+covered deterministically by unit decoding tests because their delivery depends on
+server collapsed-thread/follow state.
 
 Future live tests should continue using the `mmswift-test-` prefix and clean up where safe.

@@ -6,6 +6,18 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Replaced the CLI's hand-written parser/help with `swift-argument-parser`, scoped to
+  the executable target, adding generated root/per-command help, `--version`, shell
+  completions, typed validation with exit code 2, position-independent flags, and a
+  dedicated `diag` command group.
+- Added global `--json` output for every CLI command shape. SDK response models used by
+  the CLI now support encoding as well as decoding, while post messages, props,
+  preferences, binary downloads, and multi-record diagnostics retain their full data.
+  Live verification now extracts identifiers with `jq`.
+- Added TTY-gated progress on stderr for sync, all-channel backfill/reconnect, and event
+  waits, plus a guard against writing raw download bytes to an interactive terminal.
+- Limited the CLI's testing-SPI import to the reconnect-scenario file that calls the one
+  SPI API, and added parser/process/output/TTY regression coverage.
 - Completed the issue #75 public API ergonomics sweep. Public Mattermost identifiers now use
   `ID`/`IDs` spelling with deprecated `Id`/`Ids` aliases and explicit wire `CodingKeys`;
   subject-first channel/thread parameter order has deprecated compatibility overloads;

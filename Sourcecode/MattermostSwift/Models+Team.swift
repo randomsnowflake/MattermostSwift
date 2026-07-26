@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Team and team membership models
 
 /// Mattermost team metadata.
-public struct MattermostTeam: Decodable, Equatable, Hashable, Sendable, Identifiable {
+public struct MattermostTeam: Codable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let name: String
     public let displayName: String
@@ -12,7 +12,7 @@ public struct MattermostTeam: Decodable, Equatable, Hashable, Sendable, Identifi
 }
 
 /// Membership and role state for a user on a Mattermost team.
-public struct MattermostTeamMember: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostTeamMember: Codable, Equatable, Sendable, Identifiable {
     public let teamID: String
     public let userID: String
     public let roles: String?

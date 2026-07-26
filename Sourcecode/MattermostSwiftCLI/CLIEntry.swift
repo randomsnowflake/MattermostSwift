@@ -1,8 +1,43 @@
+import ArgumentParser
 import Foundation
-@_spi(Testing) import MattermostSwift
+import MattermostSwift
 
 @main
 struct MattermostSwiftCLI {
+    static func main() async {
+        do {
+            var command = try RootCommand.parseAsRoot()
+            if var asyncCommand = command as? AsyncParsableCommand {
+                try await asyncCommand.run()
+            } else {
+                try command.run()
+            }
+        } catch let error as CLIError {
+            writeStandardError("error: \(error.localizedDescription)\n")
+            Foundation.exit(processExitCode(for: error))
+        } catch {
+            let parserExitCode = RootCommand.exitCode(for: error)
+            let message = RootCommand.fullMessage(for: error)
+            let destination = parserExitCode.isSuccess
+                ? FileHandle.standardOutput
+                : FileHandle.standardError
+            destination.write(Data("\(message)\n".utf8))
+
+            Foundation.exit(processExitCode(for: error))
+        }
+    }
+
+    static func processExitCode(for error: any Error) -> Int32 {
+        if error is CLIError {
+            return 2
+        }
+        let parserExitCode = RootCommand.exitCode(for: error)
+        return parserExitCode == .validationFailure ? 2 : parserExitCode.rawValue
+    }
+
+    static func writeStandardError(_ message: String) {
+        FileHandle.standardError.write(Data(message.utf8))
+    }
 }
 
 struct E2ECleanupResult {

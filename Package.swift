@@ -21,6 +21,12 @@ let package = Package(
             targets: ["MattermostSwiftCLI"]
         ),
     ],
+    dependencies: [
+        .package(
+            url: "https://github.com/apple/swift-argument-parser.git",
+            from: "1.8.2"
+        ),
+    ],
     targets: [
         .target(
             name: "MattermostSwift",
@@ -28,7 +34,13 @@ let package = Package(
         ),
         .executableTarget(
             name: "MattermostSwiftCLI",
-            dependencies: ["MattermostSwift"],
+            dependencies: [
+                "MattermostSwift",
+                .product(
+                    name: "ArgumentParser",
+                    package: "swift-argument-parser"
+                ),
+            ],
             path: "Sourcecode/MattermostSwiftCLI"
         ),
         .testTarget(

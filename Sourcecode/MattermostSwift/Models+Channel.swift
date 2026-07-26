@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Channel, stats, membership, notify props, unread, and view-response models
 
 /// Mattermost channel metadata.
-public struct MattermostChannel: Decodable, Equatable, Hashable, Sendable, Identifiable {
+public struct MattermostChannel: Codable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let createAt: Int64?
     public let updateAt: Int64?
@@ -129,7 +129,7 @@ public struct MattermostChannel: Decodable, Equatable, Hashable, Sendable, Ident
 }
 
 /// Result of channel search across teams.
-public struct MattermostChannelSearchResults: Decodable, Equatable, Sendable {
+public struct MattermostChannelSearchResults: Codable, Equatable, Sendable {
     public let channels: [MattermostChannel]
     public let totalCount: Int?
 
@@ -152,7 +152,7 @@ public struct MattermostChannelSearchResults: Decodable, Equatable, Sendable {
 }
 
 /// Aggregate statistics for a channel.
-public struct MattermostChannelStats: Decodable, Equatable, Sendable {
+public struct MattermostChannelStats: Codable, Equatable, Sendable {
     public let channelID: String?
     public let memberCount: Int64?
     public let guestCount: Int64?
@@ -168,6 +168,15 @@ public struct MattermostChannelStats: Decodable, Equatable, Sendable {
         totalMessageCount = try container.decodeIfPresent(Int64.self, forKey: .totalMsgCount)
     }
 
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(channelID, forKey: .channelID)
+        try container.encodeIfPresent(memberCount, forKey: .memberCount)
+        try container.encodeIfPresent(guestCount, forKey: .guestCount)
+        try container.encodeIfPresent(pinnedPostCount, forKey: .pinnedpostCount)
+        try container.encodeIfPresent(totalMessageCount, forKey: .totalMsgCount)
+    }
+
     enum CodingKeys: String, CodingKey {
         case channelID = "channelId"
         case memberCount
@@ -181,7 +190,7 @@ public struct MattermostChannelStats: Decodable, Equatable, Sendable {
 }
 
 /// Membership and notification state for a user in a channel.
-public struct MattermostChannelMember: Decodable, Equatable, Sendable {
+public struct MattermostChannelMember: Codable, Equatable, Sendable {
     public let channelID: String
     public let userID: String
     public let roles: String?
@@ -277,7 +286,7 @@ public struct MattermostChannelMember: Decodable, Equatable, Sendable {
 }
 
 /// Typed per-channel notification settings with access to unknown server keys.
-public struct MattermostChannelNotifyProps: Equatable, Sendable {
+public struct MattermostChannelNotifyProps: Codable, Equatable, Sendable {
     public static let desktopKey = "desktop"
     public static let emailKey = "email"
     public static let markUnreadKey = "mark_unread"
@@ -400,7 +409,7 @@ public struct MattermostChannelNotifyProps: Equatable, Sendable {
 }
 
 /// Unread counts for a user in a channel.
-public struct MattermostChannelUnread: Decodable, Equatable, Sendable {
+public struct MattermostChannelUnread: Codable, Equatable, Sendable {
     public let teamID: String?
     public let channelID: String
     public let msgCount: Int
@@ -462,7 +471,7 @@ public struct MattermostChannelUnread: Decodable, Equatable, Sendable {
 }
 
 /// Result of marking a channel as viewed.
-public struct MattermostChannelViewResponse: Decodable, Equatable, Sendable {
+public struct MattermostChannelViewResponse: Codable, Equatable, Sendable {
     public let status: String
     public let lastViewedAtTimes: [String: Int64]?
 

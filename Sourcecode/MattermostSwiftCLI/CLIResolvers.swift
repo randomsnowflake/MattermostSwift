@@ -1,5 +1,5 @@
 import Foundation
-@_spi(Testing) import MattermostSwift
+import MattermostSwift
 
 extension MattermostSwiftCLI {
     static func resolvedChannelID(_ channelID: String?) throws -> String {
