@@ -282,7 +282,7 @@ public struct MattermostSyncService: Sendable {
         channels: [MattermostChannel],
         userID: String,
         store: MattermostStore,
-        width: Int = 8
+        width: Int = 4
     ) async throws -> Int {
         let unreads = try await mattermostBoundedConcurrentMap(channels, width: width) { channel in
             let unread = try await client.channelUnread(userID: userID, channelID: channel.id)

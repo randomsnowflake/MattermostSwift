@@ -22,7 +22,9 @@
 - User lookup, channel users, and presence status lookup.
 - File upload, attach-to-post, metadata, and download.
 - WebSocket connection, authentication, tolerant event decoding, and a live posted/edit/delete event e2e check.
-- Reconnecting WebSocket event stream wrapper with configurable exponential backoff.
+- Host-provided URLSession trust delegates for both SDK-created REST and WebSocket sessions, plus
+  a bounded 256-event pre-authentication WebSocket queue.
+- Reconnecting WebSocket event stream wrapper with configurable, capped full-jitter exponential backoff.
 - Typed WebSocket event helpers for posts, thread update/read/follow signals, unread invalidation, reactions, typing, presence, and channel-viewed events.
 - Channel detail lookup by id/name, public team channel discovery, channel statistics/timezone/member-count lookup, channel membership read/list/by-ids/add/remove, unread counts, view/read marking, typed notify props read/update, create, rename, and archive APIs.
 - Direct message channel open, group message channel open, and read-only group message channel search APIs.
@@ -32,6 +34,7 @@
 - Sidebar channel move/reorder helpers and a live sidebar move e2e check.
 - User preference list/load/save/delete APIs with a read-only live preference decode probe and temporary save/load/delete round-trip verification.
 - SwiftData cache foundation for teams, users, statuses, channels, posts, reactions, files, sidebar categories, and sync cursors.
+- Restrictive SDK and CLI cache-directory permissions with configurable iOS file protection for the SwiftData store and SQLite sidecar files.
 - SwiftData cache for current-user channel membership/read state and active-channel unread counts.
 - Store merging for common live post, reaction, unread invalidation, and presence events.
 - Store merging for live channel updates/deletes, channel member updates, user updates, and sidebar preference invalidation refreshes.
@@ -54,6 +57,8 @@
 - Forced-failure cleanup CLI check that creates temporary e2e resources, simulates an intermediate failure, proves the shared cleanup helper deletes the post/category/channel and restores sidebar order, and runs in `scripts/test-e2e.sh`.
 - Read-only e2e residue audit that fails if active `MattermostSwift` temporary channels or sidebar categories remain on the live server after mutating checks.
 - DocC quick-start article covering token auth, password login token source, cache hydration, unified timelines, live sync, all-channel reconnect backfill, and credential ownership.
+- DocC Keychain guidance with a device-bound token example and an explicit warning against
+  `UserDefaults`/`@AppStorage` credential storage.
 - Expanded symbol-level DocC comments across the public service facades so host apps can discover the intended high-level API without reading endpoint wrappers first.
 - Library force-unwrap audit: the reusable `MattermostSwift` target has no `try!`, `as!`, or forced optional unwraps in production code.
 - Pagination hardening: post/channel search, channel users, channel posts, and custom emoji list requests clamp invalid page and per-page inputs before hitting the REST API.
