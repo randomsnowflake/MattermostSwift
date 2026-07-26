@@ -283,6 +283,8 @@ unread rows are reconciled only from complete scoped server responses, so an emp
 safely remove stale local rows for that scope.
 Post pruning and channel-content deletion also remove reactions, files, and cached thread inbox
 state rooted at the deleted posts.
+When channel-user hydration is enabled for a selected timeline channel, `MattermostSyncService`
+follows every profile page so channels with more than 60 members are cached completely.
 For work outside that actor, use `cachedUserSnapshots()`, `cachedChannelSnapshots()`, or
 `cachedPostSnapshots(...)`; these immutable `Sendable` values do not retain a SwiftData context.
 Post snapshots carry `propsJSON` and `metadataJSON` without decoding them while the store is on the

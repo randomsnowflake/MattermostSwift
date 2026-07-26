@@ -36,6 +36,7 @@ The current unit tests cover:
   projection, backfill failure diagnostics, capped/all-channel backfill selection, live-event
   application into SwiftData, unread refresh on `post_unread` and `multiple_channels_viewed`
   invalidations, and thread-state refresh on thread invalidation,
+- complete channel-user profile hydration across mocked multi-page responses,
 - SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, dependent thread cleanup during post pruning and channel-content deletion, timestamp merge policy, sync cursors, and configurable disk-store permissions/file protection,
 - restrictive default and custom CLI cache-directory creation.
 

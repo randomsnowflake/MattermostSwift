@@ -8,7 +8,7 @@ public struct MattermostSyncOptions: Equatable, Sendable {
     /// Maximum number of channel-post pages to fetch in one sync pass.
     public var maxPostPages: Int
 
-    /// Whether to cache channel user profiles for the selected post channel.
+    /// Whether to cache all channel user profiles for the selected post channel.
     public var includeChannelUsers: Bool
 
     /// Whether to cache sidebar categories for the resolved team.
@@ -120,7 +120,7 @@ public struct MattermostSyncService: Sendable {
     }
 
     /// Hydrates the local store with joined teams, current user, status, joined channels, memberships,
-    /// unread state, sidebar categories, and optionally a channel timeline.
+    /// unread state, sidebar categories, all pages of channel users, and optionally a channel timeline.
     @MainActor
     public func sync(
         to store: MattermostStore,
@@ -164,7 +164,7 @@ public struct MattermostSyncService: Sendable {
             syncedMembersCount += 1
 
             if options.includeChannelUsers {
-                let users = try await client.users(channelID: postChannelID, perPage: 60)
+                let users = try await allChannelUsers(channelID: postChannelID)
                 try store.upsert(users: users)
                 syncedUsersCount = users.count
             }
@@ -237,6 +237,26 @@ public struct MattermostSyncService: Sendable {
             cachedUnreadsCount: try store.cachedChannelUnreadsCount(),
             teamCursorLastSyncAt: teamCursorLastSyncAt
         )
+    }
+
+    private func allChannelUsers(channelID: String) async throws -> [MattermostUser] {
+        let pageSize = 60
+        var page = 0
+        var users: [MattermostUser] = []
+
+        while true {
+            let pageUsers = try await client.users(
+                channelID: channelID,
+                page: page,
+                perPage: pageSize
+            )
+            users.append(contentsOf: pageUsers)
+
+            guard pageUsers.count >= pageSize else {
+                return users
+            }
+            page += 1
+        }
     }
 
     private func resolveTeamAndChannels(

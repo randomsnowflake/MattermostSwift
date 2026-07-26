@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Channel-user cache hydration now fetches every profile page instead of silently stopping at
+  the first 60 users.
 - Live sync now skips the full REST backfill after reconnect gaps shorter than 10 seconds by
   default, while always backfilling the first connection. Hosts can tune
   `MattermostLiveSyncOptions.minimumBackfillGap` or set it to `nil` to backfill every reconnect;
