@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Batched channel-member cleanup when authoritative joined-channel sync removes multiple channels,
+  and reused a shared plain JSON decoder for multi-channel viewed timestamps.
 - Disk-backed `MattermostStore` caches and CLI cache directories now use owner-only permissions
   by default. iOS stores apply configurable file protection to the directory and SQLite files,
   while macOS hosts retain responsibility for volume-level encryption.
