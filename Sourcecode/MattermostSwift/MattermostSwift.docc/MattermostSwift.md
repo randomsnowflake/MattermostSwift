@@ -210,6 +210,36 @@ let options = MattermostLiveSyncOptions(
 
 The CLI includes live reconnect checks for this path: `reconnect-backfill-test` proves cursor-based missed-post recovery directly through REST sync, `live-sync-reconnect-test` drives `MattermostLiveSyncService` through a reconnect lifecycle while verifying the second backfill returns and caches a post created while disconnected, and `all-channel-reconnect-test` repeats that reconnect proof with `backfillAllJoinedChannelPosts` enabled.
 
+## Protect Cached Content At Rest
+
+The SwiftData cache contains message bodies, user and channel names, and file metadata. Disk-backed
+`MattermostStore` instances therefore default to owner-only directory permissions (`0700`). On iOS,
+the store directory and existing SQLite, WAL, and shared-memory files default to
+`completeUntilFirstUserAuthentication`, which keeps them unavailable until the first unlock after
+a restart while allowing later locked-device background work.
+
+Choose `.complete` when the cache must be unavailable whenever the device is locked:
+
+```swift
+let store = try MattermostStore(
+    url: storeURL,
+    security: MattermostStoreSecurityOptions(
+        directoryPermissions: 0o700,
+        fileProtection: .complete
+    )
+)
+```
+
+A host that intentionally places the database in a shared directory can pass
+`directoryPermissions: nil` and `.platformDefault` to preserve a policy it manages itself. The
+host owns that decision and should ensure the directory cannot be read by unintended users or
+processes.
+
+File protection is an iOS facility; it is ignored on macOS. macOS applications should keep the
+cache in an application-specific private location and rely on FileVault or equivalent
+volume-level encryption for data at rest. The CLI secures both its default `.mattermostswift`
+directory and the parent directory of `MATTERMOST_STORE_PATH` with owner-only permissions.
+
 ## Keep Secrets Outside The SDK
 
 The SDK does not write credentials to Keychain or local storage. Host apps should provide tokens at startup, store credentials according to their own security model, and avoid logging token values.

@@ -251,6 +251,24 @@ Post snapshots carry `propsJSON` and `metadataJSON` without decoding them while 
 main actor. Call the snapshot's throwing `decodedProps()` or `decodedMetadata()` helper only in
 views or background work that needs those payloads.
 
+Disk-backed stores default to owner-only directory permissions (`0700`). On iOS, the store
+directory and SQLite files also default to complete-until-first-user-authentication protection.
+Hosts that do not need locked-device background access can select `.complete`; hosts using a
+shared, separately managed directory can pass `nil` for `directoryPermissions`:
+
+```swift
+let store = try MattermostStore(
+    url: storeURL,
+    security: MattermostStoreSecurityOptions(
+        directoryPermissions: 0o700,
+        fileProtection: .complete
+    )
+)
+```
+
+Apple file protection does not provide a macOS at-rest guarantee. macOS hosts remain responsible
+for choosing a private cache location and enabling FileVault or equivalent volume encryption.
+
 For production-sized attachments, use the file URL overloads instead of materialising the payload:
 
 ```swift

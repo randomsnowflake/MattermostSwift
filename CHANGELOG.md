@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Disk-backed `MattermostStore` caches and CLI cache directories now use owner-only permissions
+  by default. iOS stores apply configurable file protection to the directory and SQLite files,
+  while macOS hosts retain responsibility for volume-level encryption.
 - Corrected the `MattermostStore` threading documentation: all store, sync, live-sync, and
   retention work uses the main actor, with host guidance for scheduling potentially expensive
   pruning and channel cleanup.

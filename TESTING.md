@@ -28,7 +28,8 @@ The current unit tests cover:
 - WebSocket live event decoding, typed post create/edit/delete/unread and thread update/read/follow event helpers, embedded post/channel/user/member decoding, and tolerant invalidation events,
 - WebSocket reconnect backoff policy,
 - live-sync reconnect orchestration with an injected lifecycle stream, including backfill on each connecting event, cursor-based recovery of posts missed while disconnected, host-visible connection-state projection, backfill failure diagnostics, capped/all-channel backfill selection, live-event application into SwiftData, unread refresh on `post_unread` and `multiple_channels_viewed` invalidations, and thread-state refresh on thread invalidation,
-- SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, dependent thread cleanup during post pruning and channel-content deletion, timestamp merge policy, and sync cursors.
+- SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, dependent thread cleanup during post pruning and channel-content deletion, timestamp merge policy, sync cursors, and configurable disk-store permissions/file protection,
+- restrictive default and custom CLI cache-directory creation.
 
 ## Live Verification
 
@@ -69,7 +70,7 @@ The current live script verifies:
 - opt-in all-joined-channel live-sync backfill using an in-memory store,
 - offline cache readback with `cache-check`, including cached joined-team metadata.
 
-`sync` writes to `.mattermostswift/MattermostSwift.sqlite` by default, or to `MATTERMOST_STORE_PATH` when set. The directory is ignored by git.
+`sync` writes to `.mattermostswift/MattermostSwift.sqlite` by default, or to `MATTERMOST_STORE_PATH` when set. The cache directory uses owner-only permissions and is ignored by git.
 When username/password credentials are present, `scripts/test-live.sh` runs `login-test`; otherwise password-login probing is skipped. On the current development server, `login-test` verifies direct password login, prints the non-secret token source, and then proves the returned session token by loading `me`. Unit tests cover both the documented `Token` response header and the official `MMAUTHTOKEN` cookie fallback.
 
 ## End-to-End Verification
