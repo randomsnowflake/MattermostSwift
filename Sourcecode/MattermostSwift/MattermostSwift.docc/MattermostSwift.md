@@ -57,6 +57,8 @@ try await client.logoutCurrentSession()
 ```
 
 `MattermostSession.tokenSource` reports whether Mattermost returned the documented `Token` response header or the browser-compatible `MMAUTHTOKEN` cookie. The login request sends Mattermost's web-client `X-Requested-With: XMLHttpRequest` header so deployments that attach browser session cookies can be handled without storing the password in the SDK.
+
+The textual and debug descriptions of `MattermostSession`, `MattermostAuthentication`, and `MattermostConfiguration` redact bearer tokens. Hosts must still store returned tokens securely and avoid logging the `token` property directly.
 `logoutCurrentSession()` is best-effort remote cleanup for password-login sessions; discard the
 local token even if it fails, and do not expect a personal access token to be accepted.
 
@@ -87,6 +89,22 @@ func hydrate(client: MattermostClient, storeURL: URL) async throws {
 ```
 
 `MattermostSyncService` stores joined teams, the current user, status, joined channels, memberships, unread counts, sidebar categories, and optional channel timelines. Cursor-based follow-up syncs use Mattermost's `since` timestamp query where possible. Per-channel notification settings are available as `MattermostChannelNotifyProps`, which exposes common Mattermost keys and keeps unknown server keys intact.
+
+All `MattermostStore` operations use `ModelContainer.mainContext` and are main-actor isolated.
+That contract also covers sync and live-sync cache writes, cached fetches, `prunePosts`, and
+`deleteChannelContent`; the package has no background model context. Network requests suspend
+normally, but SwiftData work resumes on the main actor, so large caches can produce a visible UI
+hitch. Schedule large sync and retention passes only during an app-controlled idle window where
+that tradeoff is acceptable.
+
+Host apps own retention policy. A reasonable starting cadence is to prune retained channels after
+initial hydration and then about once per day during an idle window. Delete a channel's cached
+content when it leaves the app's retention scope. To use cached values from another actor, create
+immutable `Sendable` values with `cachedUserSnapshots()`, `cachedChannelSnapshots()`, or
+`cachedPostSnapshots(...)`; snapshots do not move store access itself off the main actor.
+`cachedPostSnapshots(...)` copies props and metadata as `propsJSON` and `metadataJSON` without
+decoding every post. Consumers that need those payloads can call the snapshot's throwing
+`decodedProps()` and `decodedMetadata()` helpers on demand.
 
 ## Work With Timelines
 
@@ -141,6 +159,27 @@ Default live-event streams use a dedicated long-lived `URLSession` so the bounde
 resource timeout does not recycle healthy WebSockets. If you inject a custom REST session,
 provide `webSocketURLSession` to `MattermostClient` when live events need a different policy.
 
+Use `lifecycleEvents()` when the host needs transport diagnostics as well as raw events.
+Undecodable event frames yield `MattermostLiveEventStreamLifecycleEvent.eventDecodeFailed`
+with structured failure details, then the stream continues reading from the same connection.
+
+Mattermost API failures preserve the server's structured error body:
+
+```swift
+do {
+    _ = try await client.currentUser()
+} catch let error as MattermostError where error.isUnauthorized {
+    // Present authentication UI.
+} catch MattermostError.httpStatus(_, _, let apiError) {
+    print("Mattermost error: \(apiError?.id ?? "unknown")")
+    print("Request ID: \(apiError?.requestId ?? "unknown")")
+}
+```
+
+Use `isForbidden` and `isNotFound` for the other common status branches. The attached
+``MattermostAPIErrorBody`` also exposes `detailedError` and the status code reported in the
+response body.
+
 `MattermostLiveSyncService` combines WebSocket events with REST backfill and applies updates into `MattermostStore`:
 
 ```swift
@@ -176,6 +215,10 @@ func runLiveSync(
             print("live sync refresh failed on attempt \(failure.attempt): \(failure.message)")
         case .backfillFailed(let failure):
             print("live sync backfill failed on attempt \(failure.attempt): \(failure.message)")
+            print("error identity: \(failure.domain) \(failure.code)")
+            if failure.mattermostError?.isUnauthorized == true {
+                // Present authentication UI.
+            }
         default:
             break
         }
@@ -193,6 +236,10 @@ events continue to update the cache. Unread, sidebar-category, and thread-state 
 their dedicated failure events. These non-cancellation failures degrade only the affected update;
 cancellation continues to stop live sync.
 
+Reconnects use full-jitter exponential backoff. For each attempt, the stream chooses a uniform
+delay from zero through the policy's capped exponential base, spreading clients across the retry
+window after a shared server or network outage.
+
 For small workspaces or an explicit catch-up action, set `backfillAllJoinedChannelPosts` to `true` to sweep every joined channel during connect and reconnect backfill:
 
 ```swift
@@ -202,6 +249,36 @@ let options = MattermostLiveSyncOptions(
 ```
 
 The CLI includes live reconnect checks for this path: `reconnect-backfill-test` proves cursor-based missed-post recovery directly through REST sync, `live-sync-reconnect-test` drives `MattermostLiveSyncService` through a reconnect lifecycle while verifying the second backfill returns and caches a post created while disconnected, and `all-channel-reconnect-test` repeats that reconnect proof with `backfillAllJoinedChannelPosts` enabled.
+
+## Protect Cached Content At Rest
+
+The SwiftData cache contains message bodies, user and channel names, and file metadata. Disk-backed
+`MattermostStore` instances therefore default to owner-only directory permissions (`0700`). On iOS,
+the store directory and existing SQLite, WAL, and shared-memory files default to
+`completeUntilFirstUserAuthentication`, which keeps them unavailable until the first unlock after
+a restart while allowing later locked-device background work.
+
+Choose `.complete` when the cache must be unavailable whenever the device is locked:
+
+```swift
+let store = try MattermostStore(
+    url: storeURL,
+    security: MattermostStoreSecurityOptions(
+        directoryPermissions: 0o700,
+        fileProtection: .complete
+    )
+)
+```
+
+A host that intentionally places the database in a shared directory can pass
+`directoryPermissions: nil` and `.platformDefault` to preserve a policy it manages itself. The
+host owns that decision and should ensure the directory cannot be read by unintended users or
+processes.
+
+File protection is an iOS facility; it is ignored on macOS. macOS applications should keep the
+cache in an application-specific private location and rely on FileVault or equivalent
+volume-level encryption for data at rest. The CLI secures both its default `.mattermostswift`
+directory and the parent directory of `MATTERMOST_STORE_PATH` with owner-only permissions.
 
 ## Keep Secrets Outside The SDK
 
