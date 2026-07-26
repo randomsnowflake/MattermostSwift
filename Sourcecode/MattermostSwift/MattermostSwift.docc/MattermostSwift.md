@@ -1,12 +1,17 @@
 # MattermostSwift
 
-Build Mattermost clients in Swift with REST commands, WebSocket live events, and SwiftData-backed cache sync.
+Build Mattermost clients in Swift with REST commands, WebSocket live events, and a
+SwiftData-backed cache.
 
 ## Overview
 
-`MattermostSwift` is a single-account SDK for a Mattermost server. It keeps credentials outside the package, exposes high-level operations for app code, and leaves UI concerns to host apps.
+``MattermostClient`` is the root entry point for a single Mattermost server and account. Start
+with token or password-session authentication, call its user, team, channel, post, and timeline
+operations, then add ``MattermostSyncService`` and ``MattermostLiveSyncService`` when an app needs
+offline state.
 
-Use `MattermostClient` as the root entry point: it exposes user, team, channel, post, timeline, and live-event operations as methods directly, with `MattermostSyncService` and `MattermostLiveSyncService` layered on top for cache hydration and live state.
+The SDK doesn't store credentials or provide UI. Host apps own secure token storage, presentation,
+and cache retention.
 
 The library supports iOS 18, macOS 15, tvOS 18, watchOS 11, and visionOS 2. Linux is not currently
 supported because the cache uses SwiftData and live events use the Apple Foundation WebSocket
@@ -14,44 +19,45 @@ transport.
 
 ## Authenticate
 
-Use a personal access token when a host app already owns credential storage:
+### Essentials
 
-```swift
-import Foundation
-import MattermostSwift
+- ``MattermostClient``
+- <doc:Pagination>
+- <doc:ErrorHandling>
+- ``MattermostTimelineTarget``
+- ``MattermostTimelineRequest``
+- ``MattermostTimelinePage``
 
-let serverURL = URL(string: "https://mattermost.example.com")!
-let client = try MattermostClient(
-    serverURL: serverURL,
-    token: "personal-access-token"
-)
+### Authentication
 
-let me = try await client.currentUser()
-```
+- <doc:Authentication>
+- ``MattermostConfiguration``
+- ``MattermostAuthentication``
+- ``MattermostSession``
+- ``MattermostSessionTokenSource``
 
-Probe server health and client-visible capabilities directly on the client:
+### Models
 
-```swift
-let server = try await client.serverInfo()
-print(server.ping.status)
-print(server.clientConfig.buildNumber ?? "unknown build")
+- ``MattermostUser``
+- ``MattermostTeam``
+- ``MattermostChannel``
+- ``MattermostPost``
+- ``MattermostPostList``
+- ``MattermostThreadResponse``
+- ``MattermostFileInfo``
+- ``MattermostReaction``
 
-let teams = try await client.teams()
-print(teams.first?.displayName ?? "no joined teams")
-if let team = teams.first {
-    let members = try await client.teamMembers(teamID: team.id, perPage: 20)
-    print(members.count)
-}
-```
+### Caching
 
-For username/password deployments, ask Mattermost for a session token and let the host app decide whether to store it:
+- <doc:Caching>
+- ``MattermostStore``
+- ``MattermostSyncService``
+- ``MattermostSyncOptions``
+- ``MattermostCachedUserSnapshot``
+- ``MattermostCachedChannelSnapshot``
+- ``MattermostCachedPostSnapshot``
 
-```swift
-let session = try await MattermostClient.login(
-    serverURL: serverURL,
-    loginID: "user@example.com",
-    password: "password"
-)
+### Live Events
 
 let client = try session.client(serverURL: serverURL)
 print(session.tokenSource)
@@ -394,3 +400,53 @@ must authenticate during locked-device background work.
 
 Never store bearer tokens in `UserDefaults` or `@AppStorage`; both are plist-backed preference
 storage and are not credential stores.
+
+## Topics
+
+### Essentials
+
+- ``MattermostClient``
+- <doc:Pagination>
+- <doc:ErrorHandling>
+- ``MattermostTimelineTarget``
+- ``MattermostTimelineRequest``
+- ``MattermostTimelinePage``
+
+### Authentication
+
+- <doc:Authentication>
+- ``MattermostConfiguration``
+- ``MattermostAuthentication``
+- ``MattermostSession``
+- ``MattermostSessionTokenSource``
+
+### Models
+
+- ``MattermostUser``
+- ``MattermostTeam``
+- ``MattermostChannel``
+- ``MattermostPost``
+- ``MattermostPostList``
+- ``MattermostThreadResponse``
+- ``MattermostFileInfo``
+- ``MattermostReaction``
+
+### Caching
+
+- <doc:Caching>
+- ``MattermostStore``
+- ``MattermostSyncService``
+- ``MattermostSyncOptions``
+- ``MattermostCachedUserSnapshot``
+- ``MattermostCachedChannelSnapshot``
+- ``MattermostCachedPostSnapshot``
+
+### Live Events
+
+- <doc:LiveSync>
+- ``MattermostLiveEventStream``
+- ``MattermostLiveEvent``
+- ``MattermostTypedLiveEvent``
+- ``MattermostLiveSyncService``
+- ``MattermostLiveSyncOptions``
+- ``MattermostLiveSyncEvent``

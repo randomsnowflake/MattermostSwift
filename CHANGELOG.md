@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Added curated DocC guides for authentication, pagination, caching, live sync, and error handling;
+  documented the complete main-actor `MattermostStore` API and public SwiftData cache-model
+  contracts; and corrected the README cache example for Swift 6 strict concurrency.
 - Added and documented the supported app-lifecycle contract for live events and live sync: hosts cancel the
   consuming task on background and create a fresh stream on activation, triggering normal
   connect-time backfill. Also made explicit the deliberate default of allowing bulk REST history
