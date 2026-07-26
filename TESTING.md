@@ -30,7 +30,12 @@ The current unit tests cover:
   256-event WebSocket authentication-handshake buffer,
 - WebSocket full-jitter reconnect backoff, including deterministic lower/midpoint/upper samples
   and bounds at the configured and integer caps,
-- live-sync reconnect orchestration with an injected lifecycle stream, including backfill on each connecting event, cursor-based recovery of posts missed while disconnected, host-visible connection-state projection, backfill failure diagnostics, capped/all-channel backfill selection, live-event application into SwiftData, unread refresh on `post_unread` and `multiple_channels_viewed` invalidations, and thread-state refresh on thread invalidation,
+- live-sync reconnect orchestration with an injected lifecycle stream, including deterministic
+  rapid-gap backfill suppression, long-gap and first-connect backfill, configurable/disabled gap
+  filtering, cursor-based recovery of posts missed while disconnected, host-visible connection-state
+  projection, backfill failure diagnostics, capped/all-channel backfill selection, live-event
+  application into SwiftData, unread refresh on `post_unread` and `multiple_channels_viewed`
+  invalidations, and thread-state refresh on thread invalidation,
 - SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, dependent thread cleanup during post pruning and channel-content deletion, timestamp merge policy, sync cursors, and configurable disk-store permissions/file protection,
 - restrictive default and custom CLI cache-directory creation.
 

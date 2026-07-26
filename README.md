@@ -152,6 +152,11 @@ Hosts that need connection diagnostics can consume `lifecycleEvents()`. Malforme
 are skipped without disconnecting and yield `eventDecodeFailed` with a
 `MattermostLiveEventStreamFailure`, so wire-format changes remain observable.
 
+Live sync always performs its REST backfill before the first connection. Reconnects skip that
+fan-out when the socket was down for less than 10 seconds by default, avoiding a full workspace
+refresh after a momentary network flap. Set `MattermostLiveSyncOptions.minimumBackfillGap` to
+another `Duration`, or set it to `nil` to backfill on every reconnect.
+
 ## Authentication
 
 Use a Mattermost personal access token when possible:

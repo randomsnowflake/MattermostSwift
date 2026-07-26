@@ -6,6 +6,10 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Live sync now skips the full REST backfill after reconnect gaps shorter than 10 seconds by
+  default, while always backfilling the first connection. Hosts can tune
+  `MattermostLiveSyncOptions.minimumBackfillGap` or set it to `nil` to backfill every reconnect;
+  skipped backfills emit `.connected` once the socket connection succeeds.
 - Live-sync channel backfill and bulk unread refresh now share the sync service's width-8 bounded
   concurrency, reducing reconnect and mark-all-read latency while preserving cancellation and
   channel/user result association.

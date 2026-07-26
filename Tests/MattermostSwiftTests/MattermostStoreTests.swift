@@ -1348,9 +1348,18 @@ func liveSyncOptionsClampBackfillChannelLimit() {
     #expect(options.maxBackfillChannels == 0)
     #expect(options.backfillJoinedChannelPosts)
     #expect(!options.backfillAllJoinedChannelPosts)
+    #expect(options.minimumBackfillGap == .seconds(10))
     #expect(options.refreshUnreadOnChannelViewed)
     #expect(options.refreshSidebarCategoriesOnPreferenceChange)
     #expect(options.syncOptions.maxPostPages == 1)
+
+    let customized = MattermostLiveSyncOptions(minimumBackfillGap: .seconds(30))
+    let clamped = MattermostLiveSyncOptions(minimumBackfillGap: .seconds(-1))
+    let disabled = MattermostLiveSyncOptions(minimumBackfillGap: nil)
+
+    #expect(customized.minimumBackfillGap == .seconds(30))
+    #expect(clamped.minimumBackfillGap == .zero)
+    #expect(disabled.minimumBackfillGap == nil)
 }
 
 private func storeTestPostJSON(id: String, message: String, updateAt: Int64, editAt: Int64) -> String {
