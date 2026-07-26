@@ -28,6 +28,8 @@ The current unit tests cover:
 - scoped sync-list ETag persistence and `If-None-Match` request construction, HTTP 304 cached
   readback, exclusion of post/unread requests, and V1-to-V2 SwiftData cache migration,
 - initial Mattermost response decoding,
+- typed channel/user-status/post/sidebar domain values, including unknown-value Codable round trips
+  and exact request-wire encoding,
 - post props/metadata decoding, outbound props request encoding, SwiftData cache preservation, and
   zero-decode cached post snapshots with throwing on-demand props/metadata accessors,
 - channel search, batch user lookup, user search/autocomplete/known-user request construction, direct/group channel request construction, and custom emoji request/response decoding,

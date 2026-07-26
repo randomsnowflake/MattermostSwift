@@ -166,7 +166,7 @@ func issue72CachedSnapshotsWorkInHashBasedCollections() throws {
         rootId: "",
         originalId: nil,
         message: "hello",
-        type: "",
+        type: .standard,
         hashtags: nil,
         pendingPostId: nil,
         fileIds: nil,

@@ -6,6 +6,12 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- **Source-breaking:** Replaced raw `String` channel types, user presence statuses, post types,
+  and sidebar category types/sorting modes with forward-compatible `RawRepresentable` values
+  (`MattermostChannelType`, `MattermostUserStatusValue`, `MattermostPostType`,
+  `MattermostSidebarCategoryType`, and `MattermostSidebarCategorySorting`). Public request APIs
+  now accept these typed values, and unknown server values preserve their raw strings through
+  Codable round trips.
 - Added curated DocC guides for authentication, pagination, caching, live sync, and error handling;
   documented the complete main-actor `MattermostStore` API and public SwiftData cache-model
   contracts; and corrected the README cache example for Swift 6 strict concurrency.

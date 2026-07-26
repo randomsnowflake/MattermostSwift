@@ -503,7 +503,7 @@ private extension MattermostCachedChannel {
             teamId: teamId,
             name: name,
             displayName: displayName,
-            type: type,
+            type: MattermostChannelType(rawValue: type),
             header: header,
             purpose: purpose,
             deleteAt: deleteAt,
@@ -522,10 +522,10 @@ private extension MattermostCachedSidebarCategory {
             userId: userId,
             teamId: teamId,
             displayName: displayName,
-            type: type,
+            type: MattermostSidebarCategoryType(rawValue: type),
             sortOrder: sortOrder,
             channelIds: channelIds,
-            sorting: sorting,
+            sorting: sorting.map(MattermostSidebarCategorySorting.init(rawValue:)),
             muted: muted,
             collapsed: collapsed
         )

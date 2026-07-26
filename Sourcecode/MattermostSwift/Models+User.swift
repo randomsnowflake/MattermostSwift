@@ -74,7 +74,7 @@ public struct MattermostMFASecret: Decodable, Equatable, Sendable {
 /// Presence status for a Mattermost user.
 public struct MattermostUserStatus: Codable, Equatable, Sendable {
     public let userId: String
-    public let status: String
+    public let status: MattermostUserStatusValue
     public let manual: Bool?
     public let lastActivityAt: Int64?
     public let activeChannel: String?

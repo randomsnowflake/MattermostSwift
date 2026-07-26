@@ -423,7 +423,7 @@ struct MattermostHTTPClientErrorTests {
         }
 
         let restored = try await client.restoreChannel(id: "channel-id")
-        let privateChannel = try await client.setChannelPrivacy(id: "channel-id", type: "P")
+        let privateChannel = try await client.setChannelPrivacy(id: "channel-id", type: .private)
         let converted = try await client.convertGroupToChannel(
             id: "gm-id",
             teamID: "team-id",
@@ -432,7 +432,7 @@ struct MattermostHTTPClientErrorTests {
         )
 
         #expect(restored.id == "channel-id")
-        #expect(privateChannel.type == "P")
+        #expect(privateChannel.type == .private)
         #expect(converted.id == "channel-id")
         #expect(requested.values == [
             "POST https://mattermost.example.com/api/v4/channels/channel-id/restore",

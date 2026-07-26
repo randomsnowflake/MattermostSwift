@@ -54,7 +54,7 @@ public struct MattermostPost: Decodable, Equatable, Hashable, Sendable, Identifi
     public let rootId: String
     public let originalId: String?
     public let message: String
-    public let type: String
+    public let type: MattermostPostType
     public let hashtags: String?
     public let pendingPostId: String?
     public let fileIds: [String]?
@@ -102,7 +102,7 @@ public struct MattermostPost: Decodable, Equatable, Hashable, Sendable, Identifi
         rootId: String,
         originalId: String?,
         message: String,
-        type: String,
+        type: MattermostPostType,
         hashtags: String?,
         pendingPostId: String?,
         fileIds: [String]?,
@@ -151,7 +151,7 @@ public struct MattermostPost: Decodable, Equatable, Hashable, Sendable, Identifi
         rootId = try container.decode(String.self, forKey: .rootId)
         originalId = try container.decodeIfPresent(String.self, forKey: .originalId)
         message = try container.decode(String.self, forKey: .message)
-        type = try container.decode(String.self, forKey: .type)
+        type = try container.decode(MattermostPostType.self, forKey: .type)
         hashtags = try container.decodeIfPresent(String.self, forKey: .hashtags)
         pendingPostId = try container.decodeIfPresent(String.self, forKey: .pendingPostId)
         fileIds = try container.decodeIfPresent([String].self, forKey: .fileIds)

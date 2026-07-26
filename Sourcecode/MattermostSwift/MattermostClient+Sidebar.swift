@@ -27,6 +27,7 @@ extension MattermostClient {
         teamID: String,
         displayName: String,
         channelIDs: [String] = [],
+        sorting: MattermostSidebarCategorySorting = .manual,
         userID: String = "me"
     ) async throws -> MattermostSidebarCategory {
         let resolvedUserID = try await resolvedUserIDForRequestBody(userID)
@@ -37,9 +38,9 @@ extension MattermostClient {
                 userId: resolvedUserID,
                 teamId: teamID,
                 displayName: displayName,
-                type: "custom",
+                type: .custom,
                 channelIds: channelIDs,
-                sorting: "manual"
+                sorting: sorting
             )
         )
         return category
@@ -51,7 +52,8 @@ extension MattermostClient {
         categoryID: String,
         displayName: String,
         channelIDs: [String],
-        type: String = "custom",
+        type: MattermostSidebarCategoryType = .custom,
+        sorting: MattermostSidebarCategorySorting = .manual,
         userID: String = "me"
     ) async throws -> MattermostSidebarCategory {
         let resolvedUserID = try await resolvedUserIDForRequestBody(userID)
@@ -64,7 +66,7 @@ extension MattermostClient {
                 displayName: displayName,
                 type: type,
                 channelIds: channelIDs,
-                sorting: "manual"
+                sorting: sorting
             )
         )
         return category
@@ -97,6 +99,7 @@ extension MattermostClient {
                 displayName: destination.displayName,
                 channelIDs: destinationChannelIDs,
                 type: destination.type,
+                sorting: destination.sorting ?? .manual,
                 userID: userID
             )
             updatedCategories.append(updatedDestination)
@@ -110,6 +113,7 @@ extension MattermostClient {
                 displayName: category.displayName,
                 channelIDs: channelIDs,
                 type: category.type,
+                sorting: category.sorting ?? .manual,
                 userID: userID
             )
             updatedCategories.append(updatedSource)
@@ -141,6 +145,7 @@ extension MattermostClient {
             displayName: category.displayName,
             channelIDs: channelIDs,
             type: category.type,
+            sorting: .manual,
             userID: userID
         )
     }

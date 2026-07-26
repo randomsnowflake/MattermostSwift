@@ -25,15 +25,15 @@ public struct MattermostSidebarCategory: Decodable, Equatable, Hashable, Sendabl
     public let userId: String?
     public let teamId: String?
     public let displayName: String
-    public let type: String
+    public let type: MattermostSidebarCategoryType
     public let sortOrder: Int?
     public let channelIds: [String]
-    public let sorting: String?
+    public let sorting: MattermostSidebarCategorySorting?
     public let muted: Bool?
     public let collapsed: Bool?
 
     public var isCustom: Bool {
-        type == "custom"
+        type == .custom
     }
 
     init(
@@ -41,10 +41,10 @@ public struct MattermostSidebarCategory: Decodable, Equatable, Hashable, Sendabl
         userId: String?,
         teamId: String?,
         displayName: String,
-        type: String,
+        type: MattermostSidebarCategoryType,
         sortOrder: Int?,
         channelIds: [String],
-        sorting: String?,
+        sorting: MattermostSidebarCategorySorting?,
         muted: Bool?,
         collapsed: Bool?
     ) {
@@ -79,10 +79,10 @@ public struct MattermostSidebarCategory: Decodable, Equatable, Hashable, Sendabl
         userId = try container.decodeIfPresent(String.self, forKey: .userId)
         teamId = try container.decodeIfPresent(String.self, forKey: .teamId)
         displayName = try container.decode(String.self, forKey: .displayName)
-        type = try container.decode(String.self, forKey: .type)
+        type = try container.decode(MattermostSidebarCategoryType.self, forKey: .type)
         sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder)
         channelIds = try container.decodeIfPresent([String].self, forKey: .channelIds) ?? []
-        sorting = try container.decodeIfPresent(String.self, forKey: .sorting)
+        sorting = try container.decodeIfPresent(MattermostSidebarCategorySorting.self, forKey: .sorting)
         muted = try container.decodeIfPresent(Bool.self, forKey: .muted)
         collapsed = try container.decodeIfPresent(Bool.self, forKey: .collapsed)
     }

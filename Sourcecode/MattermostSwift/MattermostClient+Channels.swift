@@ -125,7 +125,7 @@ extension MattermostClient {
         displayName: String,
         purpose: String? = nil,
         header: String? = nil,
-        type: String = "O"
+        type: MattermostChannelType = .open
     ) async throws -> MattermostChannel {
         try await httpClient.post(
             "/channels",
@@ -164,8 +164,12 @@ extension MattermostClient {
         try await httpClient.post("/channels/\(id)/restore")
     }
 
-    /// Updates a channel privacy type (`"O"` public, `"P"` private).
-    public func setChannelPrivacy(id: String, type: String) async throws -> MattermostChannel {
+    /// Updates a channel's privacy to ``MattermostChannelType/open`` or
+    /// ``MattermostChannelType/private``.
+    public func setChannelPrivacy(
+        id: String,
+        type: MattermostChannelType
+    ) async throws -> MattermostChannel {
         try await httpClient.put(
             "/channels/\(id)/privacy",
             body: MattermostChannelPrivacyRequest(privacy: type)
