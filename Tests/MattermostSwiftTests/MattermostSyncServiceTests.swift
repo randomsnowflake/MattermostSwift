@@ -144,6 +144,69 @@ func syncServicePropagatesPartialHTTPFailure() async throws {
     }
 }
 
+@MainActor
+@Test
+func syncServicePersistsETagsAndReturnsCachedListsForNotModifiedResponses() async throws {
+    let tracker = MattermostConditionalSyncRequestTracker()
+    let client = try MattermostClient(
+        serverURL: try #require(URL(string: "https://mattermost.example.com")),
+        token: "token",
+        urlSession: await MattermostTestSupport.urlSession { request in
+            try await tracker.response(for: request)
+        }
+    )
+    let store = try MattermostStore(inMemory: true)
+    let options = MattermostSyncOptions(
+        postPageSize: 60,
+        maxPostPages: 1,
+        includeChannelUsers: false,
+        includeSidebarCategories: true,
+        refreshUnreadForAllJoinedChannels: false
+    )
+
+    let first = try await client.syncService().sync(
+        to: store,
+        teamID: "team-1",
+        channelID: "channel-1",
+        options: options
+    )
+    try store.upsert(channel: MattermostChannel(
+        id: "unrelated-channel",
+        createAt: nil,
+        updateAt: nil,
+        teamId: "team-2",
+        name: "unrelated",
+        displayName: "Unrelated",
+        type: "O",
+        header: nil,
+        purpose: nil,
+        deleteAt: nil,
+        totalMsgCount: nil,
+        totalMsgCountRoot: nil,
+        lastPostAt: nil,
+        lastRootPostAt: nil
+    ))
+    try store.save()
+    let second = try await client.syncService().sync(
+        to: store,
+        teamID: "team-1",
+        channelID: "channel-1",
+        options: options
+    )
+
+    #expect(first.teams == second.teams)
+    #expect(first.channels == second.channels)
+    #expect(second.syncedCategoriesCount == 1)
+    #expect(try store.cachedSidebarCategories(teamID: "team-1").map(\.id) == ["category-1"])
+    #expect(tracker.notModifiedResponseCount == 3)
+    #expect(tracker.receivedValidators == [
+        "/api/v4/users/user-1/teams": #""teams-v1""#,
+        "/api/v4/users/me/teams/team-1/channels": #"W/"channels-v1""#,
+        "/api/v4/users/me/teams/team-1/channels/categories": #""categories-v1""#,
+    ])
+    #expect(tracker.unexpectedConditionalPaths.isEmpty)
+}
+
 private final class MattermostSyncServiceRequestTracker: @unchecked Sendable {
     private let lock = NSLock()
     private let channelUserPageSizes: [Int]?
@@ -300,5 +363,90 @@ private actor MattermostUnreadRequestGate {
                 continuation.resume()
             }
         }
+    }
+}
+
+private final class MattermostConditionalSyncRequestTracker: @unchecked Sendable {
+    private let lock = NSLock()
+    private let fallback = MattermostSyncServiceRequestTracker(requiredUnreadOverlap: 1)
+    private let validatorsByPath: [String: String] = [
+        "/api/v4/users/user-1/teams": #""teams-v1""#,
+        "/api/v4/users/me/teams/team-1/channels": #"W/"channels-v1""#,
+        "/api/v4/users/me/teams/team-1/channels/categories": #""categories-v1""#,
+    ]
+    private var receivedValidatorsStorage: [String: String] = [:]
+    private var unexpectedConditionalPathsStorage: [String] = []
+    private var notModifiedResponseCountStorage = 0
+
+    var receivedValidators: [String: String] {
+        lock.withLock { receivedValidatorsStorage }
+    }
+
+    var unexpectedConditionalPaths: [String] {
+        lock.withLock { unexpectedConditionalPathsStorage }
+    }
+
+    var notModifiedResponseCount: Int {
+        lock.withLock { notModifiedResponseCountStorage }
+    }
+
+    func response(for request: URLRequest) async throws -> (HTTPURLResponse, Data) {
+        let path = request.url?.path ?? ""
+        let requestETag = request.value(forHTTPHeaderField: "If-None-Match")
+
+        if let validator = validatorsByPath[path] {
+            if let requestETag {
+                lock.withLock {
+                    receivedValidatorsStorage[path] = requestETag
+                }
+            }
+            if requestETag == validator {
+                lock.withLock {
+                    notModifiedResponseCountStorage += 1
+                }
+                return try response(statusCode: 304, body: Data(), request: request)
+            }
+
+            let (_, body) = try await fallback.response(for: request)
+            return try response(
+                statusCode: 200,
+                body: body,
+                request: request,
+                headers: ["ETag": validator]
+            )
+        }
+
+        if requestETag != nil {
+            lock.withLock {
+                unexpectedConditionalPathsStorage.append(path)
+            }
+        }
+
+        if path == "/api/v4/channels/channel-1/posts" {
+            return try response(
+                statusCode: 200,
+                body: Data(#"{"order":[],"posts":{}}"#.utf8),
+                request: request
+            )
+        }
+        return try await fallback.response(for: request)
+    }
+
+    private func response(
+        statusCode: Int,
+        body: Data,
+        request: URLRequest,
+        headers: [String: String] = [:]
+    ) throws -> (HTTPURLResponse, Data) {
+        var headers = headers
+        headers["Content-Type"] = "application/json"
+        let url = try #require(request.url)
+        let response = try #require(HTTPURLResponse(
+            url: url,
+            statusCode: statusCode,
+            httpVersion: "HTTP/1.1",
+            headerFields: headers
+        ))
+        return (response, body)
     }
 }

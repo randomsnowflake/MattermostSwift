@@ -1,5 +1,10 @@
 import Foundation
 
+enum MattermostConditionalResponse<Value: Sendable>: Sendable {
+    case modified(value: Value, etag: String?)
+    case notModified
+}
+
 struct MattermostHTTPClient: Sendable {
     private let configuration: MattermostConfiguration
     private let urlSession: URLSession
@@ -23,6 +28,34 @@ struct MattermostHTTPClient: Sendable {
         }
 
         return try mattermostSnakeCaseDecoder.decode(Response.self, from: data)
+    }
+
+    func conditionalGet<Response: Decodable & Sendable>(
+        _ endpoint: String,
+        queryItems: [URLQueryItem] = [],
+        etag: String?
+    ) async throws -> MattermostConditionalResponse<Response> {
+        var request = try makeRequest(endpoint: endpoint, method: "GET", queryItems: queryItems)
+        let hasValidator = etag.map { !$0.isEmpty } ?? false
+        if let etag, hasValidator {
+            request.setValue(etag, forHTTPHeaderField: "If-None-Match")
+        }
+        let (data, response) = try await loadData(for: request)
+        let httpResponse = try validate(data, response, allowsNotModified: hasValidator)
+
+        if httpResponse.statusCode == 304 {
+            return .notModified
+        }
+        guard !data.isEmpty else {
+            throw MattermostError.emptyResponse
+        }
+
+        let responseETag = httpResponse.value(forHTTPHeaderField: "ETag")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        return .modified(
+            value: try mattermostSnakeCaseDecoder.decode(Response.self, from: data),
+            etag: responseETag
+        )
     }
 
     func post<Request: Encodable & Sendable, Response: Decodable & Sendable>(
@@ -187,7 +220,11 @@ struct MattermostHTTPClient: Sendable {
         )
     }
 
-    private func validate(_ data: Data, _ response: URLResponse) throws -> HTTPURLResponse {
+    private func validate(
+        _ data: Data,
+        _ response: URLResponse,
+        allowsNotModified: Bool = false
+    ) throws -> HTTPURLResponse {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw MattermostError.invalidHTTPResponse
         }
@@ -196,7 +233,8 @@ struct MattermostHTTPClient: Sendable {
             throw MattermostError.rateLimited(retryAfter: Self.retryAfter(from: httpResponse))
         }
 
-        guard (200..<300).contains(httpResponse.statusCode) else {
+        let isNotModified = allowsNotModified && httpResponse.statusCode == 304
+        guard (200..<300).contains(httpResponse.statusCode) || isNotModified else {
             let apiError = decodeMattermostAPIError(from: data)
             throw MattermostError.httpStatus(
                 code: httpResponse.statusCode,

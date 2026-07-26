@@ -20,6 +20,8 @@ The current unit tests cover:
 - thread inbox request construction, thread read-state request construction, decoding, and cache upserts,
 - query item construction,
 - REST error handling for Mattermost error bodies, non-JSON error bodies, empty successful JSON responses, binary/data endpoints, bounded 429 retries with `Retry-After`, dedicated rate-limit errors, and mutation replay prevention,
+- scoped sync-list ETag persistence and `If-None-Match` request construction, HTTP 304 cached
+  readback, exclusion of post/unread requests, and V1-to-V2 SwiftData cache migration,
 - initial Mattermost response decoding,
 - post props/metadata decoding, outbound props request encoding, SwiftData cache preservation, and
   zero-decode cached post snapshots with throwing on-demand props/metadata accessors,
@@ -37,7 +39,7 @@ The current unit tests cover:
   application into SwiftData, unread refresh on `post_unread` and `multiple_channels_viewed`
   invalidations, and thread-state refresh on thread invalidation,
 - complete channel-user profile hydration across mocked multi-page responses,
-- SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, dependent thread cleanup during post pruning and channel-content deletion, timestamp merge policy, sync cursors, and configurable disk-store permissions/file protection,
+- SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, dependent thread cleanup during post pruning and channel-content deletion, timestamp merge policy, sync cursors, conditional-list ETags, and configurable disk-store permissions/file protection,
 - restrictive default and custom CLI cache-directory creation.
 
 ## Live Verification

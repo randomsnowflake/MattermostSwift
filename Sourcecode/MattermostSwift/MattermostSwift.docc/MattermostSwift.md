@@ -88,7 +88,7 @@ func hydrate(client: MattermostClient, storeURL: URL) async throws {
 }
 ```
 
-`MattermostSyncService` stores joined teams, the current user, status, joined channels, memberships, unread counts, sidebar categories, and optional channel timelines. When `includeChannelUsers` is enabled for a selected timeline channel, every channel-user profile page is fetched and cached. Cursor-based follow-up syncs use Mattermost's `since` timestamp query where possible. Per-channel notification settings are available as `MattermostChannelNotifyProps`, which exposes common Mattermost keys and keeps unknown server keys intact.
+`MattermostSyncService` stores joined teams, the current user, status, joined channels, memberships, unread counts, sidebar categories, and optional channel timelines. It persists scoped ETags for joined-team, joined-channel, and sidebar-category lists, sends `If-None-Match` on later syncs, and returns the ordered cached list when the server replies `304 Not Modified`. Post timelines and unread counts remain unconditional. When `includeChannelUsers` is enabled for a selected timeline channel, every channel-user profile page is fetched and cached. Cursor-based follow-up post syncs use Mattermost's `since` timestamp query where possible. Per-channel notification settings are available as `MattermostChannelNotifyProps`, which exposes common Mattermost keys and keeps unknown server keys intact.
 
 All `MattermostStore` operations use `ModelContainer.mainContext` and are main-actor isolated.
 That contract also covers sync and live-sync cache writes, cached fetches, `prunePosts`, and

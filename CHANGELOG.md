@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Workspace sync now persists scoped ETags for joined-team, joined-channel, and sidebar-category
+  lists, sends `If-None-Match` on later syncs, and treats HTTP 304 as cached unchanged data.
+  Post timelines and unread-count requests remain unconditional.
 - Channel-user cache hydration now fetches every profile page instead of silently stopping at
   the first 60 users.
 - Live sync now skips the full REST backfill after reconnect gaps shorter than 10 seconds by

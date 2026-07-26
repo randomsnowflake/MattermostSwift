@@ -285,6 +285,10 @@ Post pruning and channel-content deletion also remove reactions, files, and cach
 state rooted at the deleted posts.
 When channel-user hydration is enabled for a selected timeline channel, `MattermostSyncService`
 follows every profile page so channels with more than 60 members are cached completely.
+`MattermostSyncService` also persists server ETags and ordered list membership for joined teams,
+joined channels, and sidebar categories. Later syncs send `If-None-Match`; a `304 Not Modified`
+reuses the scoped cached list without rewriting it. Post timelines and unread counts deliberately
+bypass this conditional-list cache so their freshness behavior is unchanged.
 For work outside that actor, use `cachedUserSnapshots()`, `cachedChannelSnapshots()`, or
 `cachedPostSnapshots(...)`; these immutable `Sendable` values do not retain a SwiftData context.
 Post snapshots carry `propsJSON` and `metadataJSON` without decoding them while the store is on the

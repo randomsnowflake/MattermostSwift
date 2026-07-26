@@ -34,6 +34,8 @@
 - Sidebar channel move/reorder helpers and a live sidebar move e2e check.
 - User preference list/load/save/delete APIs with a read-only live preference decode probe and temporary save/load/delete round-trip verification.
 - SwiftData cache foundation for teams, users, statuses, channels, posts, reactions, files, sidebar categories, and sync cursors.
+- Conditional GET support for cacheable workspace sync lists, with scoped persisted ETags,
+  ordered cached membership, HTTP 304 reuse, and explicit exclusion of posts and unread counts.
 - Restrictive SDK and CLI cache-directory permissions with configurable iOS file protection for the SwiftData store and SQLite sidecar files.
 - SwiftData cache for current-user channel membership/read state and active-channel unread counts.
 - Store merging for common live post, reaction, unread invalidation, and presence events.

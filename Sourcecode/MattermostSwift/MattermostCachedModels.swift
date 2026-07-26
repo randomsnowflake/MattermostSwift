@@ -602,3 +602,17 @@ public final class MattermostSyncCursor {
         self.lastItemID = lastItemID
     }
 }
+
+/// A server validator and the ordered cache membership for one conditional list request.
+@Model
+final class MattermostCacheETag {
+    @Attribute(.unique) var scope: String = ""
+    var value: String = ""
+    var itemIDs: [String] = []
+
+    init(scope: String, value: String, itemIDs: [String]) {
+        self.scope = scope
+        self.value = value
+        self.itemIDs = itemIDs
+    }
+}
