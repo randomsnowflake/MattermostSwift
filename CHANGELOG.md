@@ -6,6 +6,11 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Public channel, post, user, team, timeline-target, sidebar-category, thread, file,
+  reaction, custom-emoji, and immutable cache-snapshot value types now conform to
+  `Hashable` for use in SwiftUI navigation and hash-based collections.
+- `MattermostLiveSyncEvent` now conforms to `Equatable`, enabling direct comparison
+  in host-app live-sync reducer tests.
 - Redacted bearer tokens from the textual and debug descriptions of `MattermostSession`,
   `MattermostAuthentication`, and `MattermostConfiguration`.
 - Server ping and client-configuration decoding now tolerates key casing and separator drift across Mattermost releases.
