@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import MattermostSwift
 
@@ -97,6 +98,77 @@ func cachedSyncCursorUpdatesInPlace() throws {
     let cursor = try #require(try store.cachedSyncCursor(scope: "team:t1"))
     #expect(cursor.lastSyncAt == 42)
     #expect(cursor.lastItemID == "b")
+}
+
+@MainActor
+@Test
+func cachedETagUpdatesScopedMembershipInPlace() throws {
+    let store = try MattermostStore(inMemory: true)
+
+    let inserted = try store.setETag(
+        scope: "GET /users/me/channels",
+        value: #""channels-v1""#,
+        itemIDs: ["channel-2", "channel-1"]
+    )
+    #expect(inserted.scope == "GET /users/me/channels")
+
+    try store.setETag(
+        scope: "GET /users/me/channels",
+        value: #"W/"channels-v2""#,
+        itemIDs: ["channel-3"]
+    )
+    try store.save()
+
+    let cached = try #require(try store.cachedETag(scope: "GET /users/me/channels"))
+    #expect(cached.value == #"W/"channels-v2""#)
+    #expect(cached.itemIDs == ["channel-3"])
+
+    try store.removeETag(scope: "GET /users/me/channels")
+    try store.save()
+    #expect(try store.cachedETag(scope: "GET /users/me/channels") == nil)
+}
+
+@MainActor
+@Test
+func cacheSchemaMigratesV1StoreToV2WithoutLosingData() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appending(path: "MattermostSwiftMigration-\(UUID().uuidString)", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let storeURL = directory.appending(path: "cache.sqlite")
+
+    do {
+        let schema = Schema(versionedSchema: MattermostCacheSchemaV1.self)
+        let configuration = ModelConfiguration(
+            "MattermostSwift",
+            schema: schema,
+            url: storeURL,
+            allowsSave: true,
+            cloudKitDatabase: .none
+        )
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        context.insert(MattermostCachedTeam(MattermostTeam(
+            id: "team-1",
+            name: "team",
+            displayName: "Team",
+            description: nil,
+            type: "O"
+        )))
+        context.insert(MattermostSyncCursor(scope: "team:team-1", lastSyncAt: 42))
+        try context.save()
+    }
+
+    let migrated = try MattermostStore(url: storeURL)
+    #expect(try migrated.cachedTeam(id: "team-1")?.displayName == "Team")
+    #expect(try migrated.cachedSyncCursor(scope: "team:team-1")?.lastSyncAt == 42)
+    try migrated.setETag(
+        scope: "GET /users/user-1/teams",
+        value: #""teams-v1""#,
+        itemIDs: ["team-1"]
+    )
+    try migrated.save()
+    #expect(try migrated.cachedETag(scope: "GET /users/user-1/teams")?.itemIDs == ["team-1"])
 }
 
 @MainActor

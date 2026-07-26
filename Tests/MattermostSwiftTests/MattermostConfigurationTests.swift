@@ -2,6 +2,8 @@ import Foundation
 import Testing
 @testable import MattermostSwift
 
+private final class MattermostTestURLSessionDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {}
+
 @Test
 func configurationNormalizesServerURL() throws {
     let configuration = try MattermostConfiguration(
@@ -281,6 +283,27 @@ func clientUsesExplicitLiveEventSessionWhenProvided() throws {
 }
 
 @Test
+func clientRetainsTrustDelegateForDefaultRESTAndWebSocketSessions() throws {
+    var delegate: MattermostTestURLSessionDelegate? = MattermostTestURLSessionDelegate()
+    weak var retainedDelegate = delegate
+    let client = try MattermostClient(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        token: "token",
+        urlSessionDelegate: #require(delegate)
+    )
+    delegate = nil
+
+    #expect(retainedDelegate != nil)
+    #expect(client.urlSession.delegate === retainedDelegate)
+    #expect(client.liveEventStream().urlSession.delegate === retainedDelegate)
+    #expect(client.urlSession.configuration.timeoutIntervalForResource == 300)
+    #expect(client.liveEventStream().urlSession.configuration.timeoutIntervalForResource == 604_800)
+
+    client.urlSession.invalidateAndCancel()
+    client.liveEventStream().urlSession.invalidateAndCancel()
+}
+
+@Test
 func liveEventStreamConfiguresHeartbeatLiveness() throws {
     let configuration = try MattermostConfiguration(
         serverURL: #require(URL(string: "https://mattermost.example.com")),
@@ -354,6 +377,17 @@ func defaultSessionDoesNotPersistOrAcceptCookies() {
 
     #expect(!configuration.httpShouldSetCookies)
     #expect(configuration.httpCookieAcceptPolicy == .never)
+}
+
+@Test
+func defaultSessionsAllowConstrainedAndExpensiveNetworkPaths() {
+    let restConfiguration = URLSession.mattermost.configuration
+    let liveConfiguration = URLSession.mattermostLiveEvents.configuration
+
+    #expect(restConfiguration.allowsConstrainedNetworkAccess)
+    #expect(restConfiguration.allowsExpensiveNetworkAccess)
+    #expect(liveConfiguration.allowsConstrainedNetworkAccess)
+    #expect(liveConfiguration.allowsExpensiveNetworkAccess)
 }
 
 @Test
@@ -672,7 +706,7 @@ func httpClientBuildsCreateChannelRequestWithJSONBody() throws {
         displayName: "MattermostSwift Test",
         purpose: nil,
         header: nil,
-        type: "O"
+        type: .open
     )
 
     let request: URLRequest = try httpClient.makeJSONRequest(
@@ -845,9 +879,9 @@ func httpClientBuildsSidebarCategoryCreateRequestWithJSONBody() throws {
         userId: "user-id",
         teamId: "team-id",
         displayName: "MattermostSwift Test",
-        type: "custom",
+        type: .custom,
         channelIds: ["channel-id"],
-        sorting: "manual"
+        sorting: .manual
     )
 
     let request: URLRequest = try httpClient.makeJSONRequest(
@@ -1215,7 +1249,7 @@ func httpClientBuildsUpdateStatusRequestWithJSONBody() throws {
         method: "PUT",
         body: MattermostUserStatusUpdateRequest(
             userId: "user-a",
-            status: "dnd",
+            status: .dnd,
             dndEndTime: 1_780_000_000
         )
     )
@@ -1820,7 +1854,7 @@ func decodesUserStatus() throws {
     let status = try mattermostDecoder.decode(MattermostUserStatus.self, from: json)
 
     #expect(status.userID == "user-id")
-    #expect(status.status == "online")
+    #expect(status.status == .online)
     #expect(status.manual == false)
     #expect(status.lastActivityAt == 123)
     #expect(status.activeChannel == "channel-id")
@@ -2051,7 +2085,7 @@ func decodesTypedWebSocketStatusChangeEvent() throws {
 
     #expect(event.name == .statusChange)
     #expect(statusChange.userID == "user-a")
-    #expect(statusChange.status == "away")
+    #expect(statusChange.status == .away)
     #expect(statusChange.manual == true)
     #expect(try event.typedEvent() == .statusChange(statusChange))
 }

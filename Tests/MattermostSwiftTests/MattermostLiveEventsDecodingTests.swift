@@ -233,6 +233,37 @@ func webSocketEnvelopeToleratesWrongTypedFields() throws {
 }
 
 @Test
+func webSocketHandshakePendingEventsAreBounded() throws {
+    var pendingEvents: [MattermostLiveEvent] = []
+
+    for sequence in 0..<MattermostLiveEventStream.maximumPendingHandshakeEvents {
+        try MattermostLiveEventStream.appendPendingHandshakeEvent(
+            MattermostLiveEvent(
+                event: "posted",
+                data: [:],
+                broadcast: nil,
+                seq: sequence
+            ),
+            to: &pendingEvents
+        )
+    }
+
+    #expect(pendingEvents.count == 256)
+    #expect(throws: MattermostError.liveEventGap) {
+        try MattermostLiveEventStream.appendPendingHandshakeEvent(
+            MattermostLiveEvent(
+                event: "posted",
+                data: [:],
+                broadcast: nil,
+                seq: 256
+            ),
+            to: &pendingEvents
+        )
+    }
+    #expect(pendingEvents.count == 256)
+}
+
+@Test
 func multipleChannelsViewedDecodesChannelTimes() throws {
     let json = """
     {
@@ -240,7 +271,8 @@ func multipleChannelsViewedDecodesChannelTimes() throws {
       "data": {
         "channel_times": {
           "channel-1": 1751234567890,
-          "channel-2": 1751234567891
+          "channel-2": 1751234567891,
+          "channel_with_underscores": 1751234567892
         }
       },
       "broadcast": {
@@ -258,7 +290,11 @@ func multipleChannelsViewedDecodesChannelTimes() throws {
     #expect(event.name == .multipleChannelsViewed)
     let viewed = try #require(event.decodedMultipleChannelsViewed())
     #expect(viewed.userID == "user-1")
-    #expect(viewed.channelTimes == ["channel-1": 1_751_234_567_890, "channel-2": 1_751_234_567_891])
+    #expect(viewed.channelTimes == [
+        "channel-1": 1_751_234_567_890,
+        "channel-2": 1_751_234_567_891,
+        "channel_with_underscores": 1_751_234_567_892,
+    ])
     #expect(try event.typedEvent() == .multipleChannelsViewed(viewed))
 }
 

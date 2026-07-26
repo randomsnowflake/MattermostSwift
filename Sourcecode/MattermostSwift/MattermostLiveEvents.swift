@@ -112,7 +112,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
 
         return MattermostStatusChangeEvent(
             userID: anyString("user_id", "userId", broadcast: \.userID),
-            status: stringData("status"),
+            status: stringData("status").map(MattermostUserStatusValue.init(rawValue:)),
             manual: boolData("manual")
         )
     }
@@ -138,7 +138,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
 
         // Plain decoder: the keys are channel ids and must not be snake-case rewritten.
         let channelTimes = jsonData("channel_times").flatMap {
-            try? JSONDecoder().decode([String: Int64].self, from: $0)
+            try? mattermostPlainDecoder.decode([String: Int64].self, from: $0)
         }
         return MattermostMultipleChannelsViewedEvent(
             userID: anyString("user_id", "userId", broadcast: \.userID),
@@ -326,7 +326,7 @@ public struct MattermostTypingEvent: Equatable, Sendable {
 /// Presence update payload emitted by Mattermost WebSocket events.
 public struct MattermostStatusChangeEvent: Equatable, Sendable {
     public let userID: String?
-    public let status: String?
+    public let status: MattermostUserStatusValue?
     public let manual: Bool?
 }
 
@@ -482,7 +482,7 @@ public struct MattermostLiveBroadcast: Decodable, Equatable, Sendable {
 }
 
 /// Generic JSON value used for tolerant Mattermost JSON payloads.
-public enum MattermostJSONValue: Codable, Equatable, Sendable {
+public enum MattermostJSONValue: Codable, Equatable, Hashable, Sendable {
     case string(String)
     /// A signed JSON integer preserved without converting through `Double`.
     case integer(Int64)

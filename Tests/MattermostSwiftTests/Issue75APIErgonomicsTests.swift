@@ -320,8 +320,10 @@ struct Issue75APIErgonomicsTests {
             maximumDelay: .seconds(2),
             multiplier: 2
         )
-        #expect(policy.delay(for: 0) == .milliseconds(250))
-        #expect(policy.delay(for: 3) == .seconds(2))
+        // Reconnect delays are full-jitter; the undecorated overload samples within [0, base].
+        #expect(policy.delay(for: 0, jitterFraction: 1) == .milliseconds(250))
+        #expect(policy.delay(for: 3, jitterFraction: 1) == .seconds(2))
+        #expect(policy.delay(for: 3) <= .seconds(2))
 
         let insecure = try MattermostConfiguration(
             serverURL: #require(URL(string: "http://mattermost.example.com")),

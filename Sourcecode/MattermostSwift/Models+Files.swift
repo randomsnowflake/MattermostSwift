@@ -17,7 +17,7 @@ public struct MattermostFileUploadResponse: Decodable, Equatable, Sendable {
 }
 
 /// Metadata for an uploaded Mattermost file.
-public struct MattermostFileInfo: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostFileInfo: Decodable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let userID: String?
     public let postID: String?
@@ -125,7 +125,7 @@ public struct MattermostFileInfo: Decodable, Equatable, Sendable, Identifiable {
 }
 
 /// Metadata for a Mattermost custom emoji.
-public struct MattermostCustomEmoji: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostCustomEmoji: Decodable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let creatorID: String?
     public let name: String

@@ -3,14 +3,14 @@ import Foundation
 // MARK: - Channel, stats, membership, notify props, unread, and view-response models
 
 /// Mattermost channel metadata.
-public struct MattermostChannel: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostChannel: Decodable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let createAt: Int64?
     public let updateAt: Int64?
     public let teamID: String?
     public let name: String
     public let displayName: String
-    public let type: String
+    public let type: MattermostChannelType
     public let header: String?
     public let purpose: String?
     public let deleteAt: Int64?
@@ -30,7 +30,7 @@ public struct MattermostChannel: Decodable, Equatable, Sendable, Identifiable {
         teamID: String?,
         name: String,
         displayName: String,
-        type: String,
+        type: MattermostChannelType,
         header: String?,
         purpose: String?,
         deleteAt: Int64?,
@@ -79,7 +79,7 @@ public struct MattermostChannel: Decodable, Equatable, Sendable, Identifiable {
             teamID: teamId,
             name: name,
             displayName: displayName,
-            type: type,
+            type: MattermostChannelType(rawValue: type),
             header: header,
             purpose: purpose,
             deleteAt: deleteAt,

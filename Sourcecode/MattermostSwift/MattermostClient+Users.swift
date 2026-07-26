@@ -211,7 +211,11 @@ extension MattermostClient {
     }
 
     /// Manually sets a user's presence status.
-    public func setStatus(userID: String, status: String, dndEndTime: Int64? = nil) async throws -> MattermostUserStatus {
+    public func setStatus(
+        userID: String,
+        status: MattermostUserStatusValue,
+        dndEndTime: Int64? = nil
+    ) async throws -> MattermostUserStatus {
         try await httpClient.put(
             "/users/\(userID)/status",
             body: MattermostUserStatusUpdateRequest(

@@ -3,7 +3,7 @@ import Foundation
 // MARK: - User, session, status, and autocomplete models
 
 /// Authenticated Mattermost user profile data.
-public struct MattermostUser: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostUser: Decodable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let username: String
     public let email: String?
@@ -31,7 +31,9 @@ public enum MattermostSessionTokenSource: String, Equatable, Sendable {
 }
 
 /// User and session token returned by Mattermost username/password login.
-public struct MattermostSession: Equatable, Sendable {
+///
+/// Its textual descriptions redact the token.
+public struct MattermostSession: Equatable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     public let user: MattermostUser
     public let token: String
     public let tokenSource: MattermostSessionTokenSource
@@ -50,6 +52,14 @@ public struct MattermostSession: Equatable, Sendable {
         self.tokenSource = tokenSource
         self.serverURL = serverURL
         self.allowInsecureHTTP = allowInsecureHTTP
+    }
+
+    public var description: String {
+        "MattermostSession(user: \(user.username), tokenSource: \(tokenSource), token: <redacted>)"
+    }
+
+    public var debugDescription: String {
+        description
     }
 
     public func client(
@@ -87,7 +97,7 @@ public struct MattermostMFASecret: Decodable, Equatable, Sendable {
 /// Presence status for a Mattermost user.
 public struct MattermostUserStatus: Codable, Equatable, Sendable {
     public let userID: String
-    public let status: String
+    public let status: MattermostUserStatusValue
     public let manual: Bool?
     public let lastActivityAt: Int64?
     public let activeChannel: String?
@@ -95,7 +105,7 @@ public struct MattermostUserStatus: Codable, Equatable, Sendable {
 
     public init(
         userID: String,
-        status: String,
+        status: MattermostUserStatusValue,
         manual: Bool? = nil,
         lastActivityAt: Int64? = nil,
         activeChannel: String? = nil,
@@ -120,7 +130,7 @@ public struct MattermostUserStatus: Codable, Equatable, Sendable {
     ) {
         self.init(
             userID: userId,
-            status: status,
+            status: MattermostUserStatusValue(rawValue: status),
             manual: manual,
             lastActivityAt: lastActivityAt,
             activeChannel: activeChannel,

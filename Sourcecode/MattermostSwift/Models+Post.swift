@@ -96,7 +96,7 @@ public struct MattermostPostSearchResults: Decodable, Equatable, Sendable {
 /// Typed subset of the `metadata` payload the server embeds with each post
 /// (files and reactions). Lets clients skip the per-post `fileInfos`/`reactions`
 /// lookups when the server already delivered them inline.
-public struct MattermostPostMetadata: Decodable, Equatable, Sendable {
+public struct MattermostPostMetadata: Decodable, Equatable, Hashable, Sendable {
     public let files: [MattermostFileInfo]?
     public let reactions: [MattermostReaction]?
 
@@ -107,7 +107,7 @@ public struct MattermostPostMetadata: Decodable, Equatable, Sendable {
 }
 
 /// Mattermost post/message metadata.
-public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostPost: Decodable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let createAt: Int64
     public let updateAt: Int64
@@ -118,7 +118,7 @@ public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
     public let rootID: String
     public let originalID: String?
     public let message: String
-    public let type: String
+    public let type: MattermostPostType
     public let hashtags: String?
     public let pendingPostID: String?
     public let fileIDs: [String]?
@@ -171,7 +171,7 @@ public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
         rootID: String,
         originalID: String?,
         message: String,
-        type: String,
+        type: MattermostPostType,
         hashtags: String?,
         pendingPostID: String?,
         fileIDs: [String]?,
@@ -220,7 +220,7 @@ public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
         rootId: String,
         originalId: String?,
         message: String,
-        type: String,
+        type: MattermostPostType,
         hashtags: String?,
         pendingPostId: String?,
         fileIds: [String]?,
@@ -271,7 +271,7 @@ public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
         rootID = try container.decode(String.self, forKey: .rootID)
         originalID = try container.decodeIfPresent(String.self, forKey: .originalID)
         message = try container.decode(String.self, forKey: .message)
-        type = try container.decode(String.self, forKey: .type)
+        type = try container.decode(MattermostPostType.self, forKey: .type)
         hashtags = try container.decodeIfPresent(String.self, forKey: .hashtags)
         pendingPostID = try container.decodeIfPresent(String.self, forKey: .pendingPostID)
         fileIDs = try container.decodeIfPresent([String].self, forKey: .fileIDs)
@@ -352,7 +352,7 @@ public struct MattermostStatusOK: Decodable, Equatable, Sendable {
 }
 
 /// A reaction attached to a Mattermost post.
-public struct MattermostReaction: Codable, Equatable, Sendable {
+public struct MattermostReaction: Codable, Equatable, Hashable, Sendable {
     public let userID: String
     public let postID: String
     public let emojiName: String
