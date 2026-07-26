@@ -944,9 +944,9 @@ func liveSyncReportsSidebarAndThreadRefreshFailures() async throws {
         data: ["thread_id": .string("root-1")],
         broadcast: MattermostLiveBroadcast(
             omitUsers: nil,
-            userId: "user-1",
-            channelId: "channel-1",
-            teamId: "team-1"
+            userID: "user-1",
+            channelID: "channel-1",
+            teamID: "team-1"
         ),
         seq: 31
     )
