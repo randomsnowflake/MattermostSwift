@@ -3,7 +3,7 @@ import Testing
 @testable import MattermostSwift
 
 enum MattermostTestSupport {
-    typealias URLHandler = @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)
+    typealias URLHandler = @Sendable (URLRequest) async throws -> (HTTPURLResponse, Data)
 
     static func urlSession(handler: @escaping URLHandler) async -> URLSession {
         let handlerID = UUID().uuidString
@@ -112,11 +112,11 @@ actor MattermostMockURLProtocolHandlers {
         handlers[id] = handler
     }
 
-    func response(for request: URLRequest) throws -> (HTTPURLResponse, Data) {
+    func response(for request: URLRequest) async throws -> (HTTPURLResponse, Data) {
         guard let handlerID = request.value(forHTTPHeaderField: MattermostMockURLProtocol.handlerIDHeader),
               let handler = handlers[handlerID] else {
             throw MattermostError.invalidHTTPResponse
         }
-        return try handler(request)
+        return try await handler(request)
     }
 }

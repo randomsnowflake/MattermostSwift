@@ -7,6 +7,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 ## Unreleased
 
 - Server ping and client-configuration decoding now tolerates key casing and separator drift across Mattermost releases.
+- Channel deletion now removes cached channel memberships, preventing live
+  `channel_deleted` events from leaving orphaned membership rows.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,

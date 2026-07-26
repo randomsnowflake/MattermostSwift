@@ -282,7 +282,7 @@ public struct MattermostSyncService: Sendable {
         channels: [MattermostChannel],
         userID: String,
         store: MattermostStore,
-        width: Int = 8
+        width: Int = 4
     ) async throws -> Int {
         try await withThrowingTaskGroup(of: MattermostChannelUnread.self) { group in
             var iterator = channels.makeIterator()
