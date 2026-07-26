@@ -284,16 +284,16 @@ public struct MattermostLiveSyncService: Sendable {
                 )
             },
             refreshUnread: { userID, channelID in
-                try await client.channelUnread(userID: userID, channelID: channelID)
+                try await client.channelUnread(channelID: channelID, userID: userID)
             },
             refreshSidebarCategories: { teamID in
                 try await client.sidebarCategories(teamID: teamID)
             },
             refreshThreadState: { userID, teamID, threadID in
                 try await client.userThread(
-                    userID: userID,
                     teamID: teamID,
                     threadID: threadID,
+                    userID: userID,
                     extended: true
                 )
             }

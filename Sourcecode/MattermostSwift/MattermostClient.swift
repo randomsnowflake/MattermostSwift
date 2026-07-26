@@ -120,11 +120,13 @@ public extension MattermostClient {
         mfaToken: String? = nil,
         deviceID: String? = nil,
         ldapOnly: Bool? = nil,
+        allowInsecureHTTP: Bool = false,
         urlSession: URLSession = .mattermost
     ) async throws -> MattermostSession {
         let configuration = try MattermostConfiguration(
             serverURL: serverURL,
-            authentication: .none
+            authentication: .none,
+            allowInsecureHTTP: allowInsecureHTTP
         )
         let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: urlSession)
         var request = try httpClient.makeJSONRequest(
@@ -144,7 +146,9 @@ public extension MattermostClient {
             return MattermostSession(
                 user: response.value,
                 token: sessionToken.token,
-                tokenSource: sessionToken.source
+                tokenSource: sessionToken.source,
+                serverURL: configuration.serverURL,
+                allowInsecureHTTP: allowInsecureHTTP
             )
         }
 
@@ -187,7 +191,7 @@ public extension MattermostClient {
     /// Required:
     /// - `MATTERMOST_URL`
     /// - `MATTERMOST_TOKEN`, or `MATTERMOST_AUTH_TOKEN` as a local compatibility alias
-    static func liveFromEnvironment(
+    static func fromEnvironment(
         _ environment: [String: String] = ProcessInfo.processInfo.environment
     ) throws -> MattermostClient {
         guard let rawURL = environment["MATTERMOST_URL"], !rawURL.isEmpty else {
@@ -200,6 +204,13 @@ public extension MattermostClient {
             throw MattermostError.missingEnvironmentVariable("MATTERMOST_TOKEN")
         }
         return try MattermostClient(serverURL: serverURL, token: token)
+    }
+
+    @available(*, deprecated, renamed: "fromEnvironment(_:)")
+    static func liveFromEnvironment(
+        _ environment: [String: String] = ProcessInfo.processInfo.environment
+    ) throws -> MattermostClient {
+        try fromEnvironment(environment)
     }
 }
 

@@ -18,6 +18,10 @@ public struct MattermostUser: Decodable, Equatable, Hashable, Sendable, Identifi
     /// generated fallback. Changes act as a cache-busting token for the
     /// `/users/{id}/image` bytes.
     public let lastPictureUpdate: Int64?
+
+    public var lastPictureUpdatedAt: Date? {
+        lastPictureUpdate.map(Date.init(mattermostMilliseconds:))
+    }
 }
 
 /// Source used to extract a session token from a successful Mattermost login response.
@@ -33,15 +37,21 @@ public struct MattermostSession: Equatable, Sendable, CustomStringConvertible, C
     public let user: MattermostUser
     public let token: String
     public let tokenSource: MattermostSessionTokenSource
+    public let serverURL: URL?
+    public let allowInsecureHTTP: Bool
 
     public init(
         user: MattermostUser,
         token: String,
-        tokenSource: MattermostSessionTokenSource = .responseHeader
+        tokenSource: MattermostSessionTokenSource = .responseHeader,
+        serverURL: URL? = nil,
+        allowInsecureHTTP: Bool = false
     ) {
         self.user = user
         self.token = token
         self.tokenSource = tokenSource
+        self.serverURL = serverURL
+        self.allowInsecureHTTP = allowInsecureHTTP
     }
 
     public var description: String {
@@ -52,8 +62,21 @@ public struct MattermostSession: Equatable, Sendable, CustomStringConvertible, C
         description
     }
 
-    public func client(serverURL: URL, urlSession: URLSession = .mattermost) throws -> MattermostClient {
-        try MattermostClient(serverURL: serverURL, token: token, urlSession: urlSession)
+    public func client(
+        serverURL: URL? = nil,
+        urlSession: URLSession = .mattermost
+    ) throws -> MattermostClient {
+        guard let resolvedServerURL = serverURL ?? self.serverURL else {
+            throw MattermostError.invalidServerURL(
+                "This session predates stored server URLs; pass serverURL explicitly."
+            )
+        }
+        return try MattermostClient(
+            serverURL: resolvedServerURL,
+            token: token,
+            urlSession: urlSession,
+            allowInsecureHTTP: allowInsecureHTTP
+        )
     }
 }
 
@@ -73,12 +96,66 @@ public struct MattermostMFASecret: Decodable, Equatable, Sendable {
 
 /// Presence status for a Mattermost user.
 public struct MattermostUserStatus: Codable, Equatable, Sendable {
-    public let userId: String
+    public let userID: String
     public let status: MattermostUserStatusValue
     public let manual: Bool?
     public let lastActivityAt: Int64?
     public let activeChannel: String?
     public let dndEndTime: Int64?
+
+    public init(
+        userID: String,
+        status: MattermostUserStatusValue,
+        manual: Bool? = nil,
+        lastActivityAt: Int64? = nil,
+        activeChannel: String? = nil,
+        dndEndTime: Int64? = nil
+    ) {
+        self.userID = userID
+        self.status = status
+        self.manual = manual
+        self.lastActivityAt = lastActivityAt
+        self.activeChannel = activeChannel
+        self.dndEndTime = dndEndTime
+    }
+
+    @available(*, deprecated, message: "Use init(userID:status:manual:lastActivityAt:activeChannel:dndEndTime:)")
+    public init(
+        userId: String,
+        status: String,
+        manual: Bool? = nil,
+        lastActivityAt: Int64? = nil,
+        activeChannel: String? = nil,
+        dndEndTime: Int64? = nil
+    ) {
+        self.init(
+            userID: userId,
+            status: MattermostUserStatusValue(rawValue: status),
+            manual: manual,
+            lastActivityAt: lastActivityAt,
+            activeChannel: activeChannel,
+            dndEndTime: dndEndTime
+        )
+    }
+
+    @available(*, deprecated, renamed: "userID")
+    public var userId: String { userID }
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "userId"
+        case status
+        case manual
+        case lastActivityAt
+        case activeChannel
+        case dndEndTime
+    }
+
+    public var lastActivityDate: Date? {
+        lastActivityAt.map(Date.init(mattermostMilliseconds:))
+    }
+    public var dndEndDate: Date? {
+        dndEndTime.map(Date.init(mattermostMilliseconds:))
+    }
 }
 
 /// Custom status shown alongside a user's presence.
@@ -136,9 +213,9 @@ public struct MattermostUserAutocomplete: Decodable, Equatable, Sendable {
 /// Sanitized active session metadata returned by Mattermost for active user sessions.
 public struct MattermostUserSession: Decodable, Equatable, Sendable, Identifiable, CustomStringConvertible, CustomDebugStringConvertible {
     public let id: String
-    public let userId: String?
+    public let userID: String?
     public let createAt: Int64?
-    public let deviceId: String?
+    public let deviceID: String?
     public let expiresAt: Int64?
     public let isOauth: Bool?
     public let lastActivityAt: Int64?
@@ -148,10 +225,34 @@ public struct MattermostUserSession: Decodable, Equatable, Sendable, Identifiabl
     public let token: String?
 
     public var description: String {
-        "MattermostUserSession(id: \(id), userId: \(userId ?? "-"), expiresAt: \(expiresAt.map(String.init) ?? "-"))"
+        "MattermostUserSession(id: \(id), userID: \(userID ?? "-"), expiresAt: \(expiresAt.map(String.init) ?? "-"))"
     }
 
     public var debugDescription: String {
         description
+    }
+
+    @available(*, deprecated, renamed: "userID")
+    public var userId: String? { userID }
+    @available(*, deprecated, renamed: "deviceID")
+    public var deviceId: String? { deviceID }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userID = "userId"
+        case createAt
+        case deviceID = "deviceId"
+        case expiresAt
+        case isOauth
+        case lastActivityAt
+        case props
+        case roles
+        case token
+    }
+
+    public var createdAt: Date? { createAt.map(Date.init(mattermostMilliseconds:)) }
+    public var expirationDate: Date? { expiresAt.map(Date.init(mattermostMilliseconds:)) }
+    public var lastActivityDate: Date? {
+        lastActivityAt.map(Date.init(mattermostMilliseconds:))
     }
 }

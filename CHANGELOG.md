@@ -6,6 +6,24 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Completed the issue #75 public API ergonomics sweep. Public Mattermost identifiers now use
+  `ID`/`IDs` spelling with deprecated `Id`/`Ids` aliases and explicit wire `CodingKeys`;
+  subject-first channel/thread parameter order has deprecated compatibility overloads;
+  `channelMembers(userID:teamID:)` replaces `channelMembersForUser`; and bulk
+  `addChannelMembers` now returns every decoded membership.
+- Added `MattermostPostsOptions`, `MattermostUserSearchOptions`,
+  `MattermostChannelSearchOptions`, and `MattermostThreadOptions`. The former long-parameter
+  overloads remain deprecated, and the `posts` `since` fork now explicitly documents that it
+  ignores page and before/after pagination.
+- Added Mattermost millisecond `Date` conversion/accessors, a `Date` thread-read overload, and
+  cancellation-aware cursor pagination through `allPosts(channelID:pageSize:)`.
+- Password login and MFA checks can opt into insecure HTTP for development. Login sessions retain
+  their server URL so `session.client()` uses the authenticated server by default, and
+  `fromEnvironment` replaces `liveFromEnvironment` with a deprecated alias.
+- Reconnect delays now use `Duration`; the former `Double`-seconds initializer/properties remain
+  deprecated. Post metadata is now exposed as typed `metadata` plus tolerant `rawMetadata`, with
+  deprecated `postMetadata` compatibility. Insecure configurations no longer write to stderr and
+  expose `usesInsecureHTTP` for host-owned warnings and telemetry.
 - **Source-breaking:** Replaced raw `String` channel types, user presence statuses, post types,
   and sidebar category types/sorting modes with forward-compatible `RawRepresentable` values
   (`MattermostChannelType`, `MattermostUserStatusValue`, `MattermostPostType`,
@@ -105,7 +123,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
   into background actors without retaining SwiftData-managed objects.
 - Added `MattermostClient.logoutCurrentSession()` for server-side revocation of the authenticated session.
 - Added `MattermostClient.markThreadRead` for Mattermost's per-user thread read endpoint, using Mattermost millisecond server timestamps.
-- Added `MattermostPost.postMetadata` with typed embedded `files` and `reactions`, so clients can skip per-post `fileInfos`/`reactions` lookups when the server delivers them inline. Decoded tolerantly: malformed metadata yields `nil` instead of failing post decoding.
+- Added typed embedded post `metadata` with `files` and `reactions`, so clients can skip per-post
+  lookups when the server delivers them inline. `rawMetadata` preserves unknown fields and malformed
+  typed metadata yields `nil` without failing post decoding.
 - Added typed channel mute helpers for notification props so clients can suppress channel delivery while preserving unknown Mattermost fields.
 
 ## 0.1.0

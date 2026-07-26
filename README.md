@@ -123,7 +123,7 @@ Load a channel timeline:
 let page = try await client.timeline(.channel(id: "channel-id"))
 
 for post in page.posts {
-    print("\(post.userId): \(post.message)")
+    print("\(post.userID): \(post.message)")
 }
 ```
 
@@ -241,7 +241,7 @@ export MATTERMOST_TOKEN="your-personal-access-token"
 ```
 
 ```swift
-let client = try MattermostClient.liveFromEnvironment()
+let client = try MattermostClient.fromEnvironment()
 ```
 
 Username/password login is available for deployments that permit it. The SDK returns the session token to the caller and does not store it:
@@ -253,7 +253,7 @@ let session = try await MattermostClient.login(
     password: "password"
 )
 
-let client = try session.client(serverURL: URL(string: "https://mattermost.example.com")!)
+let client = try session.client()
 
 // Best-effort remote cleanup before discarding a password-login session locally.
 try await client.logoutCurrentSession()
@@ -266,6 +266,31 @@ DocC guide includes an add-or-update example using
 configurations redact bearer tokens so logging those values does not expose credentials.
 `logoutCurrentSession()` revokes Mattermost server sessions; hosts should still discard their
 local token even if remote cleanup fails. Personal access tokens may not be accepted by this endpoint.
+
+For an explicitly trusted HTTP development server, pass `allowInsecureHTTP: true` to
+`MattermostClient.login`, `MattermostClient.checkMFARequired`, or the token-client initializer.
+`MattermostConfiguration.usesInsecureHTTP` lets the host display its own warning; the library does
+not write warnings to standard error.
+
+## API Options, Dates, and Pagination
+
+Long post, user-search, channel-search, and thread requests use focused option values:
+
+```swift
+let page = try await client.posts(
+    channelID: "channel-id",
+    options: MattermostPostsOptions(perPage: 100, collapsedThreads: true)
+)
+
+for try await post in client.allPosts(channelID: "channel-id", pageSize: 100) {
+    print("\(post.createdAt): \(post.message)")
+}
+```
+
+`MattermostPostsOptions.since` switches to Mattermost's update-fetch behavior; when set, `page`,
+`perPage`, `before`, and `after` are ignored. Raw server timestamps remain available as `Int64`
+milliseconds, with `Date(mattermostMilliseconds:)`, `Date.mattermostMilliseconds`, and model date
+accessors for application code.
 
 ## Supported APIs
 

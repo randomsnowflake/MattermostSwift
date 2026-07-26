@@ -174,7 +174,7 @@ func syncServicePersistsETagsAndReturnsCachedListsForNotModifiedResponses() asyn
         id: "unrelated-channel",
         createAt: nil,
         updateAt: nil,
-        teamId: "team-2",
+        teamID: "team-2",
         name: "unrelated",
         displayName: "Unrelated",
         type: .open,

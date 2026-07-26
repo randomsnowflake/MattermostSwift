@@ -13,8 +13,8 @@ public struct MattermostTeam: Decodable, Equatable, Hashable, Sendable, Identifi
 
 /// Membership and role state for a user on a Mattermost team.
 public struct MattermostTeamMember: Decodable, Equatable, Sendable, Identifiable {
-    public let teamId: String
-    public let userId: String
+    public let teamID: String
+    public let userID: String
     public let roles: String?
     public let deleteAt: Int64?
     public let schemeUser: Bool?
@@ -22,6 +22,26 @@ public struct MattermostTeamMember: Decodable, Equatable, Sendable, Identifiable
     public let explicitRoles: String?
 
     public var id: String {
-        "\(teamId):\(userId)"
+        "\(teamID):\(userID)"
+    }
+
+    @available(*, deprecated, renamed: "teamID")
+    public var teamId: String { teamID }
+    @available(*, deprecated, renamed: "userID")
+    public var userId: String { userID }
+
+    enum CodingKeys: String, CodingKey {
+        case teamID = "teamId"
+        case userID = "userId"
+        case roles
+        case deleteAt
+        case schemeUser
+        case schemeAdmin
+        case explicitRoles
+    }
+
+    public var deletedAt: Date? {
+        guard let deleteAt, deleteAt > 0 else { return nil }
+        return Date(mattermostMilliseconds: deleteAt)
     }
 }

@@ -45,6 +45,8 @@ Implemented flow:
 30. Live-verify cursor-based missed-post backfill by seeding a stored channel cursor, creating a temporary post, syncing with `since`, and confirming the post lands in SwiftData.
 31. Live-verify failure cleanup by creating temporary e2e resources, simulating an intermediate failure, and proving posts/categories/channels/sidebar order are cleaned up through the shared helper.
 32. Live-verify WebSocket message lifecycle delivery for posted, edited, and deleted posts through the CLI harness.
+33. Expose consistent `ID`-spelled models, options-backed long requests, millisecond `Date`
+    bridges, and lazy cursor-based `allPosts` iteration while retaining deprecated source aliases.
 
 The CLI reads credentials from environment variables:
 
@@ -173,6 +175,10 @@ The internal REST layer decodes Mattermost snake_case payloads and maps errors i
 and 503 responses at most twice, honoring numeric `Retry-After` delays and otherwise using bounded
 backoff. Mutating requests are not replayed; HTTP 429 ultimately maps to the dedicated
 `MattermostError.rateLimited(retryAfter:)` case.
+Public `ID` property spelling is decoupled from Mattermost's `*_id` wire keys through explicit
+`CodingKeys`. Raw millisecond timestamps remain the persistence/wire representation while computed
+`Date` accessors serve host UI code. `MattermostAllPostsSequence` is a stateless public sequence
+whose iterator owns cursor, deduplication, and cancellation state.
 
 ## Expansion Rules
 

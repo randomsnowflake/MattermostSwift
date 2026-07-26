@@ -72,7 +72,7 @@ struct MattermostClientRequestTests {
 
         #expect(post.id == "post-id")
         #expect(post.message == "hello world")
-        #expect(post.rootId == "root-id")
+        #expect(post.rootID == "root-id")
     }
 
     @Test
@@ -87,7 +87,9 @@ struct MattermostClientRequestTests {
             return try Self.response(statusCode: 200, body: responseBody, request: request)
         }
 
-        let users = try await client.searchUsers(term: "ali", inChannelID: "channel-id")
+        let users = try await client.searchUsers(
+            options: MattermostUserSearchOptions(term: "ali", inChannelID: "channel-id")
+        )
 
         #expect(users.map(\.id) == ["user-id"])
         #expect(users.first?.username == "alice")

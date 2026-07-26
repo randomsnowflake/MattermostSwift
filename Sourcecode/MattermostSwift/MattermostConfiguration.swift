@@ -8,6 +8,11 @@ public struct MattermostConfiguration: Sendable, CustomStringConvertible, Custom
     public let apiBaseURL: URL
     public let webSocketURL: URL
     public let authentication: MattermostAuthentication
+    /// Whether this configuration communicates over unencrypted HTTP/WebSocket transport.
+    ///
+    /// Hosts can inspect this to show their own warning or telemetry. The library
+    /// does not write warnings to standard error.
+    public let usesInsecureHTTP: Bool
 
     /// - Parameters:
     ///   - serverURL: The root URL of the Mattermost server. An `/api/v4` suffix is normalized away.
@@ -31,19 +36,11 @@ public struct MattermostConfiguration: Sendable, CustomStringConvertible, Custom
            !normalizedServerURL.isLoopbackHost {
             throw MattermostError.insecureServerURL(serverURL.absoluteString)
         }
-        if normalizedServerURL.scheme == "http",
-           allowInsecureHTTP,
-           !normalizedServerURL.isLoopbackHost {
-            fputs(
-                "MattermostSwift: allowInsecureHTTP=true with non-loopback host \(normalizedServerURL.host() ?? "?") sends bearer tokens in cleartext.\n",
-                stderr
-            )
-        }
-
         self.serverURL = normalizedServerURL
         apiBaseURL = normalizedServerURL.appending(path: "api/v4", directoryHint: .isDirectory)
         webSocketURL = try normalizedServerURL.mattermostWebSocketURL()
         self.authentication = authentication
+        usesInsecureHTTP = normalizedServerURL.scheme == "http"
     }
 
     public var description: String {

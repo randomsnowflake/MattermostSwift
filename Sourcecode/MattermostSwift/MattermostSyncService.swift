@@ -186,7 +186,7 @@ public struct MattermostSyncService: Sendable {
         }
 
         if let teamID = resolvedTeam.teamID {
-            let members = try await client.channelMembersForUser(userID: user.id, teamID: teamID)
+            let members = try await client.channelMembers(userID: user.id, teamID: teamID)
             try store.replaceChannelMembers(members, userID: user.id, teamID: teamID)
             syncedMembersCount = max(syncedMembersCount, members.count)
 
@@ -218,7 +218,7 @@ public struct MattermostSyncService: Sendable {
                 )
             }
         } else if let postChannelID {
-            let unread = try await client.channelUnread(userID: user.id, channelID: postChannelID)
+            let unread = try await client.channelUnread(channelID: postChannelID, userID: user.id)
             try store.upsert(unread: unread, userID: user.id)
             syncedUnreadsCount = 1
         }
@@ -309,7 +309,7 @@ public struct MattermostSyncService: Sendable {
         }
 
         let channelsResult = try await joinedChannelsAcrossTeams(store: store)
-        let inferredTeamID = channelsResult.values.lazy.compactMap(\.teamId).first { !$0.isEmpty }
+        let inferredTeamID = channelsResult.values.lazy.compactMap(\.teamID).first { !$0.isEmpty }
         let inferredTeam = inferredTeamID.flatMap { teamID in
             joinedTeams.first { $0.id == teamID }
         }
@@ -469,7 +469,7 @@ public struct MattermostSyncService: Sendable {
         width: Int = 4
     ) async throws -> Int {
         let unreads = try await mattermostBoundedConcurrentMap(channels, width: width) { channel in
-            let unread = try await client.channelUnread(userID: userID, channelID: channel.id)
+            let unread = try await client.channelUnread(channelID: channel.id, userID: userID)
             try store.upsert(unread: unread, userID: userID)
             return unread
         }
@@ -500,7 +500,7 @@ private extension MattermostCachedChannel {
             id: id,
             createAt: createAt,
             updateAt: updateAt,
-            teamId: teamId,
+            teamID: teamId,
             name: name,
             displayName: displayName,
             type: MattermostChannelType(rawValue: type),
@@ -519,12 +519,12 @@ private extension MattermostCachedSidebarCategory {
     var mattermostModel: MattermostSidebarCategory {
         MattermostSidebarCategory(
             id: id,
-            userId: userId,
-            teamId: teamId,
+            userID: userId,
+            teamID: teamId,
             displayName: displayName,
             type: MattermostSidebarCategoryType(rawValue: type),
             sortOrder: sortOrder,
-            channelIds: channelIds,
+            channelIDs: channelIds,
             sorting: sorting.map(MattermostSidebarCategorySorting.init(rawValue:)),
             muted: muted,
             collapsed: collapsed

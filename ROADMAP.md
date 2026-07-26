@@ -76,6 +76,10 @@
 - Typed models for user, team, channel, server info, client config, and sidebar categories.
 - Typed models for post pages, posts, channel membership/read state, and live event envelopes.
 - Focused unit tests for configuration, request construction, REST error handling, decoding, typed live events, and cache upserts.
+- Issue #75 API ergonomics sweep with `ID` spelling and deprecated aliases, subject-first overloads,
+  options-backed long requests, plural bulk-member responses, millisecond `Date` bridges,
+  cursor-based `allPosts`, insecure-development authentication support, remembered login server
+  URLs, `Duration` reconnect policy, typed/raw metadata migration, and host-owned insecure warnings.
 
 ## Next Slices
 

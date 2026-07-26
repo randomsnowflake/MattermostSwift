@@ -562,7 +562,10 @@ struct MattermostHTTPClientErrorTests {
             return try Self.response(statusCode: 200, body: Data(#"{"order":[],"posts":{}}"#.utf8), request: request)
         }
 
-        let posts = try await client.posts(channelID: "channel-id", page: -1, perPage: -20)
+        let posts = try await client.posts(
+            channelID: "channel-id",
+            options: MattermostPostsOptions(page: -1, perPage: -20)
+        )
 
         #expect(posts.order.isEmpty)
         #expect(posts.posts.isEmpty)
@@ -580,11 +583,13 @@ struct MattermostHTTPClientErrorTests {
 
         let posts = try await client.posts(
             channelID: "channel-id",
-            perPage: 80,
-            before: "post-id",
-            skipFetchThreads: true,
-            collapsedThreads: true,
-            collapsedThreadsExtended: true
+            options: MattermostPostsOptions(
+                perPage: 80,
+                before: "post-id",
+                skipFetchThreads: true,
+                collapsedThreads: true,
+                collapsedThreadsExtended: true
+            )
         )
 
         #expect(posts.order.isEmpty)

@@ -22,8 +22,13 @@ extension MattermostClient {
     }
 
     /// Lists channel memberships for a user on a team.
-    public func channelMembersForUser(userID: String = "me", teamID: String) async throws -> [MattermostChannelMember] {
+    public func channelMembers(userID: String = "me", teamID: String) async throws -> [MattermostChannelMember] {
         try await httpClient.get("/users/\(userID)/teams/\(teamID)/channels/members")
+    }
+
+    @available(*, deprecated, renamed: "channelMembers(userID:teamID:)")
+    public func channelMembersForUser(userID: String = "me", teamID: String) async throws -> [MattermostChannelMember] {
+        try await channelMembers(userID: userID, teamID: teamID)
     }
 
     /// Adds one or more users to a public or private channel where permissions allow it.
@@ -31,7 +36,7 @@ extension MattermostClient {
         channelID: String,
         userIDs: [String],
         postRootID: String? = nil
-    ) async throws -> MattermostChannelMember {
+    ) async throws -> [MattermostChannelMember] {
         try await httpClient.post(
             "/channels/\(channelID)/members",
             body: MattermostAddChannelMembersRequest(
@@ -66,8 +71,13 @@ extension MattermostClient {
     }
 
     /// Loads unread message and mention counts for a user in a channel.
-    public func channelUnread(userID: String = "me", channelID: String) async throws -> MattermostChannelUnread {
+    public func channelUnread(channelID: String, userID: String = "me") async throws -> MattermostChannelUnread {
         try await httpClient.get("/users/\(userID)/channels/\(channelID)/unread")
+    }
+
+    @available(*, deprecated, renamed: "channelUnread(channelID:userID:)")
+    public func channelUnread(userID: String, channelID: String) async throws -> MattermostChannelUnread {
+        try await channelUnread(channelID: channelID, userID: userID)
     }
 
     /// Updates a user's channel notification properties.

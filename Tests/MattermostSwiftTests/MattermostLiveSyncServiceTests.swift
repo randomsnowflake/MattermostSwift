@@ -704,8 +704,8 @@ func liveSyncRefreshesUnreadOnPostUnreadInvalidation() async throws {
         refreshUnread: { userID, channelID in
             unreadRefreshes.append((userID, channelID))
             return MattermostChannelUnread(
-                teamId: "team-1",
-                channelId: channelID,
+                teamID: "team-1",
+                channelID: channelID,
                 msgCount: 4,
                 mentionCount: 1,
                 msgCountRoot: nil,
@@ -763,9 +763,9 @@ func liveSyncRefreshesUnreadForMultipleChannelsViewed() async throws {
         ],
         broadcast: MattermostLiveBroadcast(
             omitUsers: nil,
-            userId: "user-1",
-            channelId: nil,
-            teamId: "team-1"
+            userID: "user-1",
+            channelID: nil,
+            teamID: "team-1"
         ),
         seq: 3
     )
@@ -798,8 +798,8 @@ func liveSyncRefreshesUnreadForMultipleChannelsViewed() async throws {
                 for: channelID == "channel-1" ? .milliseconds(20) : .milliseconds(5)
             )
             return MattermostChannelUnread(
-                teamId: "team-1",
-                channelId: channelID,
+                teamID: "team-1",
+                channelID: channelID,
                 msgCount: 0,
                 mentionCount: 0,
                 msgCountRoot: 0,
@@ -815,7 +815,7 @@ func liveSyncRefreshesUnreadForMultipleChannelsViewed() async throws {
         case .eventApplied(_, .multipleChannelsViewed(let viewed)):
             appliedChannels = viewed.channelTimes.keys.sorted()
         case .channelUnreadRefreshed(let unread):
-            refreshedChannels.append(unread.channelId)
+            refreshedChannels.append(unread.channelID)
         default:
             break
         }
@@ -1034,9 +1034,9 @@ func liveSyncRefreshesThreadStateOnThreadInvalidation() async throws {
         ],
         broadcast: MattermostLiveBroadcast(
             omitUsers: nil,
-            userId: "user-1",
-            channelId: "channel-1",
-            teamId: "team-1"
+            userID: "user-1",
+            channelID: "channel-1",
+            teamID: "team-1"
         ),
         seq: 3
     )
@@ -1082,15 +1082,15 @@ func liveSyncRefreshesThreadStateOnThreadInvalidation() async throws {
                     updateAt: 20,
                     editAt: 0,
                     deleteAt: 0,
-                    userId: userID,
-                    channelId: "channel-1",
-                    rootId: "",
-                    originalId: nil,
+                    userID: userID,
+                    channelID: "channel-1",
+                    rootID: "",
+                    originalID: nil,
                     message: "root from refreshed thread state",
                     type: .standard,
                     hashtags: nil,
-                    pendingPostId: nil,
-                    fileIds: nil,
+                    pendingPostID: nil,
+                    fileIDs: nil,
                     hasReactions: false
                 ),
                 unreadReplies: 1,
@@ -1137,7 +1137,7 @@ private func liveSyncChannel(id: String, teamID: String = "team-1") -> Mattermos
         id: id,
         createAt: 1,
         updateAt: 1,
-        teamId: teamID,
+        teamID: teamID,
         name: id,
         displayName: id,
         type: .open,
@@ -1209,15 +1209,15 @@ private func liveSyncPost(
         updateAt: updateAt,
         editAt: 0,
         deleteAt: 0,
-        userId: "user-1",
-        channelId: channelID,
-        rootId: "",
-        originalId: nil,
+        userID: "user-1",
+        channelID: channelID,
+        rootID: "",
+        originalID: nil,
         message: message,
         type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: nil,
+        pendingPostID: nil,
+        fileIDs: nil,
         hasReactions: false
     )
 }
@@ -1230,19 +1230,19 @@ private func liveSyncStorePostSync(
     let postList = MattermostPostList(
         order: [post.id],
         posts: [post.id: post],
-        nextPostId: nil,
-        prevPostId: nil,
+        nextPostID: nil,
+        prevPostID: nil,
         hasNext: nil
     )
     try store.upsert(postList: postList)
     try store.setSyncCursor(
-        scope: "channel-posts:\(post.channelId)",
+        scope: "channel-posts:\(post.channelID)",
         lastSyncAt: post.cacheTimestamp,
         lastItemID: post.id
     )
     try store.save()
     return MattermostChannelPostSyncResult(
-        channelID: post.channelId,
+        channelID: post.channelID,
         posts: [post],
         pageCount: 1,
         cursorLastSyncAt: post.cacheTimestamp,
