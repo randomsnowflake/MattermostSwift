@@ -8,6 +8,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 - Redacted bearer tokens from the textual and debug descriptions of `MattermostSession`,
   `MattermostAuthentication`, and `MattermostConfiguration`.
+- Channel deletion now removes cached channel memberships, preventing live
+  `channel_deleted` events from leaving orphaned membership rows.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,
