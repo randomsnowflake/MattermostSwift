@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- `MattermostSwiftCLI --help` and empty invocations now print help without requiring
+  Mattermost credentials. Unknown or malformed commands report a specific diagnostic
+  on stderr and exit with status 2 instead of printing help and exiting successfully.
 - Declared tvOS 18, watchOS 11, and visionOS 2 support alongside iOS 18 and macOS 15,
   with CI builds for every supported Apple platform and documentation of the current Linux limits.
 - Workspace sync now persists scoped ETags for joined-team, joined-channel, and sidebar-category

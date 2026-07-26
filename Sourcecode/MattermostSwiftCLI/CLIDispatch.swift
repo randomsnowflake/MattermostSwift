@@ -3,11 +3,19 @@ import Foundation
 
 extension MattermostSwiftCLI {
     static func main() async {
+        let arguments = Array(CommandLine.arguments.dropFirst())
+        if let plan = processPlan(arguments: arguments) {
+            FileHandle.standardOutput.write(Data(plan.stdout.utf8))
+            FileHandle.standardError.write(Data(plan.stderr.utf8))
+            if plan.status != 0 {
+                Foundation.exit(plan.status)
+            }
+            return
+        }
+
         do {
-            try await run()
+            try await run(command: Command(arguments: arguments))
         } catch let error as CLIError {
-            // Usage/argument errors exit with a distinct code so CI and scripts can tell
-            // "you called it wrong" (2) apart from a runtime/server failure (1).
             FileHandle.standardError.write(Data("error: \(error.localizedDescription)\n".utf8))
             Foundation.exit(2)
         } catch {
@@ -16,11 +24,33 @@ extension MattermostSwiftCLI {
         }
     }
 
+    static func processPlan(arguments: [String]) -> CLIProcessPlan? {
+        switch Command(arguments: arguments) {
+        case .help:
+            CLIProcessPlan(status: 0, stdout: "\(helpText)\n", stderr: "")
+        case .usageError(let message):
+            CLIProcessPlan(status: 2, stdout: "", stderr: "error: \(message)\n")
+        default:
+            nil
+        }
+    }
+
     static func run() async throws {
-        let command = Command(arguments: Array(CommandLine.arguments.dropFirst()))
-        if case .loginTest = command {
+        try await run(command: Command(arguments: Array(CommandLine.arguments.dropFirst())))
+    }
+
+    static func run(command: Command) async throws {
+        switch command {
+        case .help:
+            printHelp()
+            return
+        case .usageError(let message):
+            throw CLIError.usage(message)
+        case .loginTest:
             try await runLoginTest()
             return
+        default:
+            break
         }
 
         let client = try MattermostClient.liveFromEnvironment()
@@ -303,14 +333,16 @@ extension MattermostSwiftCLI {
         case .cacheCheck(let channelID):
             try await runCacheCheck(channelID: channelID)
         case .loginTest:
-            try await runLoginTest()
+            preconditionFailure("login-test must be handled before credential loading")
         case .check:
             let user = try await client.currentUser()
             let channels = try await loadChannels(client: client)
             print("Authenticated as \(user.username) (\(user.id))")
             print("Loaded \(channels.count) channel\(channels.count == 1 ? "" : "s")")
         case .help:
-            printHelp()
+            preconditionFailure("help must be handled before credential loading")
+        case .usageError:
+            preconditionFailure("usage errors must be handled before credential loading")
         }
     }
 

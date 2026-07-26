@@ -44,7 +44,9 @@ The current unit tests cover:
   invalidations, and thread-state refresh on thread invalidation,
 - complete channel-user profile hydration across mocked multi-page responses,
 - SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, dependent thread cleanup during post pruning and channel-content deletion, timestamp merge policy, sync cursors, conditional-list ETags, and configurable disk-store permissions/file protection,
-- restrictive default and custom CLI cache-directory creation.
+- restrictive default and custom CLI cache-directory creation,
+- CLI parser diagnostics plus real executable-process verification that credential-free help writes
+  to stdout with status 0 and malformed invocations write only to stderr with status 2.
 
 ## Live Verification
 
