@@ -145,6 +145,10 @@ resource timeout does not recycle healthy WebSockets. Apps that inject transport
 pass a separate `webSocketURLSession` to `MattermostClient` when REST and live events need
 different policies.
 
+Hosts that need connection diagnostics can consume `lifecycleEvents()`. Malformed event frames
+are skipped without disconnecting and yield `eventDecodeFailed` with a
+`MattermostLiveEventStreamFailure`, so wire-format changes remain observable.
+
 ## Authentication
 
 Use a Mattermost personal access token when possible:

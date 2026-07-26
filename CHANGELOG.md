@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Malformed WebSocket event frames now emit an `eventDecodeFailed` lifecycle signal before
+  being skipped, preserving the connection while exposing wire-format failures to host apps.
 - WebSocket reconnect backoff now uses full jitter from zero through the capped exponential
   delay, preventing clients affected by the same outage from retrying in lockstep.
 - Safe REST reads and audited read-only POST requests now retry HTTP 429 and 503 responses

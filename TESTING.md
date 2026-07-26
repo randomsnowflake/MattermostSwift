@@ -25,7 +25,7 @@ The current unit tests cover:
   zero-decode cached post snapshots with throwing on-demand props/metadata accessors,
 - channel search, batch user lookup, user search/autocomplete/known-user request construction, direct/group channel request construction, and custom emoji request/response decoding,
 - user preference request construction and decoding,
-- WebSocket live event decoding, typed post create/edit/delete/unread and thread update/read/follow event helpers, embedded post/channel/user/member decoding, and tolerant invalidation events,
+- WebSocket live event decoding, observable nonfatal malformed-frame handling, typed post create/edit/delete/unread and thread update/read/follow event helpers, embedded post/channel/user/member decoding, and tolerant invalidation events,
 - WebSocket full-jitter reconnect backoff, including deterministic lower/midpoint/upper samples
   and bounds at the configured and integer caps,
 - live-sync reconnect orchestration with an injected lifecycle stream, including backfill on each connecting event, cursor-based recovery of posts missed while disconnected, host-visible connection-state projection, backfill failure diagnostics, capped/all-channel backfill selection, live-event application into SwiftData, unread refresh on `post_unread` and `multiple_channels_viewed` invalidations, and thread-state refresh on thread invalidation,

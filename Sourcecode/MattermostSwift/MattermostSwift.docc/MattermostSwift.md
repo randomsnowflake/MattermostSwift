@@ -159,6 +159,10 @@ Default live-event streams use a dedicated long-lived `URLSession` so the bounde
 resource timeout does not recycle healthy WebSockets. If you inject a custom REST session,
 provide `webSocketURLSession` to `MattermostClient` when live events need a different policy.
 
+Use `lifecycleEvents()` when the host needs transport diagnostics as well as raw events.
+Undecodable event frames yield `MattermostLiveEventStreamLifecycleEvent.eventDecodeFailed`
+with structured failure details, then the stream continues reading from the same connection.
+
 Mattermost API failures preserve the server's structured error body:
 
 ```swift
