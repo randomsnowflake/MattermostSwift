@@ -47,6 +47,12 @@ struct E2ECleanupResult {
     let restoredOrder: Bool
 }
 
+struct CLIProcessPlan: Equatable {
+    let status: Int32
+    let stdout: String
+    let stderr: String
+}
+
 enum CLIError: LocalizedError {
     case usage(String)
 

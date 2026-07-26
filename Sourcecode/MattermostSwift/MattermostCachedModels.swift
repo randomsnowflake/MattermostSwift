@@ -10,6 +10,11 @@ private let mattermostCachedPostEncoder: JSONEncoder = {
 }()
 private let mattermostCachedPostDecoder = JSONDecoder()
 
+/// SwiftData row containing the cached profile fields for a Mattermost user.
+///
+/// Instances returned by ``MattermostStore`` belong to its main context and main-actor
+/// isolation. Use ``MattermostCachedUserSnapshot`` when the value must cross actors.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedUser {
     @Attribute(.unique) public var id: String = ""
@@ -46,6 +51,11 @@ public final class MattermostCachedUser {
     }
 }
 
+/// SwiftData row containing the latest cached presence state for one user.
+///
+/// The unique identity is `userId`. Mutate and retain managed instances only on the
+/// ``MattermostStore`` main actor.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedUserStatus {
     @Attribute(.unique) public var userId: String = ""
@@ -55,7 +65,25 @@ public final class MattermostCachedUserStatus {
     public var activeChannel: String?
     public var dndEndTime: Int64?
 
+    /// Creates a cache status row, primarily for applying live presence events.
     public init(
+        userID: String,
+        status: MattermostUserStatusValue,
+        manual: Bool? = nil,
+        lastActivityAt: Int64? = nil,
+        activeChannel: String? = nil,
+        dndEndTime: Int64? = nil
+    ) {
+        self.userId = userID
+        self.status = status.rawValue
+        self.manual = manual
+        self.lastActivityAt = lastActivityAt
+        self.activeChannel = activeChannel
+        self.dndEndTime = dndEndTime
+    }
+
+    @available(*, deprecated, message: "Use init(userID:status:manual:lastActivityAt:activeChannel:dndEndTime:)")
+    public convenience init(
         userId: String,
         status: String,
         manual: Bool? = nil,
@@ -63,17 +91,19 @@ public final class MattermostCachedUserStatus {
         activeChannel: String? = nil,
         dndEndTime: Int64? = nil
     ) {
-        self.userId = userId
-        self.status = status
-        self.manual = manual
-        self.lastActivityAt = lastActivityAt
-        self.activeChannel = activeChannel
-        self.dndEndTime = dndEndTime
+        self.init(
+            userID: userId,
+            status: MattermostUserStatusValue(rawValue: status),
+            manual: manual,
+            lastActivityAt: lastActivityAt,
+            activeChannel: activeChannel,
+            dndEndTime: dndEndTime
+        )
     }
 
     init(_ status: MattermostUserStatus) {
-        userId = status.userId
-        self.status = status.status
+        userId = status.userID
+        self.status = status.status.rawValue
         manual = status.manual
         lastActivityAt = status.lastActivityAt
         activeChannel = status.activeChannel
@@ -81,7 +111,7 @@ public final class MattermostCachedUserStatus {
     }
 
     func apply(_ status: MattermostUserStatus) {
-        self.status = status.status
+        self.status = status.status.rawValue
         manual = status.manual
         lastActivityAt = status.lastActivityAt
         activeChannel = status.activeChannel
@@ -89,11 +119,18 @@ public final class MattermostCachedUserStatus {
     }
 }
 
+/// SwiftData row containing cached Mattermost team metadata.
+///
+/// Instances are managed by the ``MattermostStore`` main context.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedTeam {
     @Attribute(.unique) public var id: String = ""
     public var name: String = ""
     public var displayName: String = ""
+    /// The team's server `description` value.
+    ///
+    /// The property is named `descriptionText` to avoid colliding with Swift description APIs.
     public var descriptionText: String?
     public var type: String?
 
@@ -113,6 +150,12 @@ public final class MattermostCachedTeam {
     }
 }
 
+/// SwiftData row containing cached channel metadata and deletion state.
+///
+/// Channel updates use server timestamps so an older payload can't overwrite a newer edit or
+/// resurrect a deleted channel. A positive `deleteAt` is a tombstone; normal
+/// ``MattermostStore`` channel readers hide tombstones unless `includeDeleted` is `true`.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedChannel {
     #Index<MattermostCachedChannel>([\.teamId])
@@ -135,10 +178,10 @@ public final class MattermostCachedChannel {
         id = channel.id
         createAt = channel.createAt
         updateAt = channel.updateAt
-        teamId = channel.teamId
+        teamId = channel.teamID
         name = channel.name
         displayName = channel.displayName
-        type = channel.type
+        type = channel.type.rawValue
         header = channel.header
         purpose = channel.purpose
         deleteAt = channel.deleteAt
@@ -155,10 +198,10 @@ public final class MattermostCachedChannel {
 
         createAt = channel.createAt
         updateAt = channel.updateAt
-        teamId = channel.teamId
+        teamId = channel.teamID
         name = channel.name
         displayName = channel.displayName
-        type = channel.type
+        type = channel.type.rawValue
         header = channel.header
         purpose = channel.purpose
         deleteAt = channel.deleteAt
@@ -185,6 +228,12 @@ public final class MattermostCachedChannel {
     }
 }
 
+/// SwiftData row containing one user's membership and read state in one channel.
+///
+/// `id` is the stable channel/user composite key produced by
+/// ``cacheID(channelID:userID:)``. Instances are managed by the ``MattermostStore`` main
+/// context.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedChannelMember {
     #Index<MattermostCachedChannelMember>([\.userId])
@@ -200,14 +249,15 @@ public final class MattermostCachedChannelMember {
     public var notifyProps: [String: String] = [:]
     public var lastUpdateAt: Int64?
 
+    /// A typed view of common notification keys that preserves unknown raw server values.
     public var channelNotifyProps: MattermostChannelNotifyProps {
         MattermostChannelNotifyProps(notifyProps)
     }
 
     init(_ member: MattermostChannelMember) {
-        id = Self.cacheID(channelID: member.channelId, userID: member.userId)
-        channelId = member.channelId
-        userId = member.userId
+        id = Self.cacheID(channelID: member.channelID, userID: member.userID)
+        channelId = member.channelID
+        userId = member.userID
         roles = member.roles
         lastViewedAt = member.lastViewedAt
         msgCount = member.msgCount
@@ -218,13 +268,14 @@ public final class MattermostCachedChannelMember {
         lastUpdateAt = member.lastUpdateAt
     }
 
+    /// Returns the stable composite identity for a channel membership.
     public static func cacheID(channelID: String, userID: String) -> String {
         "\(channelID):\(userID)"
     }
 
     func apply(_ member: MattermostChannelMember) {
-        channelId = member.channelId
-        userId = member.userId
+        channelId = member.channelID
+        userId = member.userID
         roles = member.roles
         lastViewedAt = member.lastViewedAt
         msgCount = member.msgCount
@@ -236,6 +287,11 @@ public final class MattermostCachedChannelMember {
     }
 }
 
+/// SwiftData row containing server-computed unread counts for one user and channel.
+///
+/// `id` is the stable channel/user composite key produced by
+/// ``cacheID(channelID:userID:)``. Root counters support collapsed reply threads.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedChannelUnread {
     #Index<MattermostCachedChannelUnread>([\.userId])
@@ -249,9 +305,9 @@ public final class MattermostCachedChannelUnread {
     public var mentionCountRoot: Int?
 
     init(_ unread: MattermostChannelUnread, userID: String) {
-        id = Self.cacheID(channelID: unread.channelId, userID: userID)
-        teamId = unread.teamId
-        channelId = unread.channelId
+        id = Self.cacheID(channelID: unread.channelID, userID: userID)
+        teamId = unread.teamID
+        channelId = unread.channelID
         self.userId = userID
         msgCount = unread.msgCount
         mentionCount = unread.mentionCount
@@ -259,13 +315,14 @@ public final class MattermostCachedChannelUnread {
         mentionCountRoot = unread.mentionCountRoot
     }
 
+    /// Returns the stable composite identity for one user's channel unread state.
     public static func cacheID(channelID: String, userID: String) -> String {
         "\(channelID):\(userID)"
     }
 
     func apply(_ unread: MattermostChannelUnread, userID: String) {
-        teamId = unread.teamId
-        channelId = unread.channelId
+        teamId = unread.teamID
+        channelId = unread.channelID
         self.userId = userID
         msgCount = unread.msgCount
         mentionCount = unread.mentionCount
@@ -274,6 +331,11 @@ public final class MattermostCachedChannelUnread {
     }
 }
 
+/// SwiftData row containing one user's thread-inbox state for a root post and team.
+///
+/// This is per-user state, not the cached root/reply post collection. Use
+/// ``MattermostStore/cachedThread(rootID:includeDeleted:)`` to read the posts themselves.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedThread {
     #Index<MattermostCachedThread>([\.userId, \.teamId])
@@ -288,8 +350,10 @@ public final class MattermostCachedThread {
     public var unreadMentions: Int64 = 0
     public var isUrgent: Bool = false
     public var deleteAt: Int64 = 0
+    /// User IDs for the participant profiles delivered with the thread response.
     public var participantIds: [String] = []
 
+    /// Whether the cached state has unread replies or mentions.
     public var isUnread: Bool {
         unreadReplies > 0 || unreadMentions > 0
     }
@@ -309,6 +373,7 @@ public final class MattermostCachedThread {
         participantIds = thread.participants.map(\.id)
     }
 
+    /// Returns the stable team/user/root-post composite identity for thread state.
     public static func cacheID(rootID: String, userID: String, teamID: String) -> String {
         "\(teamID):\(userID):\(rootID)"
     }
@@ -344,6 +409,13 @@ public final class MattermostCachedThread {
     }
 }
 
+/// SwiftData row containing a cached Mattermost post and its deletion tombstone.
+///
+/// Updates are server-timestamp last-write-wins. `propsJSON` and `metadataJSON` preserve
+/// arbitrary server JSON; prefer ``decodedProps()`` and ``decodedMetadata()`` over parsing those
+/// storage strings directly. Instances belong to the ``MattermostStore`` main context; use
+/// ``MattermostCachedPostSnapshot`` when values must cross actors.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedPost {
     #Index<MattermostCachedPost>([\.channelId], [\.channelId, \.createAt], [\.rootId])
@@ -362,7 +434,13 @@ public final class MattermostCachedPost {
     public var pendingPostId: String?
     public var fileIds: [String] = []
     public var hasReactions: Bool?
+    /// Lossless JSON storage for arbitrary post props.
+    ///
+    /// Use ``decodedProps()`` for typed access.
     public var propsJSON: String?
+    /// Lossless JSON storage for arbitrary post metadata.
+    ///
+    /// Use ``decodedMetadata()`` for typed access.
     public var metadataJSON: String?
 
     init(_ post: MattermostPost, propsJSON: String?, metadataJSON: String?) {
@@ -371,20 +449,21 @@ public final class MattermostCachedPost {
         updateAt = post.updateAt
         editAt = post.editAt
         deleteAt = post.deleteAt
-        userId = post.userId
-        channelId = post.channelId
-        rootId = post.rootId
-        originalId = post.originalId
+        userId = post.userID
+        channelId = post.channelID
+        rootId = post.rootID
+        originalId = post.originalID
         message = post.message
-        type = post.type
+        type = post.type.rawValue
         hashtags = post.hashtags
-        pendingPostId = post.pendingPostId
-        fileIds = post.fileIds ?? []
+        pendingPostId = post.pendingPostID
+        fileIds = post.fileIDs ?? []
         hasReactions = post.hasReactions
         self.propsJSON = propsJSON
         self.metadataJSON = metadataJSON
     }
 
+    /// Encodes a tolerant Mattermost JSON dictionary for persistent string storage.
     public static func encodedJSON(_ value: [String: MattermostJSONValue]?) throws -> String? {
         guard let value else {
             return nil
@@ -394,14 +473,17 @@ public final class MattermostCachedPost {
         return String(decoding: data, as: UTF8.self)
     }
 
+    /// Decodes ``propsJSON`` into tolerant Mattermost JSON values.
     public func decodedProps() throws -> [String: MattermostJSONValue]? {
         try Self.decodedJSON(propsJSON)
     }
 
+    /// Decodes ``metadataJSON`` into tolerant Mattermost JSON values.
     public func decodedMetadata() throws -> [String: MattermostJSONValue]? {
         try Self.decodedJSON(metadataJSON)
     }
 
+    /// Whether this row is a deletion tombstone.
     public var isDeleted: Bool {
         deleteAt > 0
     }
@@ -412,20 +494,20 @@ public final class MattermostCachedPost {
         }
 
         let propsJSON = try Self.encodedJSON(post.props)
-        let metadataJSON = try Self.encodedJSON(post.metadata)
+        let metadataJSON = try Self.encodedJSON(post.rawMetadata)
         createAt = post.createAt
         updateAt = post.updateAt
         editAt = post.editAt
         deleteAt = post.deleteAt
-        userId = post.userId
-        channelId = post.channelId
-        rootId = post.rootId
-        originalId = post.originalId
+        userId = post.userID
+        channelId = post.channelID
+        rootId = post.rootID
+        originalId = post.originalID
         message = post.message
-        type = post.type
+        type = post.type.rawValue
         hashtags = post.hashtags
-        pendingPostId = post.pendingPostId
-        fileIds = post.fileIds ?? []
+        pendingPostId = post.pendingPostID
+        fileIds = post.fileIDs ?? []
         hasReactions = post.hasReactions
         self.propsJSON = propsJSON
         self.metadataJSON = metadataJSON
@@ -456,6 +538,11 @@ public final class MattermostCachedPost {
     }
 }
 
+/// SwiftData row containing one user's emoji reaction to one post.
+///
+/// `id` is the stable post/user/emoji composite key produced by
+/// ``cacheID(userID:postID:emojiName:)``.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedReaction {
     #Index<MattermostCachedReaction>([\.postId])
@@ -467,28 +554,33 @@ public final class MattermostCachedReaction {
 
     init(_ reaction: MattermostReaction) {
         id = Self.cacheID(
-            userID: reaction.userId,
-            postID: reaction.postId,
+            userID: reaction.userID,
+            postID: reaction.postID,
             emojiName: reaction.emojiName
         )
-        userId = reaction.userId
-        postId = reaction.postId
+        userId = reaction.userID
+        postId = reaction.postID
         emojiName = reaction.emojiName
         createAt = reaction.createAt
     }
 
+    /// Returns the stable composite identity for a reaction.
     public static func cacheID(userID: String, postID: String, emojiName: String) -> String {
         "\(postID):\(userID):\(emojiName)"
     }
 
     func apply(_ reaction: MattermostReaction) {
-        userId = reaction.userId
-        postId = reaction.postId
+        userId = reaction.userID
+        postId = reaction.postID
         emojiName = reaction.emojiName
         createAt = reaction.createAt
     }
 }
 
+/// SwiftData row containing cached metadata for an uploaded Mattermost file.
+///
+/// This model stores metadata only; file bytes remain outside the SwiftData cache.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedFile {
     #Index<MattermostCachedFile>([\.postId])
@@ -499,6 +591,9 @@ public final class MattermostCachedFile {
     public var updateAt: Int64?
     public var deleteAt: Int64?
     public var name: String = ""
+    /// The filename extension reported by Mattermost.
+    ///
+    /// The property is named `extensionName` because `extension` is a Swift keyword.
     public var extensionName: String?
     public var size: Int64?
     public var mimeType: String?
@@ -508,8 +603,8 @@ public final class MattermostCachedFile {
 
     init(_ file: MattermostFileInfo) {
         id = file.id
-        userId = file.userId
-        postId = file.postId
+        userId = file.userID
+        postId = file.postID
         createAt = file.createAt
         updateAt = file.updateAt
         deleteAt = file.deleteAt
@@ -523,8 +618,8 @@ public final class MattermostCachedFile {
     }
 
     func apply(_ file: MattermostFileInfo) {
-        userId = file.userId
-        postId = file.postId
+        userId = file.userID
+        postId = file.postID
         createAt = file.createAt
         updateAt = file.updateAt
         deleteAt = file.deleteAt
@@ -538,6 +633,10 @@ public final class MattermostCachedFile {
     }
 }
 
+/// SwiftData row containing a user/team sidebar category and its ordered channel IDs.
+///
+/// Instances are managed by the ``MattermostStore`` main context.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedSidebarCategory {
     #Index<MattermostCachedSidebarCategory>([\.teamId])
@@ -554,39 +653,184 @@ public final class MattermostCachedSidebarCategory {
 
     init(_ category: MattermostSidebarCategory) {
         id = category.id
-        userId = category.userId
-        teamId = category.teamId
+        userId = category.userID
+        teamId = category.teamID
         displayName = category.displayName
-        type = category.type
+        type = category.type.rawValue
         sortOrder = category.sortOrder
-        channelIds = category.channelIds
-        sorting = category.sorting
+        channelIds = category.channelIDs
+        sorting = category.sorting?.rawValue
         muted = category.muted
         collapsed = category.collapsed
     }
 
     func apply(_ category: MattermostSidebarCategory) {
-        userId = category.userId
-        teamId = category.teamId
+        userId = category.userID
+        teamId = category.teamID
         displayName = category.displayName
-        type = category.type
+        type = category.type.rawValue
         sortOrder = category.sortOrder
-        channelIds = category.channelIds
-        sorting = category.sorting
+        channelIds = category.channelIDs
+        sorting = category.sorting?.rawValue
         muted = category.muted
         collapsed = category.collapsed
     }
 }
 
+// Canonical public identifier spelling is bridged to the original persisted
+// SwiftData fields so issue #75 does not rename columns or invalidate stores.
+public extension MattermostCachedUserStatus {
+    var userID: String {
+        get { userId }
+        set { userId = newValue }
+    }
+}
+
+public extension MattermostCachedChannel {
+    var teamID: String? {
+        get { teamId }
+        set { teamId = newValue }
+    }
+}
+
+public extension MattermostCachedChannelMember {
+    var channelID: String {
+        get { channelId }
+        set { channelId = newValue }
+    }
+    var userID: String {
+        get { userId }
+        set { userId = newValue }
+    }
+}
+
+public extension MattermostCachedChannelUnread {
+    var teamID: String? {
+        get { teamId }
+        set { teamId = newValue }
+    }
+    var channelID: String {
+        get { channelId }
+        set { channelId = newValue }
+    }
+    var userID: String {
+        get { userId }
+        set { userId = newValue }
+    }
+}
+
+public extension MattermostCachedThread {
+    var rootID: String {
+        get { rootId }
+        set { rootId = newValue }
+    }
+    var userID: String {
+        get { userId }
+        set { userId = newValue }
+    }
+    var teamID: String {
+        get { teamId }
+        set { teamId = newValue }
+    }
+    var participantIDs: [String] {
+        get { participantIds }
+        set { participantIds = newValue }
+    }
+}
+
+public extension MattermostCachedPost {
+    var userID: String {
+        get { userId }
+        set { userId = newValue }
+    }
+    var channelID: String {
+        get { channelId }
+        set { channelId = newValue }
+    }
+    var rootID: String {
+        get { rootId }
+        set { rootId = newValue }
+    }
+    var originalID: String? {
+        get { originalId }
+        set { originalId = newValue }
+    }
+    var pendingPostID: String? {
+        get { pendingPostId }
+        set { pendingPostId = newValue }
+    }
+    var fileIDs: [String] {
+        get { fileIds }
+        set { fileIds = newValue }
+    }
+}
+
+public extension MattermostCachedReaction {
+    var userID: String {
+        get { userId }
+        set { userId = newValue }
+    }
+    var postID: String {
+        get { postId }
+        set { postId = newValue }
+    }
+}
+
+public extension MattermostCachedFile {
+    var userID: String? {
+        get { userId }
+        set { userId = newValue }
+    }
+    var postID: String? {
+        get { postId }
+        set { postId = newValue }
+    }
+}
+
+public extension MattermostCachedSidebarCategory {
+    var userID: String? {
+        get { userId }
+        set { userId = newValue }
+    }
+    var teamID: String? {
+        get { teamId }
+        set { teamId = newValue }
+    }
+    var channelIDs: [String] {
+        get { channelIds }
+        set { channelIds = newValue }
+    }
+}
+
+/// SwiftData row tracking the last successfully staged item for an incremental-sync scope.
+///
+/// Cursor timestamps are Mattermost server milliseconds. Advance a cursor only after all data
+/// through that point has been staged, and save the data and cursor together.
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostSyncCursor {
     @Attribute(.unique) public var scope: String = ""
     public var lastSyncAt: Int64 = 0
     public var lastItemID: String?
 
+    /// Creates a cursor for an exact cache scope.
     public init(scope: String, lastSyncAt: Int64, lastItemID: String? = nil) {
         self.scope = scope
         self.lastSyncAt = lastSyncAt
         self.lastItemID = lastItemID
+    }
+}
+
+/// A server validator and the ordered cache membership for one conditional list request.
+@Model
+final class MattermostCacheETag {
+    @Attribute(.unique) var scope: String = ""
+    var value: String = ""
+    var itemIDs: [String] = []
+
+    init(scope: String, value: String, itemIDs: [String]) {
+        self.scope = scope
+        self.value = value
+        self.itemIDs = itemIDs
     }
 }

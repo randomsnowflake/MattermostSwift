@@ -27,6 +27,7 @@ extension MattermostClient {
         teamID: String,
         displayName: String,
         channelIDs: [String] = [],
+        sorting: MattermostSidebarCategorySorting = .manual,
         userID: String = "me"
     ) async throws -> MattermostSidebarCategory {
         let resolvedUserID = try await resolvedUserIDForRequestBody(userID)
@@ -37,9 +38,9 @@ extension MattermostClient {
                 userId: resolvedUserID,
                 teamId: teamID,
                 displayName: displayName,
-                type: "custom",
+                type: .custom,
                 channelIds: channelIDs,
-                sorting: "manual"
+                sorting: sorting
             )
         )
         return category
@@ -51,7 +52,8 @@ extension MattermostClient {
         categoryID: String,
         displayName: String,
         channelIDs: [String],
-        type: String = "custom",
+        type: MattermostSidebarCategoryType = .custom,
+        sorting: MattermostSidebarCategorySorting = .manual,
         userID: String = "me"
     ) async throws -> MattermostSidebarCategory {
         let resolvedUserID = try await resolvedUserIDForRequestBody(userID)
@@ -64,7 +66,7 @@ extension MattermostClient {
                 displayName: displayName,
                 type: type,
                 channelIds: channelIDs,
-                sorting: "manual"
+                sorting: sorting
             )
         )
         return category
@@ -84,32 +86,34 @@ extension MattermostClient {
         }
 
         let destinationChannelIDs = Self.sidebarChannelIDs(
-            destination.channelIds,
+            destination.channelIDs,
             moving: channelID,
             to: position
         )
         var updatedCategories: [MattermostSidebarCategory] = []
 
-        if destinationChannelIDs != destination.channelIds {
+        if destinationChannelIDs != destination.channelIDs {
             let updatedDestination = try await updateSidebarCategory(
                 teamID: teamID,
                 categoryID: destination.id,
                 displayName: destination.displayName,
                 channelIDs: destinationChannelIDs,
                 type: destination.type,
+                sorting: destination.sorting ?? .manual,
                 userID: userID
             )
             updatedCategories.append(updatedDestination)
         }
 
-        for category in categories where category.id != destination.id && category.isCustom && category.channelIds.contains(channelID) {
-            let channelIDs = category.channelIds.filter { $0 != channelID }
+        for category in categories where category.id != destination.id && category.isCustom && category.channelIDs.contains(channelID) {
+            let channelIDs = category.channelIDs.filter { $0 != channelID }
             let updatedSource = try await updateSidebarCategory(
                 teamID: teamID,
                 categoryID: category.id,
                 displayName: category.displayName,
                 channelIDs: channelIDs,
                 type: category.type,
+                sorting: category.sorting ?? .manual,
                 userID: userID
             )
             updatedCategories.append(updatedSource)
@@ -131,7 +135,7 @@ extension MattermostClient {
     ) async throws -> MattermostSidebarCategory {
         let category = try await sidebarCategory(teamID: teamID, categoryID: categoryID, userID: userID)
         let channelIDs = Self.sidebarChannelIDs(
-            category.channelIds,
+            category.channelIDs,
             moving: channelID,
             to: position
         )
@@ -141,6 +145,7 @@ extension MattermostClient {
             displayName: category.displayName,
             channelIDs: channelIDs,
             type: category.type,
+            sorting: .manual,
             userID: userID
         )
     }

@@ -160,7 +160,7 @@ struct CLIHelpersTests {
             rootId: "",
             originalId: nil,
             message: "first line\nsecond\tline",
-            type: "",
+            type: .standard,
             hashtags: nil,
             pendingPostId: nil,
             fileIds: ["file"],
@@ -266,8 +266,17 @@ struct CLIHelpersTests {
             directory.deleteLastPathComponent()
         }
 
+        // Under the xctest runner argv[0] points outside .build, so fall back to scanning it.
+        // Prefer this test run's build configuration: a stale binary left behind by an
+        // earlier build of the other configuration would otherwise win the enumeration.
+#if DEBUG
+        let preferredConfiguration = "debug"
+#else
+        let preferredConfiguration = "release"
+#endif
         let buildDirectory = URL(fileURLWithPath: fileManager.currentDirectoryPath)
             .appendingPathComponent(".build")
+        var candidates: [URL] = []
         if let enumerator = fileManager.enumerator(
             at: buildDirectory,
             includingPropertiesForKeys: [.isRegularFileKey],
@@ -276,8 +285,17 @@ struct CLIHelpersTests {
             for case let candidate as URL in enumerator
             where candidate.lastPathComponent == "MattermostSwiftCLI"
                 && fileManager.isExecutableFile(atPath: candidate.path) {
-                return candidate
+                candidates.append(candidate)
             }
+        }
+
+        if let match = candidates.first(where: {
+            $0.deletingLastPathComponent().lastPathComponent == preferredConfiguration
+        }) {
+            return match
+        }
+        if let anyCandidate = candidates.first {
+            return anyCandidate
         }
 
         throw CLIError.usage("Could not locate the built MattermostSwiftCLI executable.")
@@ -303,4 +321,55 @@ struct CLIHelpersTests {
             stderr: String(decoding: stderrData, as: UTF8.self)
         )
     }
+
+
+    @Test("resolvedStoreURL creates and hardens the default cache directory")
+    func resolvedStoreURLHardensDefaultDirectory() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("MattermostSwiftCLITests-\(UUID().uuidString)", isDirectory: true)
+        let cacheDirectory = root.appendingPathComponent(".mattermostswift", isDirectory: true)
+        try fileManager.createDirectory(
+            at: cacheDirectory,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: NSNumber(value: UInt16(0o755))]
+        )
+        defer { try? fileManager.removeItem(at: root) }
+
+        let url = try MattermostSwiftCLI.resolvedStoreURL(
+            fileManager: fileManager,
+            environment: [:],
+            currentDirectoryURL: root
+        )
+
+        #expect(url == cacheDirectory.appendingPathComponent("MattermostSwift.sqlite"))
+        #expect(try permissions(at: cacheDirectory, fileManager: fileManager) == 0o700)
+    }
+
+    @Test("resolvedStoreURL secures a custom cache directory")
+    func resolvedStoreURLSecuresCustomDirectory() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("MattermostSwiftCLITests-\(UUID().uuidString)", isDirectory: true)
+        let expectedURL = root
+            .appendingPathComponent("custom", isDirectory: true)
+            .appendingPathComponent("cache.sqlite")
+        defer { try? fileManager.removeItem(at: root) }
+
+        let url = try MattermostSwiftCLI.resolvedStoreURL(
+            fileManager: fileManager,
+            environment: ["MATTERMOST_STORE_PATH": expectedURL.path],
+            currentDirectoryURL: nil
+        )
+
+        #expect(url == expectedURL.standardizedFileURL)
+        #expect(try permissions(at: expectedURL.deletingLastPathComponent(), fileManager: fileManager) == 0o700)
+    }
+
+    private func permissions(at url: URL, fileManager: FileManager) throws -> UInt16 {
+        let attributes = try fileManager.attributesOfItem(atPath: url.path)
+        let value = try #require(attributes[.posixPermissions] as? NSNumber)
+        return value.uint16Value & 0o777
+    }
+
 }

@@ -4,7 +4,7 @@ import Foundation
 
 struct MattermostUserStatusUpdateRequest: Encodable, Equatable, Sendable {
     let userId: String
-    let status: String
+    let status: MattermostUserStatusValue
     let dndEndTime: Int64?
 }
 
@@ -57,7 +57,7 @@ struct MattermostSessionRevokeRequest: Encodable, Equatable, Sendable {
 }
 
 struct MattermostChannelPrivacyRequest: Encodable, Equatable, Sendable {
-    let privacy: String
+    let privacy: MattermostChannelType
 }
 
 struct MattermostGroupMessageConversionRequest: Encodable, Equatable, Sendable {
@@ -151,7 +151,7 @@ struct MattermostCreateChannelRequest: Encodable, Sendable {
     let displayName: String
     let purpose: String?
     let header: String?
-    let type: String
+    let type: MattermostChannelType
 }
 
 struct MattermostPatchChannelRequest: Encodable, Sendable {
@@ -247,9 +247,9 @@ struct MattermostSidebarCategoryRequest: Encodable, Sendable {
     let userId: String
     let teamId: String
     let displayName: String
-    let type: String
+    let type: MattermostSidebarCategoryType
     let channelIds: [String]
-    let sorting: String
+    let sorting: MattermostSidebarCategorySorting
 }
 
 struct MattermostTypingRequest: Encodable, Sendable {

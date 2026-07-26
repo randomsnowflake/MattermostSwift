@@ -1,11 +1,18 @@
 import Foundation
 
 /// Configuration for a single Mattermost server and account.
-public struct MattermostConfiguration: Sendable {
+///
+/// Its textual descriptions redact bearer-token authentication.
+public struct MattermostConfiguration: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     public let serverURL: URL
     public let apiBaseURL: URL
     public let webSocketURL: URL
     public let authentication: MattermostAuthentication
+    /// Whether this configuration communicates over unencrypted HTTP/WebSocket transport.
+    ///
+    /// Hosts can inspect this to show their own warning or telemetry. The library
+    /// does not write warnings to standard error.
+    public let usesInsecureHTTP: Bool
 
     /// - Parameters:
     ///   - serverURL: The root URL of the Mattermost server. An `/api/v4` suffix is normalized away.
@@ -29,26 +36,39 @@ public struct MattermostConfiguration: Sendable {
            !normalizedServerURL.isLoopbackHost {
             throw MattermostError.insecureServerURL(serverURL.absoluteString)
         }
-        if normalizedServerURL.scheme == "http",
-           allowInsecureHTTP,
-           !normalizedServerURL.isLoopbackHost {
-            fputs(
-                "MattermostSwift: allowInsecureHTTP=true with non-loopback host \(normalizedServerURL.host() ?? "?") sends bearer tokens in cleartext.\n",
-                stderr
-            )
-        }
-
         self.serverURL = normalizedServerURL
         apiBaseURL = normalizedServerURL.appending(path: "api/v4", directoryHint: .isDirectory)
         webSocketURL = try normalizedServerURL.mattermostWebSocketURL()
         self.authentication = authentication
+        usesInsecureHTTP = normalizedServerURL.scheme == "http"
+    }
+
+    public var description: String {
+        "MattermostConfiguration(serverURL: \(serverURL), apiBaseURL: \(apiBaseURL), webSocketURL: \(webSocketURL), authentication: \(authentication))"
+    }
+
+    public var debugDescription: String {
+        description
     }
 }
 
 /// Authentication modes supported by the SDK.
-public enum MattermostAuthentication: Sendable, Equatable {
+public enum MattermostAuthentication: Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible {
     case none
     case bearerToken(String)
+
+    public var description: String {
+        switch self {
+        case .none:
+            "MattermostAuthentication.none"
+        case .bearerToken:
+            "MattermostAuthentication.bearerToken(<redacted>)"
+        }
+    }
+
+    public var debugDescription: String {
+        description
+    }
 }
 
 private extension URL {

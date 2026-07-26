@@ -85,7 +85,7 @@ public struct MattermostLiveEvent: Codable, Equatable, Sendable {
 
     /// Returns a channel id from event data or broadcast metadata.
     public func decodedChannelID() throws -> String? {
-        if let channelID = anyString("channel_id", "channelId", broadcast: \.channelId) {
+        if let channelID = anyString("channel_id", "channelId", broadcast: \.channelID) {
             return channelID
         }
         return try decodedChannel()?.id
@@ -98,8 +98,8 @@ public struct MattermostLiveEvent: Codable, Equatable, Sendable {
         }
 
         return MattermostTypingEvent(
-            userID: anyString("user_id", "userId", broadcast: \.userId),
-            channelID: anyString("channel_id", "channelId", broadcast: \.channelId),
+            userID: anyString("user_id", "userId", broadcast: \.userID),
+            channelID: anyString("channel_id", "channelId", broadcast: \.channelID),
             parentID: anyString("parent_id", "parentId", "root_id", "rootId")
         )
     }
@@ -111,8 +111,8 @@ public struct MattermostLiveEvent: Codable, Equatable, Sendable {
         }
 
         return MattermostStatusChangeEvent(
-            userID: anyString("user_id", "userId", broadcast: \.userId),
-            status: stringData("status"),
+            userID: anyString("user_id", "userId", broadcast: \.userID),
+            status: stringData("status").map(MattermostUserStatusValue.init(rawValue:)),
             manual: boolData("manual")
         )
     }
@@ -124,8 +124,8 @@ public struct MattermostLiveEvent: Codable, Equatable, Sendable {
         }
 
         return MattermostChannelViewedEvent(
-            userID: anyString("user_id", "userId", broadcast: \.userId),
-            channelID: anyString("channel_id", "channelId", broadcast: \.channelId),
+            userID: anyString("user_id", "userId", broadcast: \.userID),
+            channelID: anyString("channel_id", "channelId", broadcast: \.channelID),
             previousChannelID: anyString("prev_channel_id", "prevChannelId")
         )
     }
@@ -138,10 +138,10 @@ public struct MattermostLiveEvent: Codable, Equatable, Sendable {
 
         // Plain decoder: the keys are channel ids and must not be snake-case rewritten.
         let channelTimes = jsonData("channel_times").flatMap {
-            try? JSONDecoder().decode([String: Int64].self, from: $0)
+            try? mattermostPlainDecoder.decode([String: Int64].self, from: $0)
         }
         return MattermostMultipleChannelsViewedEvent(
-            userID: anyString("user_id", "userId", broadcast: \.userId),
+            userID: anyString("user_id", "userId", broadcast: \.userID),
             channelTimes: channelTimes ?? [:]
         )
     }
@@ -150,9 +150,9 @@ public struct MattermostLiveEvent: Codable, Equatable, Sendable {
     public func decodedCacheInvalidation() -> MattermostCacheInvalidationEvent {
         MattermostCacheInvalidationEvent(
             event: event,
-            userID: anyString("user_id", "userId", broadcast: \.userId),
-            channelID: anyString("channel_id", "channelId", broadcast: \.channelId),
-            teamID: anyString("team_id", "teamId", broadcast: \.teamId),
+            userID: anyString("user_id", "userId", broadcast: \.userID),
+            channelID: anyString("channel_id", "channelId", broadcast: \.channelID),
+            teamID: anyString("team_id", "teamId", broadcast: \.teamID),
             postID: anyString("post_id", "postId")
         )
     }
@@ -160,12 +160,12 @@ public struct MattermostLiveEvent: Codable, Equatable, Sendable {
     /// Returns tolerant thread-update data for `response` and collapsed-thread WebSocket events.
     public func decodedThreadEvent() throws -> MattermostThreadEvent {
         let post = try decodedPost()
-        let postRootID = post?.rootId.isEmpty == false ? post?.rootId : nil
+        let postRootID = post?.rootID.isEmpty == false ? post?.rootID : nil
         return MattermostThreadEvent(
             event: event,
-            userID: anyString("user_id", "userId", broadcast: \.userId) ?? post?.userId,
-            channelID: anyString("channel_id", "channelId", broadcast: \.channelId) ?? post?.channelId,
-            teamID: anyString("team_id", "teamId", broadcast: \.teamId),
+            userID: anyString("user_id", "userId", broadcast: \.userID) ?? post?.userID,
+            channelID: anyString("channel_id", "channelId", broadcast: \.channelID) ?? post?.channelID,
+            teamID: anyString("team_id", "teamId", broadcast: \.teamID),
             postID: anyString("post_id", "postId") ?? post?.id,
             rootID: anyString("root_id", "rootId") ?? postRootID,
             threadID: anyString("thread_id", "threadId") ?? postRootID ?? post?.id
@@ -326,7 +326,7 @@ public struct MattermostTypingEvent: Equatable, Sendable {
 /// Presence update payload emitted by Mattermost WebSocket events.
 public struct MattermostStatusChangeEvent: Equatable, Sendable {
     public let userID: String?
-    public let status: String?
+    public let status: MattermostUserStatusValue?
     public let manual: Bool?
 }
 
@@ -368,34 +368,76 @@ public struct MattermostThreadEvent: Equatable, Sendable {
 /// Broadcast metadata attached to a Mattermost WebSocket event.
 public struct MattermostLiveBroadcast: Codable, Equatable, Sendable {
     public let omitUsers: [String]?
-    public let userId: String?
-    public let channelId: String?
-    public let teamId: String?
+    public let userID: String?
+    public let channelID: String?
+    public let teamID: String?
 
     private enum CodingKeys: String, CodingKey {
         case omitUsers
-        case userId
-        case channelId
-        case teamId
+        case userID = "userId"
+        case channelID = "channelId"
+        case teamID = "teamId"
     }
 
     private enum SnakeCodingKeys: String, CodingKey {
         case omitUsers = "omit_users"
-        case userId = "user_id"
-        case channelId = "channel_id"
-        case teamId = "team_id"
+        case userID = "user_id"
+        case channelID = "channel_id"
+        case teamID = "team_id"
     }
 
     public init(
         omitUsers: [String]? = nil,
-        userId: String? = nil,
+        userID: String? = nil,
+        channelID: String? = nil,
+        teamID: String? = nil
+    ) {
+        self.omitUsers = omitUsers
+        self.userID = userID
+        self.channelID = channelID
+        self.teamID = teamID
+    }
+
+    @available(*, deprecated, message: "Use init(omitUsers:userID:channelID:teamID:)")
+    public init(
+        omitUsers: [String]? = nil,
+        userId: String?,
         channelId: String? = nil,
         teamId: String? = nil
     ) {
-        self.omitUsers = omitUsers
-        self.userId = userId
-        self.channelId = channelId
-        self.teamId = teamId
+        self.init(
+            omitUsers: omitUsers,
+            userID: userId,
+            channelID: channelId,
+            teamID: teamId
+        )
+    }
+
+    @available(*, deprecated, message: "Use init(omitUsers:userID:channelID:teamID:)")
+    public init(
+        omitUsers: [String]? = nil,
+        channelId: String?,
+        teamId: String? = nil
+    ) {
+        self.init(
+            omitUsers: omitUsers,
+            userID: nil,
+            channelID: channelId,
+            teamID: teamId
+        )
+    }
+
+    @available(*, deprecated, message: "Use init(omitUsers:userID:channelID:teamID:)")
+    public init(
+        omitUsers: [String]? = nil,
+        teamId: String?
+    ) {
+        self.init(
+            omitUsers: omitUsers,
+            userID: nil,
+            channelID: nil,
+            teamID: teamId
+        )
     }
 
     public init(from decoder: Decoder) throws {
@@ -403,13 +445,20 @@ public struct MattermostLiveBroadcast: Codable, Equatable, Sendable {
         let snakeContainer = try decoder.container(keyedBy: SnakeCodingKeys.self)
         omitUsers = Self.decodeStringArray(from: container, forKey: .omitUsers)
             ?? Self.decodeStringArray(from: snakeContainer, forKey: .omitUsers)
-        userId = Self.decodeString(from: container, forKey: .userId)
-            ?? Self.decodeString(from: snakeContainer, forKey: .userId)
-        channelId = Self.decodeString(from: container, forKey: .channelId)
-            ?? Self.decodeString(from: snakeContainer, forKey: .channelId)
-        teamId = Self.decodeString(from: container, forKey: .teamId)
-            ?? Self.decodeString(from: snakeContainer, forKey: .teamId)
+        userID = Self.decodeString(from: container, forKey: .userID)
+            ?? Self.decodeString(from: snakeContainer, forKey: .userID)
+        channelID = Self.decodeString(from: container, forKey: .channelID)
+            ?? Self.decodeString(from: snakeContainer, forKey: .channelID)
+        teamID = Self.decodeString(from: container, forKey: .teamID)
+            ?? Self.decodeString(from: snakeContainer, forKey: .teamID)
     }
+
+    @available(*, deprecated, renamed: "userID")
+    public var userId: String? { userID }
+    @available(*, deprecated, renamed: "channelID")
+    public var channelId: String? { channelID }
+    @available(*, deprecated, renamed: "teamID")
+    public var teamId: String? { teamID }
 
     private static func decodeString<Key: CodingKey>(
         from container: KeyedDecodingContainer<Key>,
@@ -433,7 +482,7 @@ public struct MattermostLiveBroadcast: Codable, Equatable, Sendable {
 }
 
 /// Generic JSON value used for tolerant Mattermost JSON payloads.
-public enum MattermostJSONValue: Codable, Equatable, Sendable {
+public enum MattermostJSONValue: Codable, Equatable, Hashable, Sendable {
     case string(String)
     /// A signed JSON integer preserved without converting through `Double`.
     case integer(Int64)

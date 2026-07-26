@@ -47,7 +47,7 @@ public struct MattermostThreadListRequest: Equatable, Sendable {
 }
 
 /// Per-user state for a root post in Mattermost's thread inbox.
-public struct MattermostThreadResponse: Codable, Equatable, Sendable, Identifiable {
+public struct MattermostThreadResponse: Codable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let replyCount: Int64
     public let lastReplyAt: Int64
@@ -62,6 +62,16 @@ public struct MattermostThreadResponse: Codable, Equatable, Sendable, Identifiab
 
     public var isUnread: Bool {
         unreadReplies > 0 || unreadMentions > 0
+    }
+
+    public var lastReplyDate: Date? {
+        lastReplyAt > 0 ? Date(mattermostMilliseconds: lastReplyAt) : nil
+    }
+    public var lastViewedDate: Date? {
+        lastViewedAt > 0 ? Date(mattermostMilliseconds: lastViewedAt) : nil
+    }
+    public var deletedAt: Date? {
+        deleteAt > 0 ? Date(mattermostMilliseconds: deleteAt) : nil
     }
 
     enum CodingKeys: String, CodingKey {

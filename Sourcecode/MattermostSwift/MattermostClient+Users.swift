@@ -22,11 +22,13 @@ extension MattermostClient {
     public static func checkMFARequired(
         serverURL: URL,
         loginID: String,
+        allowInsecureHTTP: Bool = false,
         urlSession: URLSession = .mattermost
     ) async throws -> Bool {
         let configuration = try MattermostConfiguration(
             serverURL: serverURL,
-            authentication: .none
+            authentication: .none,
+            allowInsecureHTTP: allowInsecureHTTP
         )
         let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: urlSession)
         let response: MattermostMFARequired = try await httpClient.post(
@@ -129,6 +131,26 @@ extension MattermostClient {
 
     /// Searches users by username, full name, nickname, or email where the server permits it.
     public func searchUsers(
+        options: MattermostUserSearchOptions
+    ) async throws -> [MattermostUser] {
+        try await httpClient.post(
+            "/users/search",
+            body: MattermostUserSearchRequest(
+                term: options.term,
+                teamId: options.teamID,
+                notInTeamId: options.notInTeamID,
+                inChannelId: options.inChannelID,
+                notInChannelId: options.notInChannelID,
+                allowInactive: options.allowInactive,
+                withoutTeam: options.withoutTeam,
+                limit: options.limit
+            )
+        )
+    }
+
+    /// Compatibility overload for the pre-options parameter list.
+    @available(*, deprecated, message: "Use searchUsers(options:)")
+    public func searchUsers(
         term: String,
         teamID: String? = nil,
         notInTeamID: String? = nil,
@@ -138,14 +160,13 @@ extension MattermostClient {
         withoutTeam: Bool = false,
         limit: Int = 20
     ) async throws -> [MattermostUser] {
-        try await httpClient.post(
-            "/users/search",
-            body: MattermostUserSearchRequest(
+        try await searchUsers(
+            options: MattermostUserSearchOptions(
                 term: term,
-                teamId: teamID,
-                notInTeamId: notInTeamID,
-                inChannelId: inChannelID,
-                notInChannelId: notInChannelID,
+                teamID: teamID,
+                notInTeamID: notInTeamID,
+                inChannelID: inChannelID,
+                notInChannelID: notInChannelID,
                 allowInactive: allowInactive,
                 withoutTeam: withoutTeam,
                 limit: limit
@@ -190,7 +211,11 @@ extension MattermostClient {
     }
 
     /// Manually sets a user's presence status.
-    public func setStatus(userID: String, status: String, dndEndTime: Int64? = nil) async throws -> MattermostUserStatus {
+    public func setStatus(
+        userID: String,
+        status: MattermostUserStatusValue,
+        dndEndTime: Int64? = nil
+    ) async throws -> MattermostUserStatus {
         try await httpClient.put(
             "/users/\(userID)/status",
             body: MattermostUserStatusUpdateRequest(

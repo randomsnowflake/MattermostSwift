@@ -8,26 +8,63 @@ public struct MattermostClient: Sendable {
     let webSocketURLSession: URLSession
 
     /// Creates a client from an explicit configuration.
+    ///
+    /// Pass `urlSessionDelegate` to evaluate authentication challenges (for example,
+    /// enterprise certificate pinning) on the default REST and WebSocket sessions. A session
+    /// supplied explicitly through `urlSession` or `webSocketURLSession` keeps its own delegate.
     public init(
         configuration: MattermostConfiguration,
         urlSession: URLSession = .mattermost,
-        webSocketURLSession: URLSession? = nil
+        webSocketURLSession: URLSession? = nil,
+        urlSessionDelegate: (any URLSessionDelegate)? = nil,
+        urlSessionDelegateQueue: OperationQueue? = nil
     ) {
+        let resolvedURLSession: URLSession
+        if let urlSessionDelegate, urlSession === URLSession.mattermost {
+            resolvedURLSession = URLSession.mattermost(
+                delegate: urlSessionDelegate,
+                delegateQueue: urlSessionDelegateQueue
+            )
+        } else {
+            resolvedURLSession = urlSession
+        }
+
+        let resolvedWebSocketURLSession: URLSession
+        if let webSocketURLSession {
+            resolvedWebSocketURLSession = webSocketURLSession
+        } else if let urlSessionDelegate {
+            resolvedWebSocketURLSession = URLSession.mattermostLiveEvents(
+                delegate: urlSessionDelegate,
+                delegateQueue: urlSessionDelegateQueue
+            )
+        } else {
+            resolvedWebSocketURLSession = (
+                urlSession === URLSession.mattermost ? .mattermostLiveEvents : urlSession
+            )
+        }
+
         self.configuration = configuration
-        self.urlSession = urlSession
-        self.webSocketURLSession = webSocketURLSession ?? (
-            urlSession === URLSession.mattermost ? .mattermostLiveEvents : urlSession
+        self.urlSession = resolvedURLSession
+        self.webSocketURLSession = resolvedWebSocketURLSession
+        httpClient = MattermostHTTPClient(
+            configuration: configuration,
+            urlSession: resolvedURLSession
         )
-        httpClient = MattermostHTTPClient(configuration: configuration, urlSession: urlSession)
     }
 
     /// Creates a bearer-token authenticated client.
+    ///
+    /// Pass `urlSessionDelegate` to evaluate authentication challenges (for example,
+    /// enterprise certificate pinning) on the default REST and WebSocket sessions. A session
+    /// supplied explicitly through `urlSession` or `webSocketURLSession` keeps its own delegate.
     public init(
         serverURL: URL,
         token: String,
         urlSession: URLSession = .mattermost,
         allowInsecureHTTP: Bool = false,
-        webSocketURLSession: URLSession? = nil
+        webSocketURLSession: URLSession? = nil,
+        urlSessionDelegate: (any URLSessionDelegate)? = nil,
+        urlSessionDelegateQueue: OperationQueue? = nil
     ) throws {
         let configuration = try MattermostConfiguration(
             serverURL: serverURL,
@@ -37,7 +74,9 @@ public struct MattermostClient: Sendable {
         self.init(
             configuration: configuration,
             urlSession: urlSession,
-            webSocketURLSession: webSocketURLSession
+            webSocketURLSession: webSocketURLSession,
+            urlSessionDelegate: urlSessionDelegate,
+            urlSessionDelegateQueue: urlSessionDelegateQueue
         )
     }
 
@@ -81,11 +120,13 @@ public extension MattermostClient {
         mfaToken: String? = nil,
         deviceID: String? = nil,
         ldapOnly: Bool? = nil,
+        allowInsecureHTTP: Bool = false,
         urlSession: URLSession = .mattermost
     ) async throws -> MattermostSession {
         let configuration = try MattermostConfiguration(
             serverURL: serverURL,
-            authentication: .none
+            authentication: .none,
+            allowInsecureHTTP: allowInsecureHTTP
         )
         let httpClient = MattermostHTTPClient(configuration: configuration, urlSession: urlSession)
         var request = try httpClient.makeJSONRequest(
@@ -105,7 +146,9 @@ public extension MattermostClient {
             return MattermostSession(
                 user: response.value,
                 token: sessionToken.token,
-                tokenSource: sessionToken.source
+                tokenSource: sessionToken.source,
+                serverURL: configuration.serverURL,
+                allowInsecureHTTP: allowInsecureHTTP
             )
         }
 
@@ -148,7 +191,7 @@ public extension MattermostClient {
     /// Required:
     /// - `MATTERMOST_URL`
     /// - `MATTERMOST_TOKEN`, or `MATTERMOST_AUTH_TOKEN` as a local compatibility alias
-    static func liveFromEnvironment(
+    static func fromEnvironment(
         _ environment: [String: String] = ProcessInfo.processInfo.environment
     ) throws -> MattermostClient {
         guard let rawURL = environment["MATTERMOST_URL"], !rawURL.isEmpty else {
@@ -161,6 +204,13 @@ public extension MattermostClient {
             throw MattermostError.missingEnvironmentVariable("MATTERMOST_TOKEN")
         }
         return try MattermostClient(serverURL: serverURL, token: token)
+    }
+
+    @available(*, deprecated, renamed: "fromEnvironment(_:)")
+    static func liveFromEnvironment(
+        _ environment: [String: String] = ProcessInfo.processInfo.environment
+    ) throws -> MattermostClient {
+        try fromEnvironment(environment)
     }
 }
 
@@ -226,8 +276,28 @@ public extension URLSession {
         configuration.timeoutIntervalForResource = 300
         configuration.httpShouldSetCookies = false
         configuration.httpCookieAcceptPolicy = .never
+        // REST currently shares one session across interactive requests and bulk history.
+        // Keep both path classes available until bulk requests have a separately injectable,
+        // resumable transport policy.
+        configuration.allowsConstrainedNetworkAccess = true
+        configuration.allowsExpensiveNetworkAccess = true
         return URLSession(configuration: configuration)
     }()
+
+    /// Creates the bounded Mattermost REST session with a host-provided delegate.
+    ///
+    /// Use the delegate to handle server-trust authentication challenges for deployments that
+    /// require certificate pinning. The returned session retains its delegate until invalidated.
+    static func mattermost(
+        delegate: any URLSessionDelegate,
+        delegateQueue: OperationQueue? = nil
+    ) -> URLSession {
+        URLSession(
+            configuration: mattermost.configuration,
+            delegate: delegate,
+            delegateQueue: delegateQueue
+        )
+    }
 
     /// URLSession configured for a long-lived Mattermost WebSocket connection.
     ///
@@ -240,6 +310,24 @@ public extension URLSession {
         configuration.timeoutIntervalForRequest = 30
         configuration.httpShouldSetCookies = false
         configuration.httpCookieAcceptPolicy = .never
+        configuration.allowsConstrainedNetworkAccess = true
+        configuration.allowsExpensiveNetworkAccess = true
         return URLSession(configuration: configuration)
     }()
+
+    /// Creates the long-lived Mattermost WebSocket session with a host-provided delegate.
+    ///
+    /// Use the same trust delegate as the REST session so both bearer-token transport paths
+    /// enforce the host app's trust policy. The returned session retains its delegate until
+    /// invalidated.
+    static func mattermostLiveEvents(
+        delegate: any URLSessionDelegate,
+        delegateQueue: OperationQueue? = nil
+    ) -> URLSession {
+        URLSession(
+            configuration: mattermostLiveEvents.configuration,
+            delegate: delegate,
+            delegateQueue: delegateQueue
+        )
+    }
 }

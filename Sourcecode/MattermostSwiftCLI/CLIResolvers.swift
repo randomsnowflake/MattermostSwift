@@ -36,7 +36,7 @@ extension MattermostSwiftCLI {
         }
 
         let channels = try await client.joinedChannelsAcrossTeams()
-        if let teamID = channels.compactMap(\.teamId).first(where: { !$0.isEmpty }) {
+        if let teamID = channels.compactMap(\.teamID).first(where: { !$0.isEmpty }) {
             return teamID
         }
 

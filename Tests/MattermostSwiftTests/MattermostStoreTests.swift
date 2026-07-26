@@ -4,6 +4,52 @@ import Testing
 
 @MainActor
 @Test
+func diskBackedStorePersistsAcrossReopen() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appending(path: "MattermostSwiftTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+    let storeURL = directory.appending(path: "MattermostSwift.sqlite", directoryHint: .notDirectory)
+    defer {
+        try? FileManager.default.removeItem(at: directory)
+    }
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+    do {
+        let store = try MattermostStore(url: storeURL)
+        try store.upsert(user: MattermostUser(
+            id: "disk-user",
+            username: "persisted",
+            email: "persisted@example.com",
+            firstName: "Disk",
+            lastName: "Test",
+            nickname: nil,
+            position: nil,
+            locale: "en",
+            timezone: nil,
+            lastPictureUpdate: 123
+        ))
+        try store.setSyncCursor(
+            scope: "disk-round-trip",
+            lastSyncAt: 456,
+            lastItemID: "disk-user"
+        )
+        try store.save()
+        #expect(FileManager.default.fileExists(atPath: storeURL.path))
+    }
+
+    do {
+        let reopenedStore = try MattermostStore(url: storeURL)
+        let user = try #require(try reopenedStore.cachedUser(id: "disk-user"))
+        let cursor = try #require(try reopenedStore.cachedSyncCursor(scope: "disk-round-trip"))
+        #expect(user.username == "persisted")
+        #expect(user.email == "persisted@example.com")
+        #expect(user.lastPictureUpdate == 123)
+        #expect(cursor.lastSyncAt == 456)
+        #expect(cursor.lastItemID == "disk-user")
+    }
+}
+
+@MainActor
+@Test
 func storeUpsertsUsersAndStatuses() throws {
     let store = try MattermostStore(inMemory: true)
     let user = MattermostUser(
@@ -31,8 +77,8 @@ func storeUpsertsUsersAndStatuses() throws {
         lastPictureUpdate: 1_700_000_000_000
     )
     let status = MattermostUserStatus(
-        userId: "user-1",
-        status: "online",
+        userID: "user-1",
+        status: .online,
         manual: false,
         lastActivityAt: 123,
         activeChannel: "channel-1",
@@ -119,10 +165,10 @@ func storeCachesChannelsPostsAndThreads() throws {
         id: "channel-1",
         createAt: 1,
         updateAt: 1,
-        teamId: "team-1",
+        teamID: "team-1",
         name: "town-square",
         displayName: "Town Square",
-        type: "O",
+        type: .open,
         header: nil,
         purpose: nil,
         deleteAt: nil,
@@ -137,15 +183,15 @@ func storeCachesChannelsPostsAndThreads() throws {
         updateAt: 1,
         editAt: 0,
         deleteAt: 0,
-        userId: "user-1",
-        channelId: "channel-1",
-        rootId: "",
-        originalId: nil,
+        userID: "user-1",
+        channelID: "channel-1",
+        rootID: "",
+        originalID: nil,
         message: "root",
-        type: "",
+        type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: nil,
+        pendingPostID: nil,
+        fileIDs: nil,
         hasReactions: nil
     )
     let reply = MattermostPost(
@@ -154,15 +200,15 @@ func storeCachesChannelsPostsAndThreads() throws {
         updateAt: 2,
         editAt: 0,
         deleteAt: 0,
-        userId: "user-2",
-        channelId: "channel-1",
-        rootId: "post-root",
-        originalId: nil,
+        userID: "user-2",
+        channelID: "channel-1",
+        rootID: "post-root",
+        originalID: nil,
         message: "reply",
-        type: "",
+        type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: ["file-1"],
+        pendingPostID: nil,
+        fileIDs: ["file-1"],
         hasReactions: true,
         props: [
             "mmswift": .object([
@@ -170,7 +216,7 @@ func storeCachesChannelsPostsAndThreads() throws {
                 "ok": .bool(true),
             ]),
         ],
-        metadata: [
+        rawMetadata: [
             "priority": .object([
                 "requested_ack": .bool(false),
             ]),
@@ -182,8 +228,8 @@ func storeCachesChannelsPostsAndThreads() throws {
             root.id: root,
             reply.id: reply,
         ],
-        nextPostId: nil,
-        prevPostId: nil,
+        nextPostID: nil,
+        prevPostID: nil,
         hasNext: nil
     )
 
@@ -220,6 +266,118 @@ func storeCachesChannelsPostsAndThreads() throws {
 
 @MainActor
 @Test
+func cachedPostSnapshotsKeepJSONRawAndDecodeOnDemand() throws {
+    let store = try MattermostStore(inMemory: true)
+    let post = MattermostPost(
+        id: "post-lazy-json",
+        createAt: 10,
+        updateAt: 10,
+        editAt: 0,
+        deleteAt: 0,
+        userId: "user-1",
+        channelId: "channel-1",
+        rootId: "",
+        originalId: nil,
+        message: "lazy snapshot",
+        type: .standard,
+        hashtags: nil,
+        pendingPostId: nil,
+        fileIds: ["file-1"],
+        hasReactions: true,
+        props: [
+            "webhook_name": .string("Build Bot"),
+            "nested_value": .object(["is_active": .bool(true)]),
+        ],
+        metadata: [
+            "files": .array([
+                .object([
+                    "id": .string("file-1"),
+                    "user_id": .string("user-1"),
+                    "post_id": .string("post-lazy-json"),
+                    "name": .string("report.pdf"),
+                    "extension": .string("pdf"),
+                    "mime_type": .string("application/pdf"),
+                ]),
+            ]),
+            "reactions": .array([
+                .object([
+                    "user_id": .string("user-2"),
+                    "post_id": .string("post-lazy-json"),
+                    "emoji_name": .string("thumbsup"),
+                    "create_at": .integer(20),
+                ]),
+            ]),
+        ]
+    )
+
+    try store.upsert(post: post)
+    try store.save()
+
+    let snapshot = try #require(
+        try store.cachedPostSnapshots(channelID: "channel-1").first
+    )
+    let expectedPropsJSON = try MattermostCachedPost.encodedJSON(post.props)
+    let expectedMetadataJSON = try MattermostCachedPost.encodedJSON(post.rawMetadata)
+    #expect(snapshot.propsJSON == expectedPropsJSON)
+    #expect(snapshot.metadataJSON == expectedMetadataJSON)
+    #expect(try snapshot.decodedProps()?["webhook_name"] == .string("Build Bot"))
+    #expect(
+        try snapshot.decodedProps()?["nested_value"]
+            == .object(["is_active": .bool(true)])
+    )
+
+    let metadata = try #require(try snapshot.decodedMetadata())
+    #expect(metadata.files?.first?.id == "file-1")
+    #expect(metadata.files?.first?.userId == "user-1")
+    #expect(metadata.files?.first?.extensionName == "pdf")
+    #expect(metadata.files?.first?.mimeType == "application/pdf")
+    #expect(metadata.reactions?.first?.userId == "user-2")
+    #expect(metadata.reactions?.first?.emojiName == "thumbsup")
+    #expect(metadata.reactions?.first?.createAt == 20)
+}
+
+@MainActor
+@Test
+func cachedPostSnapshotsDoNotEagerlyDecodeJSON() throws {
+    let store = try MattermostStore(inMemory: true)
+    let post = MattermostPost(
+        id: "post-invalid-json",
+        createAt: 10,
+        updateAt: 10,
+        editAt: 0,
+        deleteAt: 0,
+        userId: "user-1",
+        channelId: "channel-1",
+        rootId: "",
+        originalId: nil,
+        message: "invalid cached JSON",
+        type: .standard,
+        hashtags: nil,
+        pendingPostId: nil,
+        fileIds: nil,
+        hasReactions: nil
+    )
+
+    let cached = try store.upsert(post: post)
+    cached.propsJSON = "{not valid props"
+    cached.metadataJSON = "{not valid metadata"
+    try store.save()
+
+    let snapshot = try #require(
+        try store.cachedPostSnapshots(channelID: "channel-1").first
+    )
+    #expect(snapshot.propsJSON == "{not valid props")
+    #expect(snapshot.metadataJSON == "{not valid metadata")
+    #expect(throws: DecodingError.self) {
+        try snapshot.decodedProps()
+    }
+    #expect(throws: DecodingError.self) {
+        try snapshot.decodedMetadata()
+    }
+}
+
+@MainActor
+@Test
 func storeCachesThreadState() throws {
     let store = try MattermostStore(inMemory: true)
     let user = MattermostUser(
@@ -240,15 +398,15 @@ func storeCachesThreadState() throws {
         updateAt: 20,
         editAt: 0,
         deleteAt: 0,
-        userId: "user-1",
-        channelId: "channel-1",
-        rootId: "",
-        originalId: nil,
+        userID: "user-1",
+        channelID: "channel-1",
+        rootID: "",
+        originalID: nil,
         message: "root",
-        type: "",
+        type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: nil,
+        pendingPostID: nil,
+        fileIDs: nil,
         hasReactions: false
     )
     let thread = MattermostThreadResponse(
@@ -300,15 +458,15 @@ func storePreservesEditedAndDeletedPostState() throws {
         updateAt: 10,
         editAt: 0,
         deleteAt: 0,
-        userId: "user-1",
-        channelId: "channel-1",
-        rootId: "",
-        originalId: nil,
+        userID: "user-1",
+        channelID: "channel-1",
+        rootID: "",
+        originalID: nil,
         message: "original",
-        type: "",
+        type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: nil,
+        pendingPostID: nil,
+        fileIDs: nil,
         hasReactions: nil
     )
     let deleted = MattermostPost(
@@ -317,15 +475,15 @@ func storePreservesEditedAndDeletedPostState() throws {
         updateAt: 30,
         editAt: 20,
         deleteAt: 30,
-        userId: "user-1",
-        channelId: "channel-1",
-        rootId: "",
-        originalId: nil,
+        userID: "user-1",
+        channelID: "channel-1",
+        rootID: "",
+        originalID: nil,
         message: "edited",
-        type: "",
+        type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: nil,
+        pendingPostID: nil,
+        fileIDs: nil,
         hasReactions: nil
     )
 
@@ -350,15 +508,15 @@ func storeMarksPostDeletedFromLiveEventWithoutEmbeddedPost() throws {
         updateAt: 10,
         editAt: 0,
         deleteAt: 0,
-        userId: "user-1",
-        channelId: "channel-1",
-        rootId: "",
-        originalId: nil,
+        userID: "user-1",
+        channelID: "channel-1",
+        rootID: "",
+        originalID: nil,
         message: "original",
-        type: "",
+        type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: nil,
+        pendingPostID: nil,
+        fileIDs: nil,
         hasReactions: nil
     )
     let olderActivePayload = MattermostPost(
@@ -367,15 +525,15 @@ func storeMarksPostDeletedFromLiveEventWithoutEmbeddedPost() throws {
         updateAt: 20,
         editAt: 0,
         deleteAt: 0,
-        userId: "user-1",
-        channelId: "channel-1",
-        rootId: "",
-        originalId: nil,
+        userID: "user-1",
+        channelID: "channel-1",
+        rootID: "",
+        originalID: nil,
         message: "older active",
-        type: "",
+        type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: nil,
+        pendingPostID: nil,
+        fileIDs: nil,
         hasReactions: nil
     )
     let deletion = MattermostLiveEvent(
@@ -411,15 +569,15 @@ func cachedTimelineCanFilterDeletedPosts() throws {
         updateAt: 20,
         editAt: 0,
         deleteAt: 0,
-        userId: "user-1",
-        channelId: "channel-1",
-        rootId: "",
-        originalId: nil,
+        userID: "user-1",
+        channelID: "channel-1",
+        rootID: "",
+        originalID: nil,
         message: "visible",
-        type: "",
+        type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: nil,
+        pendingPostID: nil,
+        fileIDs: nil,
         hasReactions: nil
     )
     let deleted = MattermostPost(
@@ -428,15 +586,15 @@ func cachedTimelineCanFilterDeletedPosts() throws {
         updateAt: 30,
         editAt: 0,
         deleteAt: 30,
-        userId: "user-1",
-        channelId: "channel-1",
-        rootId: "",
-        originalId: nil,
+        userID: "user-1",
+        channelID: "channel-1",
+        rootID: "",
+        originalID: nil,
         message: "deleted",
-        type: "",
+        type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: nil,
+        pendingPostID: nil,
+        fileIDs: nil,
         hasReactions: nil
     )
 
@@ -461,15 +619,15 @@ func storeDoesNotApplyOlderPostPayloadOverNewerState() throws {
         updateAt: 30,
         editAt: 30,
         deleteAt: 0,
-        userId: "user-1",
-        channelId: "channel-1",
-        rootId: "",
-        originalId: nil,
+        userID: "user-1",
+        channelID: "channel-1",
+        rootID: "",
+        originalID: nil,
         message: "newer",
-        type: "",
+        type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: nil,
+        pendingPostID: nil,
+        fileIDs: nil,
         hasReactions: nil
     )
     let older = MattermostPost(
@@ -478,15 +636,15 @@ func storeDoesNotApplyOlderPostPayloadOverNewerState() throws {
         updateAt: 20,
         editAt: 20,
         deleteAt: 0,
-        userId: "user-1",
-        channelId: "channel-1",
-        rootId: "",
-        originalId: nil,
+        userID: "user-1",
+        channelID: "channel-1",
+        rootID: "",
+        originalID: nil,
         message: "older",
-        type: "",
+        type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: nil,
+        pendingPostID: nil,
+        fileIDs: nil,
         hasReactions: nil
     )
 
@@ -508,10 +666,10 @@ func storeDoesNotResurrectDeletedChannelFromOlderPayload() throws {
         id: "channel-1",
         createAt: 10,
         updateAt: 20,
-        teamId: "team-1",
+        teamID: "team-1",
         name: "town-square",
         displayName: "Deleted Channel",
-        type: "O",
+        type: .open,
         header: nil,
         purpose: nil,
         deleteAt: 40,
@@ -524,10 +682,10 @@ func storeDoesNotResurrectDeletedChannelFromOlderPayload() throws {
         id: "channel-1",
         createAt: 10,
         updateAt: 30,
-        teamId: "team-1",
+        teamID: "team-1",
         name: "town-square",
         displayName: "Older Active Channel",
-        type: "O",
+        type: .open,
         header: nil,
         purpose: nil,
         deleteAt: 0,
@@ -552,8 +710,8 @@ func storeDoesNotResurrectDeletedChannelFromOlderPayload() throws {
 func storeCachesChannelMembersAndUnreadState() throws {
     let store = try MattermostStore(inMemory: true)
     let member = MattermostChannelMember(
-        channelId: "channel-1",
-        userId: "user-1",
+        channelID: "channel-1",
+        userID: "user-1",
         roles: "channel_user",
         lastViewedAt: 10,
         msgCount: 20,
@@ -564,8 +722,8 @@ func storeCachesChannelMembersAndUnreadState() throws {
         lastUpdateAt: 30
     )
     let updatedMember = MattermostChannelMember(
-        channelId: "channel-1",
-        userId: "user-1",
+        channelID: "channel-1",
+        userID: "user-1",
         roles: "channel_user channel_admin",
         lastViewedAt: 40,
         msgCount: 22,
@@ -576,8 +734,8 @@ func storeCachesChannelMembersAndUnreadState() throws {
         lastUpdateAt: 50
     )
     let unread = MattermostChannelUnread(
-        teamId: "team-1",
-        channelId: "channel-1",
+        teamID: "team-1",
+        channelID: "channel-1",
         msgCount: 3,
         mentionCount: 2,
         msgCountRoot: 2,
@@ -610,18 +768,47 @@ func storeCachesChannelMembersAndUnreadState() throws {
 
 @MainActor
 @Test
+func storeReplaceJoinedChannelsBatchRemovesOnlyRemovedChannelMembers() throws {
+    let store = try MattermostStore(inMemory: true)
+    let removedChannels = [
+        storeTestChannel(id: "removed-1", teamID: "team-1"),
+        storeTestChannel(id: "removed-2", teamID: "team-1"),
+    ]
+    let retainedChannel = storeTestChannel(id: "retained", teamID: "team-1")
+    let otherTeamChannel = storeTestChannel(id: "other-team", teamID: "team-2")
+
+    try store.upsert(channels: removedChannels + [retainedChannel, otherTeamChannel])
+    try store.upsert(members: (removedChannels + [retainedChannel, otherTeamChannel]).map {
+        storeTestChannelMember(channelID: $0.id)
+    })
+
+    try store.replaceJoinedChannels([retainedChannel], teamID: "team-1")
+    try store.save()
+
+    #expect(try store.cachedChannel(id: "removed-1", includeDeleted: true) == nil)
+    #expect(try store.cachedChannel(id: "removed-2", includeDeleted: true) == nil)
+    #expect(try store.cachedChannel(id: "retained") != nil)
+    #expect(try store.cachedChannel(id: "other-team") != nil)
+    #expect(try store.cachedChannelMember(channelID: "removed-1", userID: "user-1") == nil)
+    #expect(try store.cachedChannelMember(channelID: "removed-2", userID: "user-1") == nil)
+    #expect(try store.cachedChannelMember(channelID: "retained", userID: "user-1") != nil)
+    #expect(try store.cachedChannelMember(channelID: "other-team", userID: "user-1") != nil)
+}
+
+@MainActor
+@Test
 func storeCachesReactionsFilesAndCursors() throws {
     let store = try MattermostStore(inMemory: true)
     let reaction = MattermostReaction(
-        userId: "user-1",
-        postId: "post-1",
+        userID: "user-1",
+        postID: "post-1",
         emojiName: "smile",
         createAt: 123
     )
     let file = MattermostFileInfo(
         id: "file-1",
-        userId: "user-1",
-        postId: "post-1",
+        userID: "user-1",
+        postID: "post-1",
         createAt: 100,
         updateAt: 101,
         deleteAt: 0,
@@ -848,24 +1035,25 @@ func storeAppliesLiveChannelMemberAndUserEvents() throws {
     try store.apply(liveEvent: channelUpdated)
     try store.apply(liveEvent: memberUpdated)
     try store.apply(liveEvent: userUpdated)
+    let cachedMember = try #require(try store.cachedChannelMember(channelID: "channel-1", userID: "user-1"))
+    #expect(cachedMember.notifyProps["desktop"] == "all")
     try store.apply(liveEvent: channelDeleted)
     try store.save()
 
     let cachedChannel = try #require(try store.cachedChannel(id: "channel-1", includeDeleted: true))
-    let cachedMember = try #require(try store.cachedChannelMember(channelID: "channel-1", userID: "user-1"))
     let cachedUser = try #require(try store.cachedUser(id: "user-1"))
 
     #expect(cachedChannel.displayName == "Town Square Updated")
     #expect((cachedChannel.deleteAt ?? 0) > 0)
-    #expect(cachedMember.notifyProps["desktop"] == "all")
+    #expect(try store.cachedChannelMember(channelID: "channel-1", userID: "user-1") == nil)
     #expect(cachedUser.username == "renamed-user")
 }
 
 @Test
-func reconnectPolicyCalculatesBackoffAndStopsAtLimit() {
+func reconnectPolicyAppliesFullJitterToCappedExponentialBackoff() {
     let policy = MattermostLiveEventReconnectPolicy(
-        initialDelaySeconds: 0.5,
-        maxDelaySeconds: 2,
+        initialDelay: .milliseconds(500),
+        maximumDelay: .seconds(2),
         multiplier: 2,
         maxRetries: 2
     )
@@ -873,35 +1061,65 @@ func reconnectPolicyCalculatesBackoffAndStopsAtLimit() {
     #expect(policy.canRetry(attempt: 0))
     #expect(policy.canRetry(attempt: 1))
     #expect(!policy.canRetry(attempt: 2))
-    #expect(policy.delay(for: 0) == .milliseconds(500))
-    #expect(policy.delay(for: 1) == .seconds(1))
-    #expect(policy.delay(for: 2) == .seconds(2))
-    #expect(policy.delay(for: 3) == .seconds(2))
-    #expect(policy.delay(for: 4) == .seconds(2))
+
+    #expect(policy.delay(for: 0, jitterFraction: 0) == .zero)
+    #expect(policy.delay(for: 0, jitterFraction: 0.5) == .milliseconds(250))
+    #expect(policy.delay(for: 0, jitterFraction: 1) == .milliseconds(500))
+    #expect(policy.delay(for: 1, jitterFraction: 1) == .seconds(1))
+    #expect(policy.delay(for: 2, jitterFraction: 1) == .seconds(2))
+    #expect(policy.delay(for: 3, jitterFraction: 1) == .seconds(2))
+    #expect(policy.delay(for: 4, jitterFraction: 1) == .seconds(2))
+}
+
+@Test(arguments: [
+    (attempt: -1, maximum: Duration.milliseconds(500)),
+    (attempt: 0, maximum: Duration.milliseconds(500)),
+    (attempt: 1, maximum: Duration.seconds(1)),
+    (attempt: 2, maximum: Duration.seconds(2)),
+    (attempt: 10, maximum: Duration.seconds(2)),
+])
+func reconnectPolicyRandomDelayStaysWithinBackoffBounds(
+    attempt: Int,
+    maximum: Duration
+) {
+    let policy = MattermostLiveEventReconnectPolicy(
+        initialDelaySeconds: 0.5,
+        maxDelaySeconds: 2,
+        multiplier: 2
+    )
+
+    for _ in 0..<100 {
+        let delay = policy.delay(for: attempt)
+        #expect(delay >= .zero)
+        #expect(delay <= maximum)
+    }
 }
 
 @Test
 func reconnectPolicyNormalizesInvalidNumbersAndSaturatesLargeAttempts() {
     let policy = MattermostLiveEventReconnectPolicy(
-        initialDelaySeconds: .nan,
-        maxDelaySeconds: .infinity,
+        initialDelay: .seconds(-1),
+        maximumDelay: .seconds(-1),
         multiplier: -.infinity,
         maxRetries: -1
     )
 
-    #expect(policy.initialDelaySeconds == 1)
-    #expect(policy.maxDelaySeconds == 60)
+    #expect(policy.initialDelay == .seconds(1))
+    #expect(policy.maximumDelay == .seconds(60))
     #expect(policy.multiplier == 1)
     #expect(policy.maxRetries == 0)
     #expect(!policy.canRetry(attempt: 0))
-    #expect(policy.delay(for: .max) == .seconds(1))
+    #expect(policy.delay(for: .max, jitterFraction: 1) == .seconds(1))
 
     let overflowing = MattermostLiveEventReconnectPolicy(
-        initialDelaySeconds: .greatestFiniteMagnitude,
-        maxDelaySeconds: .greatestFiniteMagnitude,
+        initialDelay: .seconds(Int64.max / 2),
+        maximumDelay: .seconds(Int64.max / 2),
         multiplier: .greatestFiniteMagnitude
     )
-    #expect(overflowing.delay(for: .max) > .zero)
+    let maximum = overflowing.delay(for: .max, jitterFraction: 1)
+    #expect(maximum == .milliseconds(Int.max / 2))
+    #expect(overflowing.delay(for: .max, jitterFraction: 0) == .zero)
+    #expect(overflowing.delay(for: .max) <= maximum)
 }
 
 @MainActor
@@ -927,12 +1145,14 @@ func storePrunesPostsKeepingNewestForChannel() throws {
     try store.upsert(post: storeTestPost(id: "post-2", channelID: "channel-1", message: "middle", createAt: 20))
     try store.upsert(post: storeTestPost(id: "post-3", channelID: "channel-1", message: "new", createAt: 30))
     try store.upsert(post: storeTestPost(id: "other", channelID: "channel-2", message: "other", createAt: 5))
-    try store.upsert(reaction: MattermostReaction(userId: "user-1", postId: "post-1", emojiName: "old", createAt: 11))
-    try store.upsert(reaction: MattermostReaction(userId: "user-1", postId: "post-2", emojiName: "kept", createAt: 21))
+    try store.upsert(reaction: MattermostReaction(userID: "user-1", postID: "post-1", emojiName: "old", createAt: 11))
+    try store.upsert(reaction: MattermostReaction(userID: "user-1", postID: "post-2", emojiName: "kept", createAt: 21))
+    try store.upsert(thread: storeTestThread(id: "post-1", unreadReplies: 1), userID: "user-1", teamID: "team-1")
+    try store.upsert(thread: storeTestThread(id: "post-2", unreadReplies: 1), userID: "user-1", teamID: "team-1")
     try store.upsert(file: MattermostFileInfo(
         id: "file-1",
-        userId: "user-1",
-        postId: "post-1",
+        userID: "user-1",
+        postID: "post-1",
         createAt: 12,
         updateAt: 12,
         deleteAt: 0,
@@ -946,8 +1166,8 @@ func storePrunesPostsKeepingNewestForChannel() throws {
     ))
     try store.upsert(file: MattermostFileInfo(
         id: "file-2",
-        userId: "user-1",
-        postId: "post-2",
+        userID: "user-1",
+        postID: "post-2",
         createAt: 22,
         updateAt: 22,
         deleteAt: 0,
@@ -971,6 +1191,25 @@ func storePrunesPostsKeepingNewestForChannel() throws {
     #expect(try store.cachedReaction(id: keptReactionID) != nil)
     #expect(try store.cachedFiles(postID: "post-1").isEmpty)
     #expect(try store.cachedFiles(postID: "post-2").map(\.id) == ["file-2"])
+    #expect(try store.cachedThreadState(rootID: "post-1", userID: "user-1", teamID: "team-1") == nil)
+    #expect(try store.cachedThreadState(rootID: "post-2", userID: "user-1", teamID: "team-1") != nil)
+}
+
+@MainActor
+@Test
+func deletingChannelContentRemovesCachedThreadStates() throws {
+    let store = try MattermostStore(inMemory: true)
+    try store.upsert(
+        thread: storeTestThread(id: "root-1", unreadReplies: 2),
+        userID: "user-1",
+        teamID: "team-1"
+    )
+    try store.save()
+
+    try store.deleteChannelContent(channelID: "channel-1")
+    try store.save()
+
+    #expect(try store.cachedThreadStates().isEmpty)
 }
 
 @MainActor
@@ -981,10 +1220,10 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
         id: "channel-1",
         createAt: 1,
         updateAt: 1,
-        teamId: "team-1",
+        teamID: "team-1",
         name: "town-square",
         displayName: "Town Square",
-        type: "O",
+        type: .open,
         header: nil,
         purpose: nil,
         deleteAt: nil,
@@ -994,11 +1233,11 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
         lastRootPostAt: nil
     )
     let post = storeTestPost(id: "post-1", channelID: "channel-1", message: "hello", createAt: 10)
-    let reaction = MattermostReaction(userId: "user-1", postId: "post-1", emojiName: "wave", createAt: 11)
+    let reaction = MattermostReaction(userID: "user-1", postID: "post-1", emojiName: "wave", createAt: 11)
     let file = MattermostFileInfo(
         id: "file-1",
-        userId: "user-1",
-        postId: "post-1",
+        userID: "user-1",
+        postID: "post-1",
         createAt: 12,
         updateAt: 12,
         deleteAt: 0,
@@ -1010,7 +1249,31 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
         height: nil,
         hasPreviewImage: false
     )
-    let unread = MattermostChannelUnread(teamId: "team-1", channelId: "channel-1", msgCount: 4, mentionCount: 1, msgCountRoot: nil, mentionCountRoot: nil)
+    let unread = MattermostChannelUnread(teamID: "team-1", channelID: "channel-1", msgCount: 4, mentionCount: 1, msgCountRoot: nil, mentionCountRoot: nil)
+    let deletedChannelMember = MattermostChannelMember(
+        channelID: "channel-1",
+        userID: "user-1",
+        roles: "channel_user",
+        lastViewedAt: 10,
+        msgCount: 4,
+        mentionCount: 1,
+        msgCountRoot: nil,
+        mentionCountRoot: nil,
+        notifyProps: [:],
+        lastUpdateAt: 10
+    )
+    let retainedChannelMember = MattermostChannelMember(
+        channelID: "channel-2",
+        userID: "user-1",
+        roles: "channel_user",
+        lastViewedAt: 20,
+        msgCount: 2,
+        mentionCount: 0,
+        msgCountRoot: nil,
+        mentionCountRoot: nil,
+        notifyProps: [:],
+        lastUpdateAt: 20
+    )
     let deletion = MattermostLiveEvent(
         event: "channel_deleted",
         data: ["channel_id": .string("channel-1")],
@@ -1023,6 +1286,10 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
     try store.upsert(reaction: reaction)
     try store.upsert(file: file)
     try store.upsert(unread: unread, userID: "user-1")
+    try store.upsert(member: deletedChannelMember)
+    try store.upsert(member: retainedChannelMember)
+    try store.save()
+
     try store.apply(liveEvent: deletion)
     try store.save()
 
@@ -1033,6 +1300,7 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
     #expect(try store.cachedReaction(id: reactionID) == nil)
     #expect(try store.cachedFiles(postID: "post-1").isEmpty)
     #expect(try store.cachedChannelUnread(channelID: "channel-1", userID: "user-1") == nil)
+    #expect(try store.cachedChannelMembers().map(\.channelId) == ["channel-2"])
 }
 
 @Test
@@ -1080,9 +1348,18 @@ func liveSyncOptionsClampBackfillChannelLimit() {
     #expect(options.maxBackfillChannels == 0)
     #expect(options.backfillJoinedChannelPosts)
     #expect(!options.backfillAllJoinedChannelPosts)
+    #expect(options.minimumBackfillGap == .seconds(10))
     #expect(options.refreshUnreadOnChannelViewed)
     #expect(options.refreshSidebarCategoriesOnPreferenceChange)
     #expect(options.syncOptions.maxPostPages == 1)
+
+    let customized = MattermostLiveSyncOptions(minimumBackfillGap: .seconds(30))
+    let clamped = MattermostLiveSyncOptions(minimumBackfillGap: .seconds(-1))
+    let disabled = MattermostLiveSyncOptions(minimumBackfillGap: nil)
+
+    #expect(customized.minimumBackfillGap == .seconds(30))
+    #expect(clamped.minimumBackfillGap == .zero)
+    #expect(disabled.minimumBackfillGap == nil)
 }
 
 private func storeTestPostJSON(id: String, message: String, updateAt: Int64, editAt: Int64) -> String {
@@ -1109,16 +1386,50 @@ private func storeTestPost(id: String, channelID: String, message: String, creat
         updateAt: createAt,
         editAt: 0,
         deleteAt: 0,
-        userId: "user-1",
-        channelId: channelID,
-        rootId: "",
-        originalId: nil,
+        userID: "user-1",
+        channelID: channelID,
+        rootID: "",
+        originalID: nil,
         message: message,
-        type: "",
+        type: .standard,
         hashtags: nil,
-        pendingPostId: nil,
-        fileIds: nil,
+        pendingPostID: nil,
+        fileIDs: nil,
         hasReactions: nil
+    )
+}
+
+private func storeTestChannel(id: String, teamID: String) -> MattermostChannel {
+    MattermostChannel(
+        id: id,
+        createAt: 1,
+        updateAt: 1,
+        teamID: teamID,
+        name: id,
+        displayName: id,
+        type: .open,
+        header: nil,
+        purpose: nil,
+        deleteAt: nil,
+        totalMsgCount: nil,
+        totalMsgCountRoot: nil,
+        lastPostAt: nil,
+        lastRootPostAt: nil
+    )
+}
+
+private func storeTestChannelMember(channelID: String) -> MattermostChannelMember {
+    MattermostChannelMember(
+        channelId: channelID,
+        userId: "user-1",
+        roles: "channel_user",
+        lastViewedAt: 0,
+        msgCount: 0,
+        mentionCount: 0,
+        msgCountRoot: nil,
+        mentionCountRoot: nil,
+        notifyProps: [:],
+        lastUpdateAt: 1
     )
 }
 

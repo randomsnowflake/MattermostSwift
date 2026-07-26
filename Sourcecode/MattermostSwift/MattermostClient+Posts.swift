@@ -4,6 +4,50 @@ import Foundation
 
 extension MattermostClient {
     /// Loads a page of posts for a channel.
+    ///
+    /// If `options.since` is set, the server's update-fetch mode is used and
+    /// `page`, `perPage`, `before`, and `after` are ignored.
+    public func posts(
+        channelID: String,
+        options: MattermostPostsOptions
+    ) async throws -> MattermostPostList {
+        if let since = options.since {
+            return try await postsSince(
+                channelID: channelID,
+                since: since,
+                skipFetchThreads: options.skipFetchThreads,
+                collapsedThreads: options.collapsedThreads,
+                collapsedThreadsExtended: options.collapsedThreadsExtended
+            )
+        }
+
+        var queryItems = Self.pageQueryItems(page: options.page, perPage: options.perPage)
+
+        if let before = options.before, !before.isEmpty {
+            queryItems.append(URLQueryItem(name: "before", value: before))
+        }
+
+        if let after = options.after, !after.isEmpty {
+            queryItems.append(URLQueryItem(name: "after", value: after))
+        }
+
+        if let skipFetchThreads = options.skipFetchThreads {
+            queryItems.append(URLQueryItem(name: "skipFetchThreads", value: String(skipFetchThreads)))
+        }
+
+        if let collapsedThreads = options.collapsedThreads {
+            queryItems.append(URLQueryItem(name: "collapsedThreads", value: String(collapsedThreads)))
+        }
+
+        if let collapsedThreadsExtended = options.collapsedThreadsExtended {
+            queryItems.append(URLQueryItem(name: "collapsedThreadsExtended", value: String(collapsedThreadsExtended)))
+        }
+
+        return try await httpClient.get("/channels/\(channelID)/posts", queryItems: queryItems)
+    }
+
+    /// Compatibility overload for the pre-options parameter list.
+    @available(*, deprecated, message: "Use posts(channelID:options:)")
     public func posts(
         channelID: String,
         page: Int = 0,
@@ -15,39 +59,19 @@ extension MattermostClient {
         collapsedThreads: Bool? = nil,
         collapsedThreadsExtended: Bool? = nil
     ) async throws -> MattermostPostList {
-        if let since {
-            return try await postsSince(
-                channelID: channelID,
+        try await posts(
+            channelID: channelID,
+            options: MattermostPostsOptions(
+                page: page,
+                perPage: perPage,
                 since: since,
+                before: before,
+                after: after,
                 skipFetchThreads: skipFetchThreads,
                 collapsedThreads: collapsedThreads,
                 collapsedThreadsExtended: collapsedThreadsExtended
             )
-        }
-
-        var queryItems = Self.pageQueryItems(page: page, perPage: perPage)
-
-        if let before, !before.isEmpty {
-            queryItems.append(URLQueryItem(name: "before", value: before))
-        }
-
-        if let after, !after.isEmpty {
-            queryItems.append(URLQueryItem(name: "after", value: after))
-        }
-
-        if let skipFetchThreads {
-            queryItems.append(URLQueryItem(name: "skipFetchThreads", value: String(skipFetchThreads)))
-        }
-
-        if let collapsedThreads {
-            queryItems.append(URLQueryItem(name: "collapsedThreads", value: String(collapsedThreads)))
-        }
-
-        if let collapsedThreadsExtended {
-            queryItems.append(URLQueryItem(name: "collapsedThreadsExtended", value: String(collapsedThreadsExtended)))
-        }
-
-        return try await httpClient.get("/channels/\(channelID)/posts", queryItems: queryItems)
+        )
     }
 
     /// Loads posts pinned in a channel.
