@@ -3,9 +3,14 @@ import SwiftData
 
 /// SwiftData-backed cache for Mattermost objects used by app targets and the CLI.
 ///
-/// Host apps own retention policy. Use pruning helpers such as
-/// `prunePosts(channelID:keepCount:)` and `deleteChannelContent(channelID:)` during
-/// background maintenance or channel lifecycle events to keep long-lived stores bounded.
+/// Every store operation is main-actor isolated and uses the container's main context. This
+/// includes fetches, sync/live-sync writes, and retention helpers; the store does not provide a
+/// background `ModelContext`. Run potentially large scans only when a main-thread hitch is
+/// acceptable.
+///
+/// Host apps own retention policy. A practical cadence is to prune after initial hydration and
+/// then about once per day during an app-controlled idle window. Delete channel content when a
+/// channel leaves the host's retention scope.
 @MainActor
 public final class MattermostStore {
     private static let batchedFetchIDLimit = 500
@@ -798,6 +803,10 @@ public final class MattermostStore {
         }
     }
 
+    /// Keeps the newest posts in a channel and deletes older cached post content.
+    ///
+    /// This method scans the channel on the main actor. Call it only when a main-thread hitch is
+    /// acceptable, such as an app-controlled idle window.
     public func prunePosts(channelID: String, keepCount: Int = 200) throws {
         let keepCount = max(0, keepCount)
         let posts = try cachedPosts(channelID: channelID, includeDeleted: true)
@@ -808,6 +817,10 @@ public final class MattermostStore {
         }
     }
 
+    /// Deletes cached posts and unread state for a channel.
+    ///
+    /// This method scans the channel on the main actor. Call it only when a main-thread hitch is
+    /// acceptable, typically when the channel leaves the host's retention scope.
     public func deleteChannelContent(channelID: String) throws {
         let posts = try cachedPosts(channelID: channelID, includeDeleted: true)
 

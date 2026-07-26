@@ -232,10 +232,17 @@ The library target also includes a DocC quick-start article at `Sourcecode/Matte
 
 ## Cache and large files
 
-`MattermostStore` uses an append-only SwiftData schema/migration history. Keep the store on its
-own main-actor boundary, and perform cache mutations through store APIs. Joined channels,
-memberships, sidebar categories, and unread rows are reconciled only from complete scoped server
-responses, so an empty response can safely remove stale local rows for that scope.
+`MattermostStore` uses an append-only SwiftData schema/migration history and
+`ModelContainer.mainContext`. Every store operation is main-actor isolated, including sync and
+live-sync cache writes, fetches, `prunePosts`, and `deleteChannelContent`; the package does not
+provide a background model context. Large cache scans can therefore cause a visible main-thread
+hitch. Run them only during an app-controlled idle window where that tradeoff is acceptable.
+
+Hosts own cache retention. As a starting policy, prune each retained channel after initial
+hydration and then about once per day during an idle window. Call `deleteChannelContent` when a
+channel leaves the app's retention scope. Joined channels, memberships, sidebar categories, and
+unread rows are reconciled only from complete scoped server responses, so an empty response can
+safely remove stale local rows for that scope.
 Post pruning and channel-content deletion also remove reactions, files, and cached thread inbox
 state rooted at the deleted posts.
 For work outside that actor, use `cachedUserSnapshots()`, `cachedChannelSnapshots()`, or

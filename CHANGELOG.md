@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Corrected the `MattermostStore` threading documentation: all store, sync, live-sync, and
+  retention work uses the main actor, with host guidance for scheduling potentially expensive
+  pruning and channel cleanup.
 - Live sync now skips SwiftData saves for non-mutating events such as typing indicators and
   coalesces event application plus refresh results into at most one save per applied event.
 - **Source-breaking:** `MattermostCachedPostSnapshot` now exposes `propsJSON` and
