@@ -284,30 +284,12 @@ public struct MattermostSyncService: Sendable {
         store: MattermostStore,
         width: Int = 4
     ) async throws -> Int {
-        try await withThrowingTaskGroup(of: MattermostChannelUnread.self) { group in
-            var iterator = channels.makeIterator()
-            var inflight = 0
-            var syncedCount = 0
-
-            func fill() {
-                while inflight < width, let channel = iterator.next() {
-                    inflight += 1
-                    group.addTask {
-                        try await client.channelUnread(userID: userID, channelID: channel.id)
-                    }
-                }
-            }
-
-            fill()
-            while let unread = try await group.next() {
-                try store.upsert(unread: unread, userID: userID)
-                syncedCount += 1
-                inflight -= 1
-                fill()
-            }
-
-            return syncedCount
+        let unreads = try await mattermostBoundedConcurrentMap(channels, width: width) { channel in
+            let unread = try await client.channelUnread(userID: userID, channelID: channel.id)
+            try store.upsert(unread: unread, userID: userID)
+            return unread
         }
+        return unreads.count
     }
 }
 

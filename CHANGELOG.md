@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Live-sync channel backfill and bulk unread refresh now share the sync service's width-8 bounded
+  concurrency, reducing reconnect and mark-all-read latency while preserving cancellation and
+  channel/user result association.
 - Added a host-provided `URLSessionDelegate` hook for server-trust evaluation on both default REST
   and WebSocket sessions, with matching session factories for direct URLSession construction.
 - Bounded WebSocket events buffered during authentication to 256; overflow now reports

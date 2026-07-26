@@ -599,6 +599,8 @@ func liveSyncRefreshesUnreadForMultipleChannelsViewed() async throws {
         seq: 3
     )
     var unreadRefreshes: [(userID: String, channelID: String)] = []
+    var unreadRefreshesInFlight = 0
+    var maximumUnreadRefreshesInFlight = 0
 
     let stream = service.events(
         to: store,
@@ -614,7 +616,16 @@ func liveSyncRefreshesUnreadForMultipleChannelsViewed() async throws {
             liveSyncBackfillResult(teamID: teamID ?? "team-1")
         },
         refreshUnread: { userID, channelID in
+            unreadRefreshesInFlight += 1
+            maximumUnreadRefreshesInFlight = max(
+                maximumUnreadRefreshesInFlight,
+                unreadRefreshesInFlight
+            )
+            defer { unreadRefreshesInFlight -= 1 }
             unreadRefreshes.append((userID, channelID))
+            try await Task.sleep(
+                for: channelID == "channel-1" ? .milliseconds(20) : .milliseconds(5)
+            )
             return MattermostChannelUnread(
                 teamId: "team-1",
                 channelId: channelID,
@@ -642,8 +653,9 @@ func liveSyncRefreshesUnreadForMultipleChannelsViewed() async throws {
     let firstUnread = try #require(try store.cachedChannelUnread(channelID: "channel-1", userID: "user-1"))
     let secondUnread = try #require(try store.cachedChannelUnread(channelID: "channel-2", userID: "user-1"))
     #expect(appliedChannels == ["channel-1", "channel-2"])
-    #expect(unreadRefreshes.map(\.userID) == ["user-1", "user-1"])
-    #expect(unreadRefreshes.map(\.channelID) == ["channel-1", "channel-2"])
+    #expect(unreadRefreshes.map(\.userID).sorted() == ["user-1", "user-1"])
+    #expect(unreadRefreshes.map(\.channelID).sorted() == ["channel-1", "channel-2"])
+    #expect(maximumUnreadRefreshesInFlight == 2)
     #expect(refreshedChannels == ["channel-1", "channel-2"])
     #expect(firstUnread.msgCountRoot == 0)
     #expect(secondUnread.msgCountRoot == 0)
