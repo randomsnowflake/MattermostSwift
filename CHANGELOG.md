@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Live sync now skips and reports malformed WebSocket events instead of terminating the stream,
+  and surfaces unread, sidebar-category, and thread-state refresh failures to host apps.
 - Malformed WebSocket event frames now emit an `eventDecodeFailed` lifecycle signal before
   being skipped, preserving the connection while exposing wire-format failures to host apps.
 - WebSocket reconnect backoff now uses full jitter from zero through the capped exponential

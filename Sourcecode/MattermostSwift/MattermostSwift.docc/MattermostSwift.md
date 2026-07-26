@@ -205,8 +205,14 @@ func runLiveSync(
         switch event {
         case .eventApplied(_, let typedEvent):
             print("applied \(typedEvent)")
+        case .eventApplyFailed(let rawEvent, let message):
+            print("skipped \(rawEvent.event): \(message)")
         case .channelUnreadRefreshed(let unread):
             print("unread \(unread.channelId): \(unread.msgCount)")
+        case .channelUnreadRefreshFailed(let failure),
+             .sidebarCategoriesRefreshFailed(let failure),
+             .threadStateRefreshFailed(let failure):
+            print("live sync refresh failed on attempt \(failure.attempt): \(failure.message)")
         case .backfillFailed(let failure):
             print("live sync backfill failed on attempt \(failure.attempt): \(failure.message)")
             print("error identity: \(failure.domain) \(failure.code)")
@@ -224,6 +230,11 @@ Live sync refreshes every affected channel after `channel_viewed`,
 `multiple_channels_viewed`, and `post_unread` invalidations when the corresponding unread-refresh
 options are enabled. This keeps cached channel badges aligned with reads from other sessions and
 devices, including servers with collapsed reply threads enabled.
+
+Malformed embedded event payloads yield `eventApplyFailed` and are skipped so later WebSocket
+events continue to update the cache. Unread, sidebar-category, and thread-state refresh errors yield
+their dedicated failure events. These non-cancellation failures degrade only the affected update;
+cancellation continues to stop live sync.
 
 Reconnects use full-jitter exponential backoff. For each attempt, the stream chooses a uniform
 delay from zero through the policy's capped exponential base, spreading clients across the retry
