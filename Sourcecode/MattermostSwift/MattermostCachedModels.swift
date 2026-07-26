@@ -10,6 +10,7 @@ private let mattermostCachedPostEncoder: JSONEncoder = {
 }()
 private let mattermostCachedPostDecoder = JSONDecoder()
 
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedUser {
     @Attribute(.unique) public var id: String = ""
@@ -46,6 +47,7 @@ public final class MattermostCachedUser {
     }
 }
 
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedUserStatus {
     @Attribute(.unique) public var userId: String = ""
@@ -89,6 +91,7 @@ public final class MattermostCachedUserStatus {
     }
 }
 
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedTeam {
     @Attribute(.unique) public var id: String = ""
@@ -113,6 +116,7 @@ public final class MattermostCachedTeam {
     }
 }
 
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedChannel {
     #Index<MattermostCachedChannel>([\.teamId])
@@ -185,6 +189,7 @@ public final class MattermostCachedChannel {
     }
 }
 
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedChannelMember {
     #Index<MattermostCachedChannelMember>([\.userId])
@@ -236,6 +241,7 @@ public final class MattermostCachedChannelMember {
     }
 }
 
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedChannelUnread {
     #Index<MattermostCachedChannelUnread>([\.userId])
@@ -274,6 +280,7 @@ public final class MattermostCachedChannelUnread {
     }
 }
 
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedThread {
     #Index<MattermostCachedThread>([\.userId, \.teamId])
@@ -344,6 +351,7 @@ public final class MattermostCachedThread {
     }
 }
 
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedPost {
     #Index<MattermostCachedPost>([\.channelId], [\.channelId, \.createAt], [\.rootId])
@@ -456,6 +464,7 @@ public final class MattermostCachedPost {
     }
 }
 
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedReaction {
     #Index<MattermostCachedReaction>([\.postId])
@@ -489,6 +498,7 @@ public final class MattermostCachedReaction {
     }
 }
 
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedFile {
     #Index<MattermostCachedFile>([\.postId])
@@ -538,6 +548,7 @@ public final class MattermostCachedFile {
     }
 }
 
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostCachedSidebarCategory {
     #Index<MattermostCachedSidebarCategory>([\.teamId])
@@ -578,6 +589,7 @@ public final class MattermostCachedSidebarCategory {
     }
 }
 
+// Do not conform to Sendable — see MattermostCacheSnapshots.
 @Model
 public final class MattermostSyncCursor {
     @Attribute(.unique) public var scope: String = ""

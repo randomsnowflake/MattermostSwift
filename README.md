@@ -159,6 +159,8 @@ try await client.logoutCurrentSession()
 ```
 
 Store any returned token in your app's secure storage, such as Keychain on Apple platforms.
+The textual and debug descriptions of sessions, authentication values, and configurations
+redact bearer tokens so logging those values does not expose credentials.
 `logoutCurrentSession()` revokes Mattermost server sessions; hosts should still discard their
 local token even if remote cleanup fails. Personal access tokens may not be accepted by this endpoint.
 
@@ -230,12 +232,42 @@ The library target also includes a DocC quick-start article at `Sourcecode/Matte
 
 ## Cache and large files
 
-`MattermostStore` uses an append-only SwiftData schema/migration history. Keep the store on its
-own main-actor boundary, and perform cache mutations through store APIs. Joined channels,
-memberships, sidebar categories, and unread rows are reconciled only from complete scoped server
-responses, so an empty response can safely remove stale local rows for that scope.
+`MattermostStore` uses an append-only SwiftData schema/migration history and
+`ModelContainer.mainContext`. Every store operation is main-actor isolated, including sync and
+live-sync cache writes, fetches, `prunePosts`, and `deleteChannelContent`; the package does not
+provide a background model context. Large cache scans can therefore cause a visible main-thread
+hitch. Run them only during an app-controlled idle window where that tradeoff is acceptable.
+
+Hosts own cache retention. As a starting policy, prune each retained channel after initial
+hydration and then about once per day during an idle window. Call `deleteChannelContent` when a
+channel leaves the app's retention scope. Joined channels, memberships, sidebar categories, and
+unread rows are reconciled only from complete scoped server responses, so an empty response can
+safely remove stale local rows for that scope.
+Post pruning and channel-content deletion also remove reactions, files, and cached thread inbox
+state rooted at the deleted posts.
 For work outside that actor, use `cachedUserSnapshots()`, `cachedChannelSnapshots()`, or
 `cachedPostSnapshots(...)`; these immutable `Sendable` values do not retain a SwiftData context.
+Post snapshots carry `propsJSON` and `metadataJSON` without decoding them while the store is on the
+main actor. Call the snapshot's throwing `decodedProps()` or `decodedMetadata()` helper only in
+views or background work that needs those payloads.
+
+Disk-backed stores default to owner-only directory permissions (`0700`). On iOS, the store
+directory and SQLite files also default to complete-until-first-user-authentication protection.
+Hosts that do not need locked-device background access can select `.complete`; hosts using a
+shared, separately managed directory can pass `nil` for `directoryPermissions`:
+
+```swift
+let store = try MattermostStore(
+    url: storeURL,
+    security: MattermostStoreSecurityOptions(
+        directoryPermissions: 0o700,
+        fileProtection: .complete
+    )
+)
+```
+
+Apple file protection does not provide a macOS at-rest guarantee. macOS hosts remain responsible
+for choosing a private cache location and enabling FileVault or equivalent volume encryption.
 
 For production-sized attachments, use the file URL overloads instead of materialising the payload:
 

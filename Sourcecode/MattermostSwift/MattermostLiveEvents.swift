@@ -433,7 +433,7 @@ public struct MattermostLiveBroadcast: Decodable, Equatable, Sendable {
 }
 
 /// Generic JSON value used for tolerant Mattermost JSON payloads.
-public enum MattermostJSONValue: Codable, Equatable, Sendable {
+public enum MattermostJSONValue: Codable, Equatable, Hashable, Sendable {
     case string(String)
     /// A signed JSON integer preserved without converting through `Double`.
     case integer(Int64)
