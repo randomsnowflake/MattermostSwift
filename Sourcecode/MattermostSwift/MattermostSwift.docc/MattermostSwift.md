@@ -8,6 +8,10 @@ Build Mattermost clients in Swift with REST commands, WebSocket live events, and
 
 Use `MattermostClient` as the root entry point: it exposes user, team, channel, post, timeline, and live-event operations as methods directly, with `MattermostSyncService` and `MattermostLiveSyncService` layered on top for cache hydration and live state.
 
+The library supports iOS 18, macOS 15, tvOS 18, watchOS 11, and visionOS 2. Linux is not currently
+supported because the cache uses SwiftData and live events use the Apple Foundation WebSocket
+transport.
+
 ## Authenticate
 
 Use a personal access token when a host app already owns credential storage:

@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Declared tvOS 18, watchOS 11, and visionOS 2 support alongside iOS 18 and macOS 15,
+  with CI builds for every supported Apple platform and documentation of the current Linux limits.
 - Workspace sync now persists scoped ETags for joined-team, joined-channel, and sidebar-category
   lists, sends `If-None-Match` on later syncs, and treats HTTP 304 as cached unchanged data.
   Post timelines and unread-count requests remain unconditional.
