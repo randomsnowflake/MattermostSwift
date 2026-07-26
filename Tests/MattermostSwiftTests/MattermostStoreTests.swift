@@ -4,6 +4,52 @@ import Testing
 
 @MainActor
 @Test
+func diskBackedStorePersistsAcrossReopen() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appending(path: "MattermostSwiftTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+    let storeURL = directory.appending(path: "MattermostSwift.sqlite", directoryHint: .notDirectory)
+    defer {
+        try? FileManager.default.removeItem(at: directory)
+    }
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+    do {
+        let store = try MattermostStore(url: storeURL)
+        try store.upsert(user: MattermostUser(
+            id: "disk-user",
+            username: "persisted",
+            email: "persisted@example.com",
+            firstName: "Disk",
+            lastName: "Test",
+            nickname: nil,
+            position: nil,
+            locale: "en",
+            timezone: nil,
+            lastPictureUpdate: 123
+        ))
+        try store.setSyncCursor(
+            scope: "disk-round-trip",
+            lastSyncAt: 456,
+            lastItemID: "disk-user"
+        )
+        try store.save()
+        #expect(FileManager.default.fileExists(atPath: storeURL.path))
+    }
+
+    do {
+        let reopenedStore = try MattermostStore(url: storeURL)
+        let user = try #require(try reopenedStore.cachedUser(id: "disk-user"))
+        let cursor = try #require(try reopenedStore.cachedSyncCursor(scope: "disk-round-trip"))
+        #expect(user.username == "persisted")
+        #expect(user.email == "persisted@example.com")
+        #expect(user.lastPictureUpdate == 123)
+        #expect(cursor.lastSyncAt == 456)
+        #expect(cursor.lastItemID == "disk-user")
+    }
+}
+
+@MainActor
+@Test
 func storeUpsertsUsersAndStatuses() throws {
     let store = try MattermostStore(inMemory: true)
     let user = MattermostUser(
@@ -848,16 +894,17 @@ func storeAppliesLiveChannelMemberAndUserEvents() throws {
     try store.apply(liveEvent: channelUpdated)
     try store.apply(liveEvent: memberUpdated)
     try store.apply(liveEvent: userUpdated)
+    let cachedMember = try #require(try store.cachedChannelMember(channelID: "channel-1", userID: "user-1"))
+    #expect(cachedMember.notifyProps["desktop"] == "all")
     try store.apply(liveEvent: channelDeleted)
     try store.save()
 
     let cachedChannel = try #require(try store.cachedChannel(id: "channel-1", includeDeleted: true))
-    let cachedMember = try #require(try store.cachedChannelMember(channelID: "channel-1", userID: "user-1"))
     let cachedUser = try #require(try store.cachedUser(id: "user-1"))
 
     #expect(cachedChannel.displayName == "Town Square Updated")
     #expect((cachedChannel.deleteAt ?? 0) > 0)
-    #expect(cachedMember.notifyProps["desktop"] == "all")
+    #expect(try store.cachedChannelMember(channelID: "channel-1", userID: "user-1") == nil)
     #expect(cachedUser.username == "renamed-user")
 }
 
@@ -1032,6 +1079,30 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
         hasPreviewImage: false
     )
     let unread = MattermostChannelUnread(teamId: "team-1", channelId: "channel-1", msgCount: 4, mentionCount: 1, msgCountRoot: nil, mentionCountRoot: nil)
+    let deletedChannelMember = MattermostChannelMember(
+        channelId: "channel-1",
+        userId: "user-1",
+        roles: "channel_user",
+        lastViewedAt: 10,
+        msgCount: 4,
+        mentionCount: 1,
+        msgCountRoot: nil,
+        mentionCountRoot: nil,
+        notifyProps: [:],
+        lastUpdateAt: 10
+    )
+    let retainedChannelMember = MattermostChannelMember(
+        channelId: "channel-2",
+        userId: "user-1",
+        roles: "channel_user",
+        lastViewedAt: 20,
+        msgCount: 2,
+        mentionCount: 0,
+        msgCountRoot: nil,
+        mentionCountRoot: nil,
+        notifyProps: [:],
+        lastUpdateAt: 20
+    )
     let deletion = MattermostLiveEvent(
         event: "channel_deleted",
         data: ["channel_id": .string("channel-1")],
@@ -1044,6 +1115,10 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
     try store.upsert(reaction: reaction)
     try store.upsert(file: file)
     try store.upsert(unread: unread, userID: "user-1")
+    try store.upsert(member: deletedChannelMember)
+    try store.upsert(member: retainedChannelMember)
+    try store.save()
+
     try store.apply(liveEvent: deletion)
     try store.save()
 
@@ -1054,6 +1129,7 @@ func channelDeletedLiveEventPurgesCachedChannelContent() throws {
     #expect(try store.cachedReaction(id: reactionID) == nil)
     #expect(try store.cachedFiles(postID: "post-1").isEmpty)
     #expect(try store.cachedChannelUnread(channelID: "channel-1", userID: "user-1") == nil)
+    #expect(try store.cachedChannelMembers().map(\.channelId) == ["channel-2"])
 }
 
 @Test
