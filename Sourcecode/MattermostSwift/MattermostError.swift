@@ -36,6 +36,11 @@ public enum MattermostError: Error, Equatable, Sendable {
     case invalidEndpoint(String)
     case invalidHTTPResponse
     case httpStatus(code: Int, message: String?, apiError: MattermostAPIErrorBody?)
+    /// The server rejected a request because its rate limit was exceeded.
+    ///
+    /// `retryAfter` contains the delay in seconds when the response supplied a valid
+    /// `Retry-After` value.
+    case rateLimited(retryAfter: TimeInterval?)
     case emptyResponse
     case transportFailure(String)
     case fileTooLarge(limit: Int64)
@@ -89,6 +94,12 @@ extension MattermostError: LocalizedError {
                 "Mattermost API request failed with HTTP \(code): \(message)"
             } else {
                 "Mattermost API request failed with HTTP \(code)."
+            }
+        case .rateLimited(let retryAfter):
+            if let retryAfter {
+                "Mattermost rate limited the request. Retry after \(retryAfter) seconds."
+            } else {
+                "Mattermost rate limited the request."
             }
         case .emptyResponse:
             "Mattermost returned an empty response."

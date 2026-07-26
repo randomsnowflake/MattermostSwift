@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Safe REST reads and audited read-only POST requests now retry HTTP 429 and 503 responses
+  with bounded backoff, honoring numeric `Retry-After` values. Mutations are never replayed,
+  and exhausted HTTP 429 responses surface as `MattermostError.rateLimited(retryAfter:)`.
 - **Breaking:** `MattermostError.httpStatus` now includes a third `apiError` associated value.
   `MattermostAPIErrorBody` preserves Mattermost error IDs, detailed errors, request IDs, and body
   status codes; `MattermostError` also provides `isUnauthorized`, `isForbidden`, and `isNotFound`.

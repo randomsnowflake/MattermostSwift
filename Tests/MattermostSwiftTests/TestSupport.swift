@@ -21,14 +21,17 @@ enum MattermostTestSupport {
         statusCode: Int,
         body: Data,
         contentType: String = "application/json",
+        headerFields: [String: String] = [:],
         request: URLRequest
     ) throws -> (HTTPURLResponse, Data) {
         let url = try #require(request.url)
+        var responseHeaders = headerFields
+        responseHeaders["Content-Type"] = contentType
         let response = try #require(HTTPURLResponse(
             url: url,
             statusCode: statusCode,
             httpVersion: "HTTP/1.1",
-            headerFields: ["Content-Type": contentType]
+            headerFields: responseHeaders
         ))
         return (response, body)
     }

@@ -46,6 +46,12 @@ To test unreleased changes, use a branch or local path dependency during app dev
 
 The library target has no SwiftUI or Combine dependency.
 
+Safe REST reads and the SDK's explicitly audited read-only POST endpoints automatically retry
+HTTP 429 and 503 responses up to two times. Numeric `Retry-After` response values are honored;
+mutating requests are never replayed automatically. A rate limit that cannot be retried or remains
+after those attempts throws `MattermostError.rateLimited(retryAfter:)`, allowing host apps to
+present server-directed retry timing.
+
 ## Error Handling
 
 Server failures surface as `MattermostError.httpStatus(code:message:apiError:)`. The

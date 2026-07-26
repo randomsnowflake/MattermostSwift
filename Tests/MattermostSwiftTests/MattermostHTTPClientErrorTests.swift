@@ -121,6 +121,93 @@ struct MattermostHTTPClientErrorTests {
     }
 
     @Test
+    func clientRetriesRateLimitedGETUsingRetryAfter() async throws {
+        let attempts = MattermostRequestLog()
+        let client = try await Self.makeClient { request in
+            attempts.append(request.httpMethod ?? "")
+            if attempts.values.count == 1 {
+                return try Self.response(
+                    statusCode: 429,
+                    body: Data(),
+                    headerFields: ["Retry-After": "0"],
+                    request: request
+                )
+            }
+            return try Self.response(
+                statusCode: 200,
+                body: Data(#"{"id":"user-id","username":"alice"}"#.utf8),
+                request: request
+            )
+        }
+
+        let user = try await client.currentUser()
+
+        #expect(user.id == "user-id")
+        #expect(attempts.values == ["GET", "GET"])
+    }
+
+    @Test
+    func clientDoesNotRetryRateLimitedMutation() async throws {
+        let attempts = MattermostRequestLog()
+        let client = try await Self.makeClient { request in
+            attempts.append(request.httpMethod ?? "")
+            return try Self.response(
+                statusCode: 429,
+                body: Data(),
+                headerFields: ["Retry-After": "4"],
+                request: request
+            )
+        }
+
+        await #expect(throws: MattermostError.rateLimited(retryAfter: 4)) {
+            _ = try await client.sendPost(channelID: "channel-id", message: "must not replay")
+        }
+        #expect(attempts.values == ["POST"])
+    }
+
+    @Test
+    func clientRejectsInvalidRetryAfterValues() async throws {
+        let attempts = MattermostRequestLog()
+        let client = try await Self.makeClient { request in
+            attempts.append(request.httpMethod ?? "")
+            return try Self.response(
+                statusCode: 429,
+                body: Data(),
+                headerFields: ["Retry-After": "NaN"],
+                request: request
+            )
+        }
+
+        await #expect(throws: MattermostError.rateLimited(retryAfter: nil)) {
+            _ = try await client.sendPost(channelID: "channel-id", message: "must not replay")
+        }
+        #expect(attempts.values == ["POST"])
+    }
+
+    @Test
+    func clientBoundsRateLimitRetriesAndExposesDedicatedError() async throws {
+        let attempts = MattermostRequestLog()
+        let client = try await Self.makeClient { request in
+            attempts.append(request.httpMethod ?? "")
+            return try Self.response(
+                statusCode: 429,
+                body: Data(),
+                headerFields: ["Retry-After": "0"],
+                request: request
+            )
+        }
+
+        await #expect(throws: MattermostError.rateLimited(retryAfter: 0)) {
+            _ = try await client.currentUser()
+        }
+        #expect(attempts.values == ["GET", "GET", "GET"])
+        #expect(
+            MattermostError.rateLimited(retryAfter: 4).errorDescription
+                == "Mattermost rate limited the request. Retry after 4.0 seconds."
+        )
+    }
+
+    @Test
     func clientPreservesCancellationErrors() async throws {
         let client = try await Self.makeClient { _ in
             throw URLError(.cancelled)
@@ -727,12 +814,14 @@ struct MattermostHTTPClientErrorTests {
         statusCode: Int,
         body: Data,
         contentType: String = "application/json",
+        headerFields: [String: String] = [:],
         request: URLRequest
     ) throws -> (HTTPURLResponse, Data) {
         try MattermostTestSupport.response(
             statusCode: statusCode,
             body: body,
             contentType: contentType,
+            headerFields: headerFields,
             request: request
         )
     }
