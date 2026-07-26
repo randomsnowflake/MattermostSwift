@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Fixed the live post-props verification to preserve integer JSON values and fail when
+  either the server or SwiftData cache round trip changes the tested property bag.
 - Replaced the CLI's hand-written parser/help with `swift-argument-parser`, scoped to
   the executable target, adding generated root/per-command help, `--version`, shell
   completions, typed validation with exit code 2, position-independent flags, and a

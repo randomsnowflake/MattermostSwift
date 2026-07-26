@@ -381,7 +381,7 @@ extension MattermostSwiftCLI {
             "mmswift_test": .object([
                 "marker": .string(marker),
                 "ok": .bool(true),
-                "count": .number(1),
+                "count": .integer(1),
             ]),
         ]
         let post = try await client.sendPost(channelID: channelID, message: marker, props: props)
@@ -397,9 +397,18 @@ extension MattermostSwiftCLI {
             let deleteStatus = try await client.deletePost(id: post.id)
             deletedPost = true
 
+            let fetchedPropsMatch = fetched.props?["mmswift_test"] == props["mmswift_test"]
+            let cachedPropsMatch = cachedProps?["mmswift_test"] == props["mmswift_test"]
+            guard fetchedPropsMatch else {
+                throw CLIError.usage("Mattermost post props changed during the server round trip.")
+            }
+            guard cachedPropsMatch else {
+                throw CLIError.usage("Mattermost post props changed during the cache round trip.")
+            }
+
             print("post: \(post.id)")
-            print("fetched-props: \(fetched.props?["mmswift_test"] == props["mmswift_test"])")
-            print("cached-props: \(cachedProps?["mmswift_test"] == props["mmswift_test"])")
+            print("fetched-props: \(fetchedPropsMatch)")
+            print("cached-props: \(cachedPropsMatch)")
             print("post-delete-status: \(deleteStatus.status)")
         } catch {
             if !deletedPost {
