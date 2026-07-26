@@ -8,7 +8,7 @@ public struct MattermostSyncOptions: Equatable, Sendable {
     /// Maximum number of channel-post pages to fetch in one sync pass.
     public var maxPostPages: Int
 
-    /// Whether to cache channel user profiles for the selected post channel.
+    /// Whether to cache all channel user profiles for the selected post channel.
     public var includeChannelUsers: Bool
 
     /// Whether to cache sidebar categories for the resolved team.
@@ -120,7 +120,7 @@ public struct MattermostSyncService: Sendable {
     }
 
     /// Hydrates the local store with joined teams, current user, status, joined channels, memberships,
-    /// unread state, sidebar categories, and optionally a channel timeline.
+    /// unread state, sidebar categories, all pages of channel users, and optionally a channel timeline.
     @MainActor
     public func sync(
         to store: MattermostStore,
@@ -131,24 +131,32 @@ public struct MattermostSyncService: Sendable {
     ) async throws -> MattermostSyncResult {
         let user = try await client.currentUser()
         let status = try await client.status(userID: user.id)
-        let joinedTeams = try await client.teams(userID: user.id)
-        let resolvedTeam = try await resolveTeamAndChannels(
-            teamID: requestedTeamID,
-            teamName: teamName,
-            joinedTeams: joinedTeams
-        )
+        let joinedTeamsResult = try await joinedTeams(userID: user.id, store: store)
+        let joinedTeams = joinedTeamsResult.values
 
         try store.upsert(user: user)
         try store.upsert(status: status)
-        try store.upsert(teams: joinedTeams)
+        if joinedTeamsResult.wasModified {
+            try store.upsert(teams: joinedTeams)
+        }
+
+        let resolvedTeam = try await resolveTeamAndChannels(
+            teamID: requestedTeamID,
+            teamName: teamName,
+            joinedTeams: joinedTeams,
+            store: store
+        )
+
         if let team = resolvedTeam.team {
             try store.upsert(team: team)
         }
-        if let teamID = resolvedTeam.teamID {
-            try store.replaceJoinedChannels(resolvedTeam.channels, teamID: teamID)
-        } else {
-            // Across-team responses do not establish a deletion scope for direct/group channels.
-            try store.upsert(channels: resolvedTeam.channels)
+        if resolvedTeam.channelsWereModified {
+            if let teamID = resolvedTeam.teamID {
+                try store.replaceJoinedChannels(resolvedTeam.channels, teamID: teamID)
+            } else {
+                // Across-team responses do not establish a deletion scope for direct/group channels.
+                try store.upsert(channels: resolvedTeam.channels)
+            }
         }
 
         let syncedTeamsCount = joinedTeams.count
@@ -164,7 +172,7 @@ public struct MattermostSyncService: Sendable {
             syncedMembersCount += 1
 
             if options.includeChannelUsers {
-                let users = try await client.users(channelID: postChannelID, perPage: 60)
+                let users = try await allChannelUsers(channelID: postChannelID)
                 try store.upsert(users: users)
                 syncedUsersCount = users.count
             }
@@ -183,8 +191,15 @@ public struct MattermostSyncService: Sendable {
             syncedMembersCount = max(syncedMembersCount, members.count)
 
             if options.includeSidebarCategories {
-                let categories = try await client.sidebarCategories(teamID: teamID)
-                try store.replaceSidebarCategories(categories, userID: user.id, teamID: teamID)
+                let categoriesResult = try await sidebarCategories(
+                    userID: user.id,
+                    teamID: teamID,
+                    store: store
+                )
+                let categories = categoriesResult.values
+                if categoriesResult.wasModified {
+                    try store.replaceSidebarCategories(categories, userID: user.id, teamID: teamID)
+                }
                 syncedCategoriesCount = categories.count
             }
         }
@@ -239,11 +254,38 @@ public struct MattermostSyncService: Sendable {
         )
     }
 
+    private func allChannelUsers(channelID: String) async throws -> [MattermostUser] {
+        let pageSize = 60
+        var page = 0
+        var users: [MattermostUser] = []
+
+        while true {
+            let pageUsers = try await client.users(
+                channelID: channelID,
+                page: page,
+                perPage: pageSize
+            )
+            users.append(contentsOf: pageUsers)
+
+            guard pageUsers.count >= pageSize else {
+                return users
+            }
+            page += 1
+        }
+    }
+
+    @MainActor
     private func resolveTeamAndChannels(
         teamID: String?,
         teamName: String?,
-        joinedTeams: [MattermostTeam]
-    ) async throws -> (team: MattermostTeam?, teamID: String?, channels: [MattermostChannel]) {
+        joinedTeams: [MattermostTeam],
+        store: MattermostStore
+    ) async throws -> (
+        team: MattermostTeam?,
+        teamID: String?,
+        channels: [MattermostChannel],
+        channelsWereModified: Bool
+    ) {
         if let teamID, !teamID.isEmpty {
             let team: MattermostTeam
             if let joinedTeam = joinedTeams.first(where: { $0.id == teamID }) {
@@ -251,7 +293,8 @@ public struct MattermostSyncService: Sendable {
             } else {
                 team = try await client.team(id: teamID)
             }
-            return (team, teamID, try await client.joinedChannels(teamID: teamID))
+            let channels = try await joinedChannels(teamID: teamID, store: store)
+            return (team, teamID, channels.values, channels.wasModified)
         }
 
         if let teamName, !teamName.isEmpty {
@@ -261,15 +304,156 @@ public struct MattermostSyncService: Sendable {
             } else {
                 team = try await client.team(named: teamName)
             }
-            return (team, team.id, try await client.joinedChannels(teamID: team.id))
+            let channels = try await joinedChannels(teamID: team.id, store: store)
+            return (team, team.id, channels.values, channels.wasModified)
         }
 
-        let channels = try await client.joinedChannelsAcrossTeams()
-        let inferredTeamID = channels.lazy.compactMap(\.teamId).first { !$0.isEmpty }
+        let channelsResult = try await joinedChannelsAcrossTeams(store: store)
+        let inferredTeamID = channelsResult.values.lazy.compactMap(\.teamId).first { !$0.isEmpty }
         let inferredTeam = inferredTeamID.flatMap { teamID in
             joinedTeams.first { $0.id == teamID }
         }
-        return (inferredTeam, inferredTeamID, channels)
+        return (
+            inferredTeam,
+            inferredTeamID,
+            channelsResult.values,
+            channelsResult.wasModified
+        )
+    }
+
+    @MainActor
+    private func joinedTeams(
+        userID: String,
+        store: MattermostStore
+    ) async throws -> ConditionalList<MattermostTeam> {
+        let endpoint = "/users/\(userID)/teams"
+        let scope = Self.etagScope(endpoint: endpoint)
+        let cachedETag = try store.cachedETag(scope: scope)
+        let response: MattermostConditionalResponse<[MattermostTeam]> = try await client.httpClient
+            .conditionalGet(endpoint, etag: cachedETag?.value)
+
+        switch response {
+        case .modified(let teams, let etag):
+            try updateETag(etag, scope: scope, itemIDs: teams.map(\.id), store: store)
+            return ConditionalList(values: teams, wasModified: true)
+        case .notModified:
+            return ConditionalList(
+                values: Self.orderedModels(
+                    ids: cachedETag?.itemIDs ?? [],
+                    models: try store.cachedTeams().map(\.mattermostModel)
+                ),
+                wasModified: false
+            )
+        }
+    }
+
+    @MainActor
+    private func joinedChannels(
+        teamID: String,
+        store: MattermostStore
+    ) async throws -> ConditionalList<MattermostChannel> {
+        let endpoint = "/users/me/teams/\(teamID)/channels"
+        return try await joinedChannels(endpoint: endpoint, store: store)
+    }
+
+    @MainActor
+    private func joinedChannelsAcrossTeams(
+        store: MattermostStore
+    ) async throws -> ConditionalList<MattermostChannel> {
+        try await joinedChannels(endpoint: "/users/me/channels", store: store)
+    }
+
+    @MainActor
+    private func joinedChannels(
+        endpoint: String,
+        store: MattermostStore
+    ) async throws -> ConditionalList<MattermostChannel> {
+        let scope = Self.etagScope(endpoint: endpoint)
+        let cachedETag = try store.cachedETag(scope: scope)
+        let response: MattermostConditionalResponse<[MattermostChannel]> = try await client.httpClient
+            .conditionalGet(endpoint, etag: cachedETag?.value)
+
+        switch response {
+        case .modified(let channels, let etag):
+            try updateETag(etag, scope: scope, itemIDs: channels.map(\.id), store: store)
+            return ConditionalList(values: channels, wasModified: true)
+        case .notModified:
+            return ConditionalList(
+                values: Self.orderedModels(
+                    ids: cachedETag?.itemIDs ?? [],
+                    models: try store.cachedChannels(includeDeleted: true).map(\.mattermostModel)
+                ),
+                wasModified: false
+            )
+        }
+    }
+
+    @MainActor
+    private func sidebarCategories(
+        userID: String,
+        teamID: String,
+        store: MattermostStore
+    ) async throws -> ConditionalList<MattermostSidebarCategory> {
+        let endpoint = "/users/me/teams/\(teamID)/channels/categories"
+        let scope = Self.etagScope(endpoint: endpoint)
+        let cachedETag = try store.cachedETag(scope: scope)
+        let response: MattermostConditionalResponse<MattermostSidebarCategoryList> = try await client.httpClient
+            .conditionalGet(endpoint, etag: cachedETag?.value)
+
+        switch response {
+        case .modified(let list, let etag):
+            let categories = list.orderedCategories
+            try updateETag(etag, scope: scope, itemIDs: categories.map(\.id), store: store)
+            return ConditionalList(values: categories, wasModified: true)
+        case .notModified:
+            return ConditionalList(
+                values: Self.orderedModels(
+                    ids: cachedETag?.itemIDs ?? [],
+                    models: try store.cachedSidebarCategories(teamID: teamID)
+                        .filter { $0.userId == nil || $0.userId == userID }
+                        .map(\.mattermostModel)
+                ),
+                wasModified: false
+            )
+        }
+    }
+
+    @MainActor
+    private func updateETag(
+        _ etag: String?,
+        scope: String,
+        itemIDs: [String],
+        store: MattermostStore
+    ) throws {
+        if let etag {
+            try store.setETag(scope: scope, value: etag, itemIDs: itemIDs)
+        } else {
+            try store.removeETag(scope: scope)
+        }
+    }
+
+    private static func etagScope(
+        endpoint: String,
+        queryItems: [URLQueryItem] = []
+    ) -> String {
+        let query = queryItems
+            .sorted {
+                if $0.name != $1.name {
+                    return $0.name < $1.name
+                }
+                return ($0.value ?? "") < ($1.value ?? "")
+            }
+            .map { "\($0.name)=\($0.value ?? "")" }
+            .joined(separator: "&")
+        return query.isEmpty ? "GET \(endpoint)" : "GET \(endpoint)?\(query)"
+    }
+
+    private static func orderedModels<Model: Identifiable>(
+        ids: [String],
+        models: [Model]
+    ) -> [Model] where Model.ID == String {
+        let modelsByID = Dictionary(models.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return ids.compactMap { modelsByID[$0] }
     }
 
     // Keep the per-channel HTTP fan-out instead of deriving unread state locally.
@@ -282,32 +466,69 @@ public struct MattermostSyncService: Sendable {
         channels: [MattermostChannel],
         userID: String,
         store: MattermostStore,
-        width: Int = 8
+        width: Int = 4
     ) async throws -> Int {
-        try await withThrowingTaskGroup(of: MattermostChannelUnread.self) { group in
-            var iterator = channels.makeIterator()
-            var inflight = 0
-            var syncedCount = 0
-
-            func fill() {
-                while inflight < width, let channel = iterator.next() {
-                    inflight += 1
-                    group.addTask {
-                        try await client.channelUnread(userID: userID, channelID: channel.id)
-                    }
-                }
-            }
-
-            fill()
-            while let unread = try await group.next() {
-                try store.upsert(unread: unread, userID: userID)
-                syncedCount += 1
-                inflight -= 1
-                fill()
-            }
-
-            return syncedCount
+        let unreads = try await mattermostBoundedConcurrentMap(channels, width: width) { channel in
+            let unread = try await client.channelUnread(userID: userID, channelID: channel.id)
+            try store.upsert(unread: unread, userID: userID)
+            return unread
         }
+        return unreads.count
+    }
+}
+
+private struct ConditionalList<Value: Sendable>: Sendable {
+    let values: [Value]
+    let wasModified: Bool
+}
+
+private extension MattermostCachedTeam {
+    var mattermostModel: MattermostTeam {
+        MattermostTeam(
+            id: id,
+            name: name,
+            displayName: displayName,
+            description: descriptionText,
+            type: type
+        )
+    }
+}
+
+private extension MattermostCachedChannel {
+    var mattermostModel: MattermostChannel {
+        MattermostChannel(
+            id: id,
+            createAt: createAt,
+            updateAt: updateAt,
+            teamId: teamId,
+            name: name,
+            displayName: displayName,
+            type: type,
+            header: header,
+            purpose: purpose,
+            deleteAt: deleteAt,
+            totalMsgCount: totalMsgCount,
+            totalMsgCountRoot: totalMsgCountRoot,
+            lastPostAt: lastPostAt,
+            lastRootPostAt: lastRootPostAt
+        )
+    }
+}
+
+private extension MattermostCachedSidebarCategory {
+    var mattermostModel: MattermostSidebarCategory {
+        MattermostSidebarCategory(
+            id: id,
+            userId: userId,
+            teamId: teamId,
+            displayName: displayName,
+            type: type,
+            sortOrder: sortOrder,
+            channelIds: channelIds,
+            sorting: sorting,
+            muted: muted,
+            collapsed: collapsed
+        )
     }
 }
 
