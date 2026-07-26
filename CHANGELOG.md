@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Cached thread inbox rows are now removed when their root posts are pruned or their channel
+  content is deleted, preventing stale unread threads and unbounded cache growth.
 - Channel deletion now removes cached channel memberships, preventing live
   `channel_deleted` events from leaving orphaned membership rows.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
