@@ -1,3 +1,4 @@
+// SwiftData's PersistentModel conformances are not yet Sendable-audited on our minimum deployment targets; remove @preconcurrency once they are.
 @preconcurrency import SwiftData
 
 /// The first released shape of the MattermostSwift cache.

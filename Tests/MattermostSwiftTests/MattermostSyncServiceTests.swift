@@ -10,7 +10,7 @@ func syncServiceHydratesStoreCursorsAndBoundedUnreadRefresh() async throws {
         serverURL: try #require(URL(string: "https://mattermost.example.com")),
         token: "token",
         urlSession: await MattermostTestSupport.urlSession { request in
-            try tracker.response(for: request)
+            try await tracker.response(for: request)
         }
     )
     let store = try MattermostStore(inMemory: true)
@@ -43,18 +43,18 @@ func syncServiceHydratesStoreCursorsAndBoundedUnreadRefresh() async throws {
     #expect(cursor.lastSyncAt == result.teamCursorLastSyncAt)
     #expect(try store.cachedPosts(channelID: "channel-1").map(\.id) == ["post-3", "post-2", "post-1"])
     #expect(try store.cachedSidebarCategories(teamID: "team-1").map(\.id) == ["category-1"])
-    #expect(tracker.maxConcurrentUnreadRequests <= 4)
+    #expect(tracker.maxConcurrentUnreadRequests == 4)
 }
 
 @MainActor
 @Test
 func syncServiceFetchesAndCachesEveryChannelUserPage() async throws {
-    let tracker = MattermostSyncServiceRequestTracker(channelUserPageSizes: [60, 2])
+    let tracker = MattermostSyncServiceRequestTracker(channelUserPageSizes: [60, 2], requiredUnreadOverlap: 1)
     let client = try MattermostClient(
         serverURL: try #require(URL(string: "https://mattermost.example.com")),
         token: "token",
         urlSession: await MattermostTestSupport.urlSession { request in
-            try tracker.response(for: request)
+            try await tracker.response(for: request)
         }
     )
     let store = try MattermostStore(inMemory: true)
@@ -86,7 +86,7 @@ func syncServiceResolvesTeamByNameAndInferredChannels() async throws {
         serverURL: try #require(URL(string: "https://mattermost.example.com")),
         token: "token",
         urlSession: await MattermostTestSupport.urlSession { request in
-            try MattermostSyncServiceRequestTracker().response(for: request)
+            try await MattermostSyncServiceRequestTracker().response(for: request)
         }
     )
     let namedStore = try MattermostStore(inMemory: true)
@@ -101,7 +101,7 @@ func syncServiceResolvesTeamByNameAndInferredChannels() async throws {
         serverURL: try #require(URL(string: "https://mattermost.example.com")),
         token: "token",
         urlSession: await MattermostTestSupport.urlSession { request in
-            try MattermostSyncServiceRequestTracker().response(for: request)
+            try await MattermostSyncServiceRequestTracker().response(for: request)
         }
     )
     let inferredStore = try MattermostStore(inMemory: true)
@@ -130,12 +130,16 @@ func syncServicePropagatesPartialHTTPFailure() async throws {
                     request: request
                 )
             }
-            return try MattermostSyncServiceRequestTracker().response(for: request)
+            return try await MattermostSyncServiceRequestTracker().response(for: request)
         }
     )
     let store = try MattermostStore(inMemory: true)
 
-    await #expect(throws: MattermostError.httpStatus(code: 503, message: "status unavailable")) {
+    await #expect(throws: MattermostError.httpStatus(
+        code: 503,
+        message: "status unavailable",
+        apiError: MattermostAPIErrorBody(message: "status unavailable")
+    )) {
         _ = try await client.syncService().sync(to: store)
     }
 }
@@ -143,25 +147,34 @@ func syncServicePropagatesPartialHTTPFailure() async throws {
 private final class MattermostSyncServiceRequestTracker: @unchecked Sendable {
     private let lock = NSLock()
     private let channelUserPageSizes: [Int]?
+    private let unreadRequestGate: MattermostUnreadRequestGate
     private var unreadRequestsInFlight = 0
-    private(set) var maxConcurrentUnreadRequests = 0
+    private var maxConcurrentUnreadRequestsStorage = 0
     private var storedChannelUserRequests: [(page: Int, perPage: Int)] = []
 
-    init(channelUserPageSizes: [Int]? = nil) {
+    /// `requiredUnreadOverlap` is the number of unread requests the gate holds before releasing.
+    /// Tests that do not refresh unread for every joined channel must lower it or the single
+    /// unread request blocks forever.
+    init(channelUserPageSizes: [Int]? = nil, requiredUnreadOverlap: Int = 4) {
         self.channelUserPageSizes = channelUserPageSizes
+        unreadRequestGate = MattermostUnreadRequestGate(requiredOverlap: requiredUnreadOverlap)
     }
 
     var channelUserRequests: [(page: Int, perPage: Int)] {
         lock.withLock { storedChannelUserRequests }
     }
 
-    func response(for request: URLRequest) throws -> (HTTPURLResponse, Data) {
+    var maxConcurrentUnreadRequests: Int {
+        lock.withLock { maxConcurrentUnreadRequestsStorage }
+    }
+
+    func response(for request: URLRequest) async throws -> (HTTPURLResponse, Data) {
         let path = request.url?.path ?? ""
         let absoluteString = request.url?.absoluteString ?? ""
 
         if path.contains("/unread") {
             beginUnreadRequest()
-            Thread.sleep(forTimeInterval: 0.02)
+            await unreadRequestGate.waitUntilRequiredOverlap()
             endUnreadRequest()
         }
 
@@ -250,13 +263,42 @@ private final class MattermostSyncServiceRequestTracker: @unchecked Sendable {
     private func beginUnreadRequest() {
         lock.withLock {
             unreadRequestsInFlight += 1
-            maxConcurrentUnreadRequests = max(maxConcurrentUnreadRequests, unreadRequestsInFlight)
+            maxConcurrentUnreadRequestsStorage = max(
+                maxConcurrentUnreadRequestsStorage,
+                unreadRequestsInFlight
+            )
         }
     }
 
     private func endUnreadRequest() {
         lock.withLock {
             unreadRequestsInFlight -= 1
+        }
+    }
+}
+
+private actor MattermostUnreadRequestGate {
+    private let requiredOverlap: Int
+    private var isReleased = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(requiredOverlap: Int) {
+        self.requiredOverlap = requiredOverlap
+    }
+
+    func waitUntilRequiredOverlap() async {
+        guard !isReleased else { return }
+
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+            guard waiters.count == requiredOverlap else { return }
+
+            isReleased = true
+            let continuations = waiters
+            waiters.removeAll()
+            for continuation in continuations {
+                continuation.resume()
+            }
         }
     }
 }
