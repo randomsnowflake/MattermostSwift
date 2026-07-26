@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Live sync now skips SwiftData saves for non-mutating events such as typing indicators and
+  coalesces event application plus refresh results into at most one save per applied event.
 - **Source-breaking:** `MattermostCachedPostSnapshot` now exposes `propsJSON` and
   `metadataJSON` instead of eagerly decoded `props` and `metadata`. Snapshot creation performs no
   JSON decoding; call the new throwing `decodedProps()` and `decodedMetadata()` methods on demand.
