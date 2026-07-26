@@ -232,7 +232,13 @@ public struct MattermostLiveSyncService: Sendable {
     ///
     /// The returned sequence performs a bounded REST sync before the first socket connection and
     /// after reconnect gaps that meet `options.minimumBackfillGap`, then applies typed live events
-    /// into `store` as they arrive. Cancelling iteration shuts down the underlying WebSocket task.
+    /// into `store` as they arrive.
+    ///
+    /// Host apps should consume this sequence from a task whose lifetime matches their active
+    /// foreground scene. Cancel that task when the scene enters the background; cancellation
+    /// terminates reconnect/backfill work and closes the underlying WebSocket. Create a new
+    /// sequence when the scene becomes active again so the normal connect-time backfill runs
+    /// before live delivery resumes.
     @MainActor
     public func events(
         to store: MattermostStore,

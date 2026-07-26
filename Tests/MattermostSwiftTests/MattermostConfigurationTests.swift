@@ -380,6 +380,17 @@ func defaultSessionDoesNotPersistOrAcceptCookies() {
 }
 
 @Test
+func defaultSessionsAllowConstrainedAndExpensiveNetworkPaths() {
+    let restConfiguration = URLSession.mattermost.configuration
+    let liveConfiguration = URLSession.mattermostLiveEvents.configuration
+
+    #expect(restConfiguration.allowsConstrainedNetworkAccess)
+    #expect(restConfiguration.allowsExpensiveNetworkAccess)
+    #expect(liveConfiguration.allowsConstrainedNetworkAccess)
+    #expect(liveConfiguration.allowsExpensiveNetworkAccess)
+}
+
+@Test
 func httpClientBuildsTeamRequests() throws {
     let configuration = try MattermostConfiguration(
         serverURL: #require(URL(string: "https://mattermost.example.com")),

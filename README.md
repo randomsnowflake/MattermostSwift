@@ -166,6 +166,51 @@ fan-out when the socket was down for less than 10 seconds by default, avoiding a
 refresh after a momentary network flap. Set `MattermostLiveSyncOptions.minimumBackfillGap` to
 another `Duration`, or set it to `nil` to backfill on every reconnect.
 
+### App lifecycle and network cost
+
+Live sync is foreground-owned work. A host app must stop consuming the live stream when its
+scene enters the background and start a new stream when the scene becomes active. Cancelling the
+consuming task cancels reconnect/backfill work and closes the WebSocket; the new stream performs
+its normal REST backfill before reconnecting, recovering events missed while backgrounded.
+
+SwiftUI can make the scene phase the task identity:
+
+```swift
+@Environment(\.scenePhase) private var scenePhase
+
+var body: some View {
+    ContentView()
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+
+            do {
+                for try await event in client.liveSyncService().events(to: store) {
+                    updateConnectionUI(with: event)
+                }
+            } catch is CancellationError {
+                // Expected when SwiftUI replaces the task on a scene-phase change.
+            } catch {
+                presentLiveSyncError(error)
+            }
+        }
+}
+```
+
+UIKit/AppKit hosts should keep the consuming `Task`, call `cancel()` from their background
+lifecycle callback, discard it, and create a new task on activation. Do not extend the live
+stream with an iOS background task merely to keep heartbeats or reconnect backfill running.
+
+The default REST session currently allows Low Data Mode (constrained) and expensive network
+paths, including paginated post history and live-sync backfill. This is deliberate: REST
+authentication, interactive message operations, unread refresh, and bulk history currently share
+one injectable session, so disabling constrained access there would also disable interactive
+operations and turn catch-up into a transport failure rather than a reliably deferred transfer.
+Hosts that want a whole-REST Low Data Mode policy can inject a `URLSession` whose configuration
+sets `allowsConstrainedNetworkAccess = false` (and, if desired,
+`allowsExpensiveNetworkAccess = false`), while passing a separate unconstrained
+`webSocketURLSession`. MattermostSwift does not currently classify only bulk-history requests for
+a different transport policy.
+
 ## Authentication
 
 Use a Mattermost personal access token when possible:

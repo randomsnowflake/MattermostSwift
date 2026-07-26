@@ -6,6 +6,10 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Added and documented the supported app-lifecycle contract for live events and live sync: hosts cancel the
+  consuming task on background and create a fresh stream on activation, triggering normal
+  connect-time backfill. Also made explicit the deliberate default of allowing bulk REST history
+  on Low Data Mode/expensive paths and documented the injectable whole-REST alternative.
 - `MattermostSwiftCLI --help` and empty invocations now print help without requiring
   Mattermost credentials. Unknown or malformed commands report a specific diagnostic
   on stderr and exit with status 2 instead of printing help and exiting successfully.

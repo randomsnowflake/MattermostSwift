@@ -291,6 +291,25 @@ let options = MattermostLiveSyncOptions(
 
 The CLI includes live reconnect checks for this path: `reconnect-backfill-test` proves cursor-based missed-post recovery directly through REST sync, `live-sync-reconnect-test` drives `MattermostLiveSyncService` through a reconnect lifecycle while verifying the second backfill returns and caches a post created while disconnected, and `all-channel-reconnect-test` repeats that reconnect proof with `backfillAllJoinedChannelPosts` enabled.
 
+### Stop live sync while backgrounded
+
+The host owns live-sync lifetime. Cancel the task consuming `events(to:...)` when its scene enters
+the background, then create a new stream and task when the scene becomes active. Cancellation
+stops refresh/backfill and reconnect work and closes the WebSocket. Starting again runs the normal
+connect-time backfill before live events resume.
+
+In SwiftUI, use `scenePhase` as the identity of a `.task(id:)` and return immediately unless the
+phase is `.active`; SwiftUI cancels the old consuming task when the phase changes. UIKit and AppKit
+hosts should store the consuming `Task`, cancel and discard it from their background callback,
+then replace it on activation. Do not use an iOS background task solely to keep live-sync
+heartbeats running.
+
+The default REST transport permits constrained and expensive network access, including bulk post
+history. MattermostSwift does not currently route bulk history separately because the same
+injectable session also carries interactive REST calls. Hosts may inject a REST `URLSession` with
+`allowsConstrainedNetworkAccess = false` and pass a separate unconstrained
+`webSocketURLSession` when blocking all REST work in Low Data Mode matches their product policy.
+
 ## Protect Cached Content At Rest
 
 The SwiftData cache contains message bodies, user and channel names, and file metadata. Disk-backed

@@ -15,6 +15,7 @@ declared in `Package.swift` covered without requiring simulators, signing, or li
 The current unit tests cover:
 
 - server URL normalization,
+- explicit default allowance of Low Data Mode/constrained and expensive network paths,
 - environment credential validation,
 - username/password login request construction and environment validation,
 - bearer-token redaction in session, authentication, and configuration descriptions,
@@ -42,6 +43,7 @@ The current unit tests cover:
   projection, backfill failure diagnostics, capped/all-channel backfill selection, live-event
   application into SwiftData, unread refresh on `post_unread` and `multiple_channels_viewed`
   invalidations, and thread-state refresh on thread invalidation,
+- host-task cancellation propagation through live sync to the injected WebSocket lifecycle,
 - complete channel-user profile hydration across mocked multi-page responses,
 - SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, dependent thread cleanup during post pruning and channel-content deletion, timestamp merge policy, sync cursors, conditional-list ETags, and configurable disk-store permissions/file protection,
 - restrictive default and custom CLI cache-directory creation,
