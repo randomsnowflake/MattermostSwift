@@ -1551,14 +1551,17 @@ extension MattermostSwiftCLI {
     }
 
 
-    static func resolvedStoreURL() throws -> URL {
-        let fileManager = FileManager.default
+    static func resolvedStoreURL(
+        fileManager: FileManager = .default,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        currentDirectoryURL: URL? = nil
+    ) throws -> URL {
         let url: URL
 
-        if let rawPath = ProcessInfo.processInfo.environment["MATTERMOST_STORE_PATH"], !rawPath.isEmpty {
+        if let rawPath = environment["MATTERMOST_STORE_PATH"], !rawPath.isEmpty {
             url = URL(fileURLWithPath: rawPath).standardizedFileURL
         } else {
-            let currentDirectory = URL(
+            let currentDirectory = currentDirectoryURL ?? URL(
                 fileURLWithPath: fileManager.currentDirectoryPath,
                 isDirectory: true
             )
@@ -1569,7 +1572,16 @@ extension MattermostSwiftCLI {
         }
 
         let directory = url.deletingLastPathComponent()
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        let permissions = NSNumber(value: UInt16(0o700))
+        try fileManager.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: permissions]
+        )
+        try fileManager.setAttributes(
+            [.posixPermissions: permissions],
+            ofItemAtPath: directory.path
+        )
         return url
     }
 

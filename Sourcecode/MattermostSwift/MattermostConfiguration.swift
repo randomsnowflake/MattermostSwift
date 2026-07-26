@@ -1,7 +1,9 @@
 import Foundation
 
 /// Configuration for a single Mattermost server and account.
-public struct MattermostConfiguration: Sendable {
+///
+/// Its textual descriptions redact bearer-token authentication.
+public struct MattermostConfiguration: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     public let serverURL: URL
     public let apiBaseURL: URL
     public let webSocketURL: URL
@@ -43,12 +45,33 @@ public struct MattermostConfiguration: Sendable {
         webSocketURL = try normalizedServerURL.mattermostWebSocketURL()
         self.authentication = authentication
     }
+
+    public var description: String {
+        "MattermostConfiguration(serverURL: \(serverURL), apiBaseURL: \(apiBaseURL), webSocketURL: \(webSocketURL), authentication: \(authentication))"
+    }
+
+    public var debugDescription: String {
+        description
+    }
 }
 
 /// Authentication modes supported by the SDK.
-public enum MattermostAuthentication: Sendable, Equatable {
+public enum MattermostAuthentication: Sendable, Equatable, CustomStringConvertible, CustomDebugStringConvertible {
     case none
     case bearerToken(String)
+
+    public var description: String {
+        switch self {
+        case .none:
+            "MattermostAuthentication.none"
+        case .bearerToken:
+            "MattermostAuthentication.bearerToken(<redacted>)"
+        }
+    }
+
+    public var debugDescription: String {
+        description
+    }
 }
 
 private extension URL {
