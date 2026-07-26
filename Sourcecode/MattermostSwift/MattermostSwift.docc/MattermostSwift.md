@@ -57,6 +57,8 @@ try await client.logoutCurrentSession()
 ```
 
 `MattermostSession.tokenSource` reports whether Mattermost returned the documented `Token` response header or the browser-compatible `MMAUTHTOKEN` cookie. The login request sends Mattermost's web-client `X-Requested-With: XMLHttpRequest` header so deployments that attach browser session cookies can be handled without storing the password in the SDK.
+
+The textual and debug descriptions of `MattermostSession`, `MattermostAuthentication`, and `MattermostConfiguration` redact bearer tokens. Hosts must still store returned tokens securely and avoid logging the `token` property directly.
 `logoutCurrentSession()` is best-effort remote cleanup for password-login sessions; discard the
 local token even if it fails, and do not expect a personal access token to be accepted.
 

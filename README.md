@@ -159,6 +159,8 @@ try await client.logoutCurrentSession()
 ```
 
 Store any returned token in your app's secure storage, such as Keychain on Apple platforms.
+The textual and debug descriptions of sessions, authentication values, and configurations
+redact bearer tokens so logging those values does not expose credentials.
 `logoutCurrentSession()` revokes Mattermost server sessions; hosts should still discard their
 local token even if remote cleanup fails. Personal access tokens may not be accepted by this endpoint.
 
@@ -234,6 +236,8 @@ The library target also includes a DocC quick-start article at `Sourcecode/Matte
 own main-actor boundary, and perform cache mutations through store APIs. Joined channels,
 memberships, sidebar categories, and unread rows are reconciled only from complete scoped server
 responses, so an empty response can safely remove stale local rows for that scope.
+Post pruning and channel-content deletion also remove reactions, files, and cached thread inbox
+state rooted at the deleted posts.
 For work outside that actor, use `cachedUserSnapshots()`, `cachedChannelSnapshots()`, or
 `cachedPostSnapshots(...)`; these immutable `Sendable` values do not retain a SwiftData context.
 Post snapshots carry `propsJSON` and `metadataJSON` without decoding them while the store is on the
