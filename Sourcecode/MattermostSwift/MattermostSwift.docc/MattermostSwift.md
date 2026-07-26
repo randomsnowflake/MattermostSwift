@@ -163,6 +163,26 @@ Use `lifecycleEvents()` when the host needs transport diagnostics as well as raw
 Undecodable event frames yield `MattermostLiveEventStreamLifecycleEvent.eventDecodeFailed`
 with structured failure details, then the stream continues reading from the same connection.
 
+Deployments that require custom server-trust evaluation can pass a `URLSessionDelegate` to the
+client. The SDK installs it on both default sessions, so the same pinning policy protects REST
+bearer headers and the WebSocket authentication challenge:
+
+```swift
+let trustDelegate = EnterpriseMattermostTrustDelegate()
+let client = try MattermostClient(
+    serverURL: serverURL,
+    token: token,
+    urlSessionDelegate: trustDelegate
+)
+```
+
+Implement the delegate's URL authentication-challenge method to evaluate `serverTrust` according
+to your deployment's policy. Do not disable normal trust validation. If you provide
+`urlSession` or `webSocketURLSession` explicitly, configure that session with its delegate before
+passing it to the client. `URLSession.mattermost(delegate:)` and
+`URLSession.mattermostLiveEvents(delegate:)` expose the same hook for callers that construct
+sessions directly.
+
 Mattermost API failures preserve the server's structured error body:
 
 ```swift
@@ -282,4 +302,55 @@ directory and the parent directory of `MATTERMOST_STORE_PATH` with owner-only pe
 
 ## Keep Secrets Outside The SDK
 
-The SDK does not write credentials to Keychain or local storage. Host apps should provide tokens at startup, store credentials according to their own security model, and avoid logging token values.
+The SDK does not write credentials to Keychain or local storage. Host apps should provide tokens
+at startup and avoid logging token values. On Apple platforms, store a device-bound token in
+Keychain with an explicit accessibility class:
+
+```swift
+import Foundation
+import Security
+
+struct KeychainSaveError: Error {
+    let status: OSStatus
+}
+
+func storeMattermostToken(_ token: String, account: String) throws {
+    var query: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrService as String: "com.example.app.mattermost",
+        kSecAttrAccount as String: account,
+    ]
+#if os(macOS)
+    query[kSecUseDataProtectionKeychain as String] = true
+#endif
+
+    let tokenData = Data(token.utf8)
+    let protectedValues: [String: Any] = [
+        kSecValueData as String: tokenData,
+        kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+    ]
+    let updateStatus = SecItemUpdate(
+        query as CFDictionary,
+        protectedValues as CFDictionary
+    )
+    if updateStatus == errSecSuccess {
+        return
+    }
+    guard updateStatus == errSecItemNotFound else {
+        throw KeychainSaveError(status: updateStatus)
+    }
+
+    query.merge(protectedValues) { _, newValue in newValue }
+    let addStatus = SecItemAdd(query as CFDictionary, nil)
+    guard addStatus == errSecSuccess else {
+        throw KeychainSaveError(status: addStatus)
+    }
+}
+```
+
+`kSecAttrAccessibleWhenUnlockedThisDeviceOnly` keeps this example's token device-bound and
+available only while unlocked. Choose a different Keychain accessibility class if the host app
+must authenticate during locked-device background work.
+
+Never store bearer tokens in `UserDefaults` or `@AppStorage`; both are plist-backed preference
+storage and are not credential stores.

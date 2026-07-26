@@ -6,6 +6,12 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Added a host-provided `URLSessionDelegate` hook for server-trust evaluation on both default REST
+  and WebSocket sessions, with matching session factories for direct URLSession construction.
+- Bounded WebSocket events buffered during authentication to 256; overflow now reports
+  `MattermostError.liveEventGap` and requires normal reconnect reconciliation.
+- Added concrete Keychain token-storage guidance using
+  `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` and warned against `UserDefaults`/`@AppStorage`.
 - Live sync now skips and reports malformed WebSocket events instead of terminating the stream,
   and surfaces unread, sidebar-category, and thread-state refresh failures to host apps.
 - Malformed WebSocket event frames now emit an `eventDecodeFailed` lifecycle signal before

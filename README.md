@@ -143,7 +143,10 @@ for try await event in client.liveEventStream().events() {
 Default live-event streams use a dedicated long-lived `URLSession` so the bounded HTTP
 resource timeout does not recycle healthy WebSockets. Apps that inject transport sessions can
 pass a separate `webSocketURLSession` to `MattermostClient` when REST and live events need
-different policies.
+different policies. Enterprise deployments can pass `urlSessionDelegate` to install a custom
+server-trust or certificate-pinning policy on both SDK-created sessions; callers constructing
+sessions directly can use `URLSession.mattermost(delegate:)` and
+`URLSession.mattermostLiveEvents(delegate:)`.
 
 Hosts that need connection diagnostics can consume `lifecycleEvents()`. Malformed event frames
 are skipped without disconnecting and yield `eventDecodeFailed` with a
@@ -186,9 +189,11 @@ let client = try session.client(serverURL: URL(string: "https://mattermost.examp
 try await client.logoutCurrentSession()
 ```
 
-Store any returned token in your app's secure storage, such as Keychain on Apple platforms.
-The textual and debug descriptions of sessions, authentication values, and configurations
-redact bearer tokens so logging those values does not expose credentials.
+Store any returned token in your app's secure storage, such as Keychain on Apple platforms; the
+DocC guide includes an add-or-update example using
+`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. Never put bearer tokens in `UserDefaults` or
+`@AppStorage`. The textual and debug descriptions of sessions, authentication values, and
+configurations redact bearer tokens so logging those values does not expose credentials.
 `logoutCurrentSession()` revokes Mattermost server sessions; hosts should still discard their
 local token even if remote cleanup fails. Personal access tokens may not be accepted by this endpoint.
 
@@ -308,9 +313,10 @@ let uploaded = try await client.uploadFile(
 try await client.downloadFile(id: uploaded.fileInfos[0].id, to: destinationURL, maximumSize: 500_000_000)
 ```
 
-Live event streams use finite queues. If a consumer cannot keep up, they finish with
-`MattermostError.liveEventGap`; restart live sync to run its normal authoritative backfill before
-presenting the cache as current.
+Live event streams use finite queues, including a 256-event limit while the WebSocket
+authentication handshake is pending. If a server or consumer overruns a queue, the stream finishes
+with `MattermostError.liveEventGap`; restart live sync to run its normal authoritative backfill
+before presenting the cache as current.
 
 Live sync skips an individual WebSocket event when its embedded payload cannot be decoded and
 emits `eventApplyFailed` so the host can report schema drift without reconnecting. Failed unread,

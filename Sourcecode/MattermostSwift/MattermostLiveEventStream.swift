@@ -306,7 +306,7 @@ public struct MattermostLiveEventStream: Sendable {
         var pendingEvents: [MattermostLiveEvent] = []
         for try await envelope in envelopes {
             if let event = envelope.liveEvent {
-                pendingEvents.append(event)
+                try appendPendingHandshakeEvent(event, to: &pendingEvents)
                 if event.event == MattermostLiveEventName.hello.rawValue {
                     return pendingEvents
                 }
@@ -325,6 +325,18 @@ public struct MattermostLiveEventStream: Sendable {
         throw MattermostError.transportFailure(
             "Mattermost WebSocket closed before authentication completed."
         )
+    }
+
+    static let maximumPendingHandshakeEvents = 256
+
+    static func appendPendingHandshakeEvent(
+        _ event: MattermostLiveEvent,
+        to pendingEvents: inout [MattermostLiveEvent]
+    ) throws {
+        guard pendingEvents.count < maximumPendingHandshakeEvents else {
+            throw MattermostError.liveEventGap
+        }
+        pendingEvents.append(event)
     }
 
     private static let connectionStabilityWindow: Duration = .seconds(30)
