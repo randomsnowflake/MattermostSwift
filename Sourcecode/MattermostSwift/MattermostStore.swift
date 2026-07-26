@@ -3,9 +3,14 @@ import SwiftData
 
 /// SwiftData-backed cache for Mattermost objects used by app targets and the CLI.
 ///
-/// Host apps own retention policy. Use pruning helpers such as
-/// `prunePosts(channelID:keepCount:)` and `deleteChannelContent(channelID:)` during
-/// background maintenance or channel lifecycle events to keep long-lived stores bounded.
+/// Every store operation is main-actor isolated and uses the container's main context. This
+/// includes fetches, sync/live-sync writes, and retention helpers; the store does not provide a
+/// background `ModelContext`. Run potentially large scans only when a main-thread hitch is
+/// acceptable.
+///
+/// Host apps own retention policy. A practical cadence is to prune after initial hydration and
+/// then about once per day during an app-controlled idle window. Delete channel content when a
+/// channel leaves the host's retention scope.
 @MainActor
 public final class MattermostStore {
     private static let batchedFetchIDLimit = 500
@@ -234,11 +239,6 @@ public final class MattermostStore {
         for channel in existing where !retained.contains(channel.id) {
             let channelID = channel.id
             try deleteChannelContent(channelID: channelID)
-            for member in try context.fetch(FetchDescriptor<MattermostCachedChannelMember>(
-                predicate: #Predicate { $0.channelId == channelID }
-            )) {
-                context.delete(member)
-            }
             context.delete(channel)
         }
     }
@@ -722,6 +722,9 @@ public final class MattermostStore {
     }
 
     /// Returns immutable post values that can safely be retained or sent to another actor.
+    ///
+    /// Post props and metadata remain as raw JSON on each snapshot. Use the snapshot's
+    /// throwing decode helpers only when a consumer needs those values.
     public func cachedPostSnapshots(
         channelID: String,
         limit: Int? = nil,
@@ -829,6 +832,10 @@ public final class MattermostStore {
         }
     }
 
+    /// Keeps the newest posts in a channel and deletes older cached post content.
+    ///
+    /// This method scans the channel on the main actor. Call it only when a main-thread hitch is
+    /// acceptable, such as an app-controlled idle window.
     public func prunePosts(channelID: String, keepCount: Int = 200) throws {
         let keepCount = max(0, keepCount)
         let posts = try cachedPosts(channelID: channelID, includeDeleted: true)
@@ -839,6 +846,10 @@ public final class MattermostStore {
         }
     }
 
+    /// Deletes cached posts and unread state for a channel.
+    ///
+    /// This method scans the channel on the main actor. Call it only when a main-thread hitch is
+    /// acceptable, typically when the channel leaves the host's retention scope.
     public func deleteChannelContent(channelID: String) throws {
         let posts = try cachedPosts(channelID: channelID, includeDeleted: true)
 
@@ -849,6 +860,11 @@ public final class MattermostStore {
             predicate: #Predicate { $0.channelId == channelID }
         )) {
             context.delete(unread)
+        }
+        for member in try context.fetch(FetchDescriptor<MattermostCachedChannelMember>(
+            predicate: #Predicate { $0.channelId == channelID }
+        )) {
+            context.delete(member)
         }
         try deleteCachedPostContent(postIDs: posts.map(\.id))
     }
@@ -868,6 +884,11 @@ public final class MattermostStore {
             })
         }) {
             context.delete(file)
+        }
+        for thread in try fetchInBatches(ids: postIDs, descriptor: { chunkIDs in
+            FetchDescriptor<MattermostCachedThread>(predicate: #Predicate { chunkIDs.contains($0.rootId) })
+        }) {
+            context.delete(thread)
         }
     }
 
@@ -937,25 +958,43 @@ public final class MattermostStore {
 
     @discardableResult
     public func apply(liveEvent: MattermostLiveEvent) throws -> MattermostTypedLiveEvent {
+        try applyReportingMutation(liveEvent: liveEvent).typedEvent
+    }
+
+    // Report mutation from the same exhaustive switch that applies the event so live-sync
+    // persistence cannot drift from this method's no-op cases.
+    func applyReportingMutation(
+        liveEvent: MattermostLiveEvent
+    ) throws -> MattermostLiveEventApplication {
         let typedEvent = try liveEvent.typedEvent()
+        let mutatesStore: Bool
 
         switch typedEvent {
         case .posted(let post), .postEdited(let post):
             try upsert(post: post)
+            mutatesStore = true
         case .postDeleted(let post):
             if let post {
                 try upsert(post: post)
+                mutatesStore = true
             } else if let postID = liveEvent.stringData("post_id") ?? liveEvent.stringData("postId") {
+                let cachedPostExists = try cachedPost(id: postID) != nil
                 let deletedAt = liveEvent.int64Data("delete_at")
                     ?? liveEvent.int64Data("deleteAt")
                     ?? liveEvent.int64Data("update_at")
                     ?? liveEvent.int64Data("updateAt")
                     ?? Int64(Date.now.timeIntervalSince1970 * 1000)
                 try markPostDeleted(id: postID, at: deletedAt)
+                mutatesStore = cachedPostExists
+            } else {
+                mutatesStore = false
             }
         case .reactionAdded(let reaction):
             if let reaction {
                 try upsert(reaction: reaction)
+                mutatesStore = true
+            } else {
+                mutatesStore = false
             }
         case .reactionRemoved(let reaction):
             if let reaction {
@@ -964,7 +1003,11 @@ public final class MattermostStore {
                     postID: reaction.postId,
                     emojiName: reaction.emojiName
                 )
+                let cachedReactionExists = try cachedReaction(id: id) != nil
                 try deleteCachedReaction(id: id)
+                mutatesStore = cachedReactionExists
+            } else {
+                mutatesStore = false
             }
         case .statusChange(let statusChange):
             if let userID = statusChange.userID, let status = statusChange.status {
@@ -979,27 +1022,45 @@ public final class MattermostStore {
                 } else {
                     context.insert(cachedStatus)
                 }
+                mutatesStore = true
+            } else {
+                mutatesStore = false
             }
         case .channelCreated(let channel), .channelUpdated(let channel):
             if let channel {
                 try upsert(channel: channel)
+                mutatesStore = true
+            } else {
+                mutatesStore = false
             }
         case .channelDeleted(let channel, let channelID):
             if let channel {
                 try upsert(channel: channel)
                 try markChannelDeleted(id: channel.id, at: channel.deleteAt ?? Int64(Date.now.timeIntervalSince1970 * 1000))
                 try deleteChannelContent(channelID: channel.id)
+                mutatesStore = true
             } else if let channelID {
+                let cachedChannelExists = try cachedChannel(id: channelID, includeDeleted: true) != nil
+                let cachedContentExists = !(try cachedPosts(channelID: channelID, includeDeleted: true)).isEmpty
                 try markChannelDeleted(id: channelID)
                 try deleteChannelContent(channelID: channelID)
+                mutatesStore = cachedChannelExists || cachedContentExists
+            } else {
+                mutatesStore = false
             }
         case .channelMemberUpdated(let member):
             if let member {
                 try upsert(member: member)
+                mutatesStore = true
+            } else {
+                mutatesStore = false
             }
         case .userUpdated(let user):
             if let user {
                 try upsert(user: user)
+                mutatesStore = true
+            } else {
+                mutatesStore = false
             }
         case .hello,
              .typing,
@@ -1014,9 +1075,17 @@ public final class MattermostStore {
              .threadReadChanged,
              .cacheInvalidated,
              .unknown:
-            break
+            mutatesStore = false
         }
 
-        return typedEvent
+        return MattermostLiveEventApplication(
+            typedEvent: typedEvent,
+            mutatesStore: mutatesStore
+        )
     }
+}
+
+struct MattermostLiveEventApplication {
+    let typedEvent: MattermostTypedLiveEvent
+    let mutatesStore: Bool
 }

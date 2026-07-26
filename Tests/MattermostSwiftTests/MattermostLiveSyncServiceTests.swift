@@ -293,6 +293,7 @@ func liveSyncAppliesInjectedLifecycleEventsToStore() async throws {
         token: "test-token"
     ).liveSyncService()
     let store = try MattermostStore(inMemory: true)
+    var saveCount = 0
     let posted = MattermostLiveEvent(
         event: "posted",
         data: ["post": .string("""
@@ -325,6 +326,9 @@ func liveSyncAppliesInjectedLifecycleEventsToStore() async throws {
         },
         backfill: { _, teamID, _, _ in
             liveSyncBackfillResult(teamID: teamID ?? "team-1")
+        },
+        save: { _ in
+            saveCount += 1
         }
     )
 
@@ -338,6 +342,58 @@ func liveSyncAppliesInjectedLifecycleEventsToStore() async throws {
     let cachedPost = try #require(try store.cachedPost(id: "post-1"))
     #expect(appliedPostID == "post-1")
     #expect(cachedPost.message == "hello from live sync")
+    #expect(saveCount == 1)
+}
+
+@MainActor
+@Test
+func liveSyncDoesNotSaveForTypingEvent() async throws {
+    let service = try MattermostClient(
+        serverURL: try #require(URL(string: "https://mattermost.example.com")),
+        token: "test-token"
+    ).liveSyncService()
+    let store = try MattermostStore(inMemory: true)
+    let typing = MattermostLiveEvent(
+        event: "typing",
+        data: [
+            "user_id": .string("user-1"),
+            "channel_id": .string("channel-1"),
+            "parent_id": .string("root-1"),
+        ],
+        broadcast: nil,
+        seq: 2
+    )
+    var saveCount = 0
+
+    let stream = service.events(
+        to: store,
+        lifecycleEvents: {
+            AsyncThrowingStream { continuation in
+                continuation.yield(.event(typing))
+                continuation.finish()
+            }
+        },
+        backfill: { _, teamID, _, _ in
+            liveSyncBackfillResult(teamID: teamID ?? "team-1")
+        },
+        save: { _ in
+            saveCount += 1
+        }
+    )
+
+    var appliedTyping: MattermostTypingEvent?
+    for try await event in stream {
+        if case .eventApplied(_, .typing(let typingEvent)) = event {
+            appliedTyping = typingEvent
+        }
+    }
+
+    #expect(appliedTyping == MattermostTypingEvent(
+        userID: "user-1",
+        channelID: "channel-1",
+        parentID: "root-1"
+    ))
+    #expect(saveCount == 0)
 }
 
 @MainActor
@@ -358,6 +414,7 @@ func liveSyncRefreshesUnreadOnPostUnreadInvalidation() async throws {
         seq: 2
     )
     var unreadRefreshes: [(userID: String, channelID: String)] = []
+    var saveCount = 0
 
     let stream = service.events(
         to: store,
@@ -382,6 +439,9 @@ func liveSyncRefreshesUnreadOnPostUnreadInvalidation() async throws {
                 msgCountRoot: nil,
                 mentionCountRoot: nil
             )
+        },
+        save: { _ in
+            saveCount += 1
         }
     )
 
@@ -410,6 +470,7 @@ func liveSyncRefreshesUnreadOnPostUnreadInvalidation() async throws {
     #expect(refreshedUnread?.msgCount == 4)
     #expect(cachedUnread.msgCount == 4)
     #expect(cachedUnread.mentionCount == 1)
+    #expect(saveCount == 1)
 }
 
 @MainActor

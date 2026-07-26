@@ -57,6 +57,8 @@ try await client.logoutCurrentSession()
 ```
 
 `MattermostSession.tokenSource` reports whether Mattermost returned the documented `Token` response header or the browser-compatible `MMAUTHTOKEN` cookie. The login request sends Mattermost's web-client `X-Requested-With: XMLHttpRequest` header so deployments that attach browser session cookies can be handled without storing the password in the SDK.
+
+The textual and debug descriptions of `MattermostSession`, `MattermostAuthentication`, and `MattermostConfiguration` redact bearer tokens. Hosts must still store returned tokens securely and avoid logging the `token` property directly.
 `logoutCurrentSession()` is best-effort remote cleanup for password-login sessions; discard the
 local token even if it fails, and do not expect a personal access token to be accepted.
 
@@ -87,6 +89,22 @@ func hydrate(client: MattermostClient, storeURL: URL) async throws {
 ```
 
 `MattermostSyncService` stores joined teams, the current user, status, joined channels, memberships, unread counts, sidebar categories, and optional channel timelines. Cursor-based follow-up syncs use Mattermost's `since` timestamp query where possible. Per-channel notification settings are available as `MattermostChannelNotifyProps`, which exposes common Mattermost keys and keeps unknown server keys intact.
+
+All `MattermostStore` operations use `ModelContainer.mainContext` and are main-actor isolated.
+That contract also covers sync and live-sync cache writes, cached fetches, `prunePosts`, and
+`deleteChannelContent`; the package has no background model context. Network requests suspend
+normally, but SwiftData work resumes on the main actor, so large caches can produce a visible UI
+hitch. Schedule large sync and retention passes only during an app-controlled idle window where
+that tradeoff is acceptable.
+
+Host apps own retention policy. A reasonable starting cadence is to prune retained channels after
+initial hydration and then about once per day during an idle window. Delete a channel's cached
+content when it leaves the app's retention scope. To use cached values from another actor, create
+immutable `Sendable` values with `cachedUserSnapshots()`, `cachedChannelSnapshots()`, or
+`cachedPostSnapshots(...)`; snapshots do not move store access itself off the main actor.
+`cachedPostSnapshots(...)` copies props and metadata as `propsJSON` and `metadataJSON` without
+decoding every post. Consumers that need those payloads can call the snapshot's throwing
+`decodedProps()` and `decodedMetadata()` helpers on demand.
 
 ## Work With Timelines
 

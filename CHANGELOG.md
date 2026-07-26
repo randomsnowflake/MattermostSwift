@@ -9,6 +9,26 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 - Disk-backed `MattermostStore` caches and CLI cache directories now use owner-only permissions
   by default. iOS stores apply configurable file protection to the directory and SQLite files,
   while macOS hosts retain responsibility for volume-level encryption.
+- Corrected the `MattermostStore` threading documentation: all store, sync, live-sync, and
+  retention work uses the main actor, with host guidance for scheduling potentially expensive
+  pruning and channel cleanup.
+- Live sync now skips SwiftData saves for non-mutating events such as typing indicators and
+  coalesces event application plus refresh results into at most one save per applied event.
+- **Source-breaking:** `MattermostCachedPostSnapshot` now exposes `propsJSON` and
+  `metadataJSON` instead of eagerly decoded `props` and `metadata`. Snapshot creation performs no
+  JSON decoding; call the new throwing `decodedProps()` and `decodedMetadata()` methods on demand.
+- Public channel, post, user, team, timeline-target, sidebar-category, thread, file,
+  reaction, custom-emoji, and immutable cache-snapshot value types now conform to
+  `Hashable` for use in SwiftUI navigation and hash-based collections.
+- `MattermostLiveSyncEvent` now conforms to `Equatable`, enabling direct comparison
+  in host-app live-sync reducer tests.
+- Redacted bearer tokens from the textual and debug descriptions of `MattermostSession`,
+  `MattermostAuthentication`, and `MattermostConfiguration`.
+- Server ping and client-configuration decoding now tolerates key casing and separator drift across Mattermost releases.
+- Cached thread inbox rows are now removed when their root posts are pruned or their channel
+  content is deleted, preventing stale unread threads and unbounded cache growth.
+- Channel deletion now removes cached channel memberships, preventing live
+  `channel_deleted` events from leaving orphaned membership rows.
 - Default live-event streams now use a dedicated long-lived URL session, preventing the
   bounded HTTP session's five-minute resource deadline from recycling healthy WebSockets.
 - WebSocket heartbeats now detect URLSession tasks that CFNetwork cancelled after route loss,
