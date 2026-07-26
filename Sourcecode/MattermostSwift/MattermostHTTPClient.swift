@@ -197,9 +197,11 @@ struct MattermostHTTPClient: Sendable {
         }
 
         guard (200..<300).contains(httpResponse.statusCode) else {
+            let apiError = decodeMattermostAPIError(from: data)
             throw MattermostError.httpStatus(
                 code: httpResponse.statusCode,
-                message: decodeMattermostAPIError(from: data)?.message
+                message: apiError?.message,
+                apiError: apiError
             )
         }
 
@@ -436,11 +438,11 @@ struct MattermostHTTPClient: Sendable {
     }
 
 
-    private func decodeMattermostAPIError(from data: Data) -> MattermostAPIError? {
+    private func decodeMattermostAPIError(from data: Data) -> MattermostAPIErrorBody? {
         guard !data.isEmpty else {
             return nil
         }
-        return try? mattermostSnakeCaseDecoder.decode(MattermostAPIError.self, from: data)
+        return try? mattermostSnakeCaseDecoder.decode(MattermostAPIErrorBody.self, from: data)
     }
 }
 
@@ -482,10 +484,6 @@ struct MattermostMultipartFilePart: Sendable, MattermostMultipartPartProtocol {
         }
         return value
     }
-}
-
-private struct MattermostAPIError: Decodable, Sendable {
-    let message: String?
 }
 
 private extension String {

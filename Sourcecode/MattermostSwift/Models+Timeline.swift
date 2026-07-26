@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Timeline target, request, page, and sync-result models
 
 /// A unified timeline target for channel timelines and thread timelines.
-public enum MattermostTimelineTarget: Equatable, Sendable {
+public enum MattermostTimelineTarget: Equatable, Hashable, Sendable {
     case channel(id: String)
     case thread(rootPostID: String)
 
