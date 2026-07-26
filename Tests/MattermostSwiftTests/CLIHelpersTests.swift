@@ -36,6 +36,49 @@ struct CLIHelpersTests {
         #expect(MattermostSwiftCLI.imageSignature(for: Data()) == "unknown")
     }
 
+    @Test("resolvedStoreURL creates and hardens the default cache directory")
+    func resolvedStoreURLHardensDefaultDirectory() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("MattermostSwiftCLITests-\(UUID().uuidString)", isDirectory: true)
+        let cacheDirectory = root.appendingPathComponent(".mattermostswift", isDirectory: true)
+        try fileManager.createDirectory(
+            at: cacheDirectory,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: NSNumber(value: UInt16(0o755))]
+        )
+        defer { try? fileManager.removeItem(at: root) }
+
+        let url = try MattermostSwiftCLI.resolvedStoreURL(
+            fileManager: fileManager,
+            environment: [:],
+            currentDirectoryURL: root
+        )
+
+        #expect(url == cacheDirectory.appendingPathComponent("MattermostSwift.sqlite"))
+        #expect(try permissions(at: cacheDirectory, fileManager: fileManager) == 0o700)
+    }
+
+    @Test("resolvedStoreURL secures a custom cache directory")
+    func resolvedStoreURLSecuresCustomDirectory() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory
+            .appendingPathComponent("MattermostSwiftCLITests-\(UUID().uuidString)", isDirectory: true)
+        let expectedURL = root
+            .appendingPathComponent("custom", isDirectory: true)
+            .appendingPathComponent("cache.sqlite")
+        defer { try? fileManager.removeItem(at: root) }
+
+        let url = try MattermostSwiftCLI.resolvedStoreURL(
+            fileManager: fileManager,
+            environment: ["MATTERMOST_STORE_PATH": expectedURL.path],
+            currentDirectoryURL: nil
+        )
+
+        #expect(url == expectedURL.standardizedFileURL)
+        #expect(try permissions(at: expectedURL.deletingLastPathComponent(), fileManager: fileManager) == 0o700)
+    }
+
     @Test("Command parses representative argv arrays")
     func commandParsing() {
         #expect(Command(arguments: ["me"]) == .me)
@@ -46,5 +89,11 @@ struct CLIHelpersTests {
         #expect(Command(arguments: ["send-message", "--channel", "chan", "hello", "world"]) == .sendMessage(channelID: "chan", message: "hello world"))
         #expect(Command(arguments: []) == .help)
         #expect(Command(arguments: ["totally-unknown-command"]) == .help)
+    }
+
+    private func permissions(at url: URL, fileManager: FileManager) throws -> UInt16 {
+        let attributes = try fileManager.attributesOfItem(atPath: url.path)
+        let value = try #require(attributes[.posixPermissions] as? NSNumber)
+        return value.uint16Value & 0o777
     }
 }

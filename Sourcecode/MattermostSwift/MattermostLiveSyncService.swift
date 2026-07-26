@@ -83,17 +83,64 @@ public enum MattermostLiveSyncConnectionState: Equatable, Sendable {
 
 /// Host-visible live-sync failure details.
 public struct MattermostLiveSyncFailure: Equatable, Sendable {
+    /// Reconnect attempt whose backfill failed.
     public let attempt: Int
+    /// Error domain of the backfill failure.
+    public let domain: String
+    /// Error code of the backfill failure.
+    public let code: Int
+    /// Domain of the underlying error, when available.
+    public let underlyingDomain: String?
+    /// Code of the underlying error, when available.
+    public let underlyingCode: Int?
+    /// Human-readable failure description.
     public let message: String
+    /// Typed SDK error, when the backfill failed with `MattermostError`.
+    public let mattermostError: MattermostError?
 
-    public init(attempt: Int, message: String) {
+    public init(
+        attempt: Int,
+        domain: String,
+        code: Int,
+        underlyingDomain: String? = nil,
+        underlyingCode: Int? = nil,
+        message: String,
+        mattermostError: MattermostError? = nil
+    ) {
         self.attempt = attempt
+        self.domain = domain
+        self.code = code
+        self.underlyingDomain = underlyingDomain
+        self.underlyingCode = underlyingCode
         self.message = message
+        self.mattermostError = mattermostError
+    }
+
+    public init(attempt: Int, error: any Error) {
+        let nsError = error as NSError
+        let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
+        self.init(
+            attempt: attempt,
+            domain: nsError.domain,
+            code: nsError.code,
+            underlyingDomain: underlying?.domain,
+            underlyingCode: underlying?.code,
+            message: Self.failureMessage(for: error),
+            mattermostError: error as? MattermostError
+        )
+    }
+
+    private static func failureMessage(for error: any Error) -> String {
+        let message = error.localizedDescription
+        if !message.isEmpty {
+            return message
+        }
+        return String(describing: error)
     }
 }
 
 /// Events emitted by `MattermostLiveSyncService`.
-public enum MattermostLiveSyncEvent: Sendable {
+public enum MattermostLiveSyncEvent: Equatable, Sendable {
     case connecting(attempt: Int)
     case backfilled(MattermostLiveBackfillResult)
     case eventApplied(MattermostLiveEvent, MattermostTypedLiveEvent)
@@ -147,6 +194,7 @@ typealias MattermostLiveSyncThreadStateRefresh = @MainActor @Sendable (
     _ teamID: String,
     _ threadID: String
 ) async throws -> MattermostThreadResponse
+typealias MattermostLiveSyncSave = @MainActor @Sendable (_ store: MattermostStore) throws -> Void
 
 /// Keeps a `MattermostStore` updated from WebSocket events with bounded REST backfill.
 public struct MattermostLiveSyncService: Sendable {
@@ -232,7 +280,8 @@ public struct MattermostLiveSyncService: Sendable {
         backfill: @escaping MattermostLiveSyncBackfill,
         refreshUnread: MattermostLiveSyncUnreadRefresh? = nil,
         refreshSidebarCategories: MattermostLiveSyncSidebarRefresh? = nil,
-        refreshThreadState: MattermostLiveSyncThreadStateRefresh? = nil
+        refreshThreadState: MattermostLiveSyncThreadStateRefresh? = nil,
+        save: @escaping MattermostLiveSyncSave = { try $0.save() }
     ) -> AsyncThrowingStream<MattermostLiveSyncEvent, Error> {
         // Host output is bounded independently from socket ingress. A lagging host gets an
         // explicit gap error instead of a silently stale event history; the store itself has
@@ -266,7 +315,7 @@ public struct MattermostLiveSyncService: Sendable {
                             } catch {
                                 try Self.yield(.backfillFailed(MattermostLiveSyncFailure(
                                     attempt: attempt,
-                                    message: Self.failureMessage(for: error)
+                                    error: error
                                 )), to: continuation)
                             }
 
@@ -274,9 +323,8 @@ public struct MattermostLiveSyncService: Sendable {
                             break
 
                         case .event(let event):
-                            let typedEvent = try store.apply(liveEvent: event)
-                            try store.save()
-                            try Self.yield(.eventApplied(event, typedEvent), to: continuation)
+                            let application = try store.applyReportingMutation(liveEvent: event)
+                            let typedEvent = application.typedEvent
 
                             // Membership broadcasts do not carry a complete enough collection to
                             // safely delete locally. Re-run the bounded authoritative sync so a
@@ -359,9 +407,14 @@ public struct MattermostLiveSyncService: Sendable {
                                 }
                             }
 
-                            if !unreadResults.isEmpty || categoriesResult != nil || threadResult != nil {
-                                try store.save()
+                            let refreshMutatedStore =
+                                !unreadResults.isEmpty || categoriesResult != nil || threadResult != nil
+                            if application.mutatesStore || refreshMutatedStore {
+                                try save(store)
+                            }
 
+                            try Self.yield(.eventApplied(event, typedEvent), to: continuation)
+                            if refreshMutatedStore {
                                 for unreadResult in unreadResults {
                                     try Self.yield(.channelUnreadRefreshed(unreadResult), to: continuation)
                                 }
@@ -460,13 +513,6 @@ public struct MattermostLiveSyncService: Sendable {
             .map(\.id)
     }
 
-    private static func failureMessage(for error: any Error) -> String {
-        let message = error.localizedDescription
-        if !message.isEmpty {
-            return message
-        }
-        return String(describing: error)
-    }
 }
 
 /// Lifecycle-level WebSocket events used by live sync orchestration.
