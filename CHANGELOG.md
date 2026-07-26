@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- **Source-breaking:** `MattermostCachedPostSnapshot` now exposes `propsJSON` and
+  `metadataJSON` instead of eagerly decoded `props` and `metadata`. Snapshot creation performs no
+  JSON decoding; call the new throwing `decodedProps()` and `decodedMetadata()` methods on demand.
 - Public channel, post, user, team, timeline-target, sidebar-category, thread, file,
   reaction, custom-emoji, and immutable cache-snapshot value types now conform to
   `Hashable` for use in SwiftUI navigation and hash-based collections.

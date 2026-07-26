@@ -688,6 +688,9 @@ public final class MattermostStore {
     }
 
     /// Returns immutable post values that can safely be retained or sent to another actor.
+    ///
+    /// Post props and metadata remain as raw JSON on each snapshot. Use the snapshot's
+    /// throwing decode helpers only when a consumer needs those values.
     public func cachedPostSnapshots(
         channelID: String,
         limit: Int? = nil,

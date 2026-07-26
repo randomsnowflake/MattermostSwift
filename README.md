@@ -240,6 +240,9 @@ Post pruning and channel-content deletion also remove reactions, files, and cach
 state rooted at the deleted posts.
 For work outside that actor, use `cachedUserSnapshots()`, `cachedChannelSnapshots()`, or
 `cachedPostSnapshots(...)`; these immutable `Sendable` values do not retain a SwiftData context.
+Post snapshots carry `propsJSON` and `metadataJSON` without decoding them while the store is on the
+main actor. Call the snapshot's throwing `decodedProps()` or `decodedMetadata()` helper only in
+views or background work that needs those payloads.
 
 For production-sized attachments, use the file URL overloads instead of materialising the payload:
 

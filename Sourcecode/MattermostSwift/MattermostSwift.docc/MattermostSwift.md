@@ -90,6 +90,11 @@ func hydrate(client: MattermostClient, storeURL: URL) async throws {
 
 `MattermostSyncService` stores joined teams, the current user, status, joined channels, memberships, unread counts, sidebar categories, and optional channel timelines. Cursor-based follow-up syncs use Mattermost's `since` timestamp query where possible. Per-channel notification settings are available as `MattermostChannelNotifyProps`, which exposes common Mattermost keys and keeps unknown server keys intact.
 
+For cache values that need to leave the main actor, use the store's immutable snapshot APIs.
+`cachedPostSnapshots(...)` copies props and metadata as `propsJSON` and `metadataJSON` without
+decoding every post. Consumers that need those payloads can call the snapshot's throwing
+`decodedProps()` and `decodedMetadata()` helpers on demand.
+
 ## Work With Timelines
 
 Use the client's timeline methods for both channel timelines and thread timelines:

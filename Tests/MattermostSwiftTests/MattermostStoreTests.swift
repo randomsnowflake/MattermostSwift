@@ -266,6 +266,118 @@ func storeCachesChannelsPostsAndThreads() throws {
 
 @MainActor
 @Test
+func cachedPostSnapshotsKeepJSONRawAndDecodeOnDemand() throws {
+    let store = try MattermostStore(inMemory: true)
+    let post = MattermostPost(
+        id: "post-lazy-json",
+        createAt: 10,
+        updateAt: 10,
+        editAt: 0,
+        deleteAt: 0,
+        userId: "user-1",
+        channelId: "channel-1",
+        rootId: "",
+        originalId: nil,
+        message: "lazy snapshot",
+        type: "",
+        hashtags: nil,
+        pendingPostId: nil,
+        fileIds: ["file-1"],
+        hasReactions: true,
+        props: [
+            "webhook_name": .string("Build Bot"),
+            "nested_value": .object(["is_active": .bool(true)]),
+        ],
+        metadata: [
+            "files": .array([
+                .object([
+                    "id": .string("file-1"),
+                    "user_id": .string("user-1"),
+                    "post_id": .string("post-lazy-json"),
+                    "name": .string("report.pdf"),
+                    "extension": .string("pdf"),
+                    "mime_type": .string("application/pdf"),
+                ]),
+            ]),
+            "reactions": .array([
+                .object([
+                    "user_id": .string("user-2"),
+                    "post_id": .string("post-lazy-json"),
+                    "emoji_name": .string("thumbsup"),
+                    "create_at": .integer(20),
+                ]),
+            ]),
+        ]
+    )
+
+    try store.upsert(post: post)
+    try store.save()
+
+    let snapshot = try #require(
+        try store.cachedPostSnapshots(channelID: "channel-1").first
+    )
+    let expectedPropsJSON = try MattermostCachedPost.encodedJSON(post.props)
+    let expectedMetadataJSON = try MattermostCachedPost.encodedJSON(post.metadata)
+    #expect(snapshot.propsJSON == expectedPropsJSON)
+    #expect(snapshot.metadataJSON == expectedMetadataJSON)
+    #expect(try snapshot.decodedProps()?["webhook_name"] == .string("Build Bot"))
+    #expect(
+        try snapshot.decodedProps()?["nested_value"]
+            == .object(["is_active": .bool(true)])
+    )
+
+    let metadata = try #require(try snapshot.decodedMetadata())
+    #expect(metadata.files?.first?.id == "file-1")
+    #expect(metadata.files?.first?.userId == "user-1")
+    #expect(metadata.files?.first?.extensionName == "pdf")
+    #expect(metadata.files?.first?.mimeType == "application/pdf")
+    #expect(metadata.reactions?.first?.userId == "user-2")
+    #expect(metadata.reactions?.first?.emojiName == "thumbsup")
+    #expect(metadata.reactions?.first?.createAt == 20)
+}
+
+@MainActor
+@Test
+func cachedPostSnapshotsDoNotEagerlyDecodeJSON() throws {
+    let store = try MattermostStore(inMemory: true)
+    let post = MattermostPost(
+        id: "post-invalid-json",
+        createAt: 10,
+        updateAt: 10,
+        editAt: 0,
+        deleteAt: 0,
+        userId: "user-1",
+        channelId: "channel-1",
+        rootId: "",
+        originalId: nil,
+        message: "invalid cached JSON",
+        type: "",
+        hashtags: nil,
+        pendingPostId: nil,
+        fileIds: nil,
+        hasReactions: nil
+    )
+
+    let cached = try store.upsert(post: post)
+    cached.propsJSON = "{not valid props"
+    cached.metadataJSON = "{not valid metadata"
+    try store.save()
+
+    let snapshot = try #require(
+        try store.cachedPostSnapshots(channelID: "channel-1").first
+    )
+    #expect(snapshot.propsJSON == "{not valid props")
+    #expect(snapshot.metadataJSON == "{not valid metadata")
+    #expect(throws: DecodingError.self) {
+        try snapshot.decodedProps()
+    }
+    #expect(throws: DecodingError.self) {
+        try snapshot.decodedMetadata()
+    }
+}
+
+@MainActor
+@Test
 func storeCachesThreadState() throws {
     let store = try MattermostStore(inMemory: true)
     let user = MattermostUser(
