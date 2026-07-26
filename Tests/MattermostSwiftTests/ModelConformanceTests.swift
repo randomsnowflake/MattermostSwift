@@ -202,13 +202,23 @@ func issue72LiveSyncEventsHaveEquatableValueSemantics() {
     #expect(connecting == .connecting(attempt: 2))
     #expect(connecting != .connecting(attempt: 3))
 
-    let failure = MattermostLiveSyncFailure(attempt: 2, message: "offline")
+    let failure = MattermostLiveSyncFailure(
+        attempt: 2,
+        domain: NSURLErrorDomain,
+        code: NSURLErrorNotConnectedToInternet,
+        message: "offline"
+    )
     #expect(
         MattermostLiveSyncEvent.backfillFailed(failure)
             == .backfillFailed(failure)
     )
     #expect(
         MattermostLiveSyncEvent.backfillFailed(failure)
-            != .backfillFailed(.init(attempt: 3, message: "offline"))
+            != .backfillFailed(.init(
+                attempt: 3,
+                domain: NSURLErrorDomain,
+                code: NSURLErrorNotConnectedToInternet,
+                message: "offline"
+            ))
     )
 }
