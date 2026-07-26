@@ -37,6 +37,25 @@ func liveEventStreamFailureCapturesNSErrorAndUnderlyingNSErrorDetails() {
     #expect(failure.message == "The network connection was lost.")
 }
 
+@Test
+func liveSyncFailurePreservesTypedMattermostError() {
+    let error = MattermostError.httpStatus(
+        code: 401,
+        message: "Token expired",
+        apiError: MattermostAPIErrorBody(
+            id: "api.context.session_expired.app_error",
+            message: "Token expired",
+            requestId: "request-401",
+            statusCode: 401
+        )
+    )
+
+    let failure = MattermostLiveSyncFailure(attempt: 1, error: error)
+
+    #expect(failure.mattermostError == error)
+    #expect(failure.mattermostError?.isUnauthorized == true)
+}
+
 @MainActor
 @Test
 func liveSyncRunsBackfillForEveryConnectingLifecycleEvent() async throws {
@@ -132,9 +151,15 @@ func liveSyncEventsExposeConnectionStateForHostUI() async throws {
 @MainActor
 @Test
 func liveSyncEmitsBackfillFailureWithoutTerminating() async throws {
-    struct BackfillFailure: LocalizedError, Equatable {
-        let errorDescription: String? = "backfill failed for test"
-    }
+    let underlying = NSError(domain: NSPOSIXErrorDomain, code: 57)
+    let backfillFailure = NSError(
+        domain: NSURLErrorDomain,
+        code: NSURLErrorNetworkConnectionLost,
+        userInfo: [
+            NSUnderlyingErrorKey: underlying,
+            NSLocalizedDescriptionKey: "backfill failed for test",
+        ]
+    )
 
     let service = try MattermostClient(
         serverURL: try #require(URL(string: "https://mattermost.example.com")),
@@ -152,7 +177,7 @@ func liveSyncEmitsBackfillFailureWithoutTerminating() async throws {
             }
         },
         backfill: { _, _, _, _ in
-            throw BackfillFailure()
+            throw backfillFailure
         }
     )
 
@@ -171,6 +196,10 @@ func liveSyncEmitsBackfillFailureWithoutTerminating() async throws {
 
     #expect(failure == MattermostLiveSyncFailure(
         attempt: 2,
+        domain: NSURLErrorDomain,
+        code: NSURLErrorNetworkConnectionLost,
+        underlyingDomain: NSPOSIXErrorDomain,
+        underlyingCode: 57,
         message: "backfill failed for test"
     ))
     #expect(states == [

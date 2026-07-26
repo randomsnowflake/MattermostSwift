@@ -159,6 +159,23 @@ Default live-event streams use a dedicated long-lived `URLSession` so the bounde
 resource timeout does not recycle healthy WebSockets. If you inject a custom REST session,
 provide `webSocketURLSession` to `MattermostClient` when live events need a different policy.
 
+Mattermost API failures preserve the server's structured error body:
+
+```swift
+do {
+    _ = try await client.currentUser()
+} catch let error as MattermostError where error.isUnauthorized {
+    // Present authentication UI.
+} catch MattermostError.httpStatus(_, _, let apiError) {
+    print("Mattermost error: \(apiError?.id ?? "unknown")")
+    print("Request ID: \(apiError?.requestId ?? "unknown")")
+}
+```
+
+Use `isForbidden` and `isNotFound` for the other common status branches. The attached
+``MattermostAPIErrorBody`` also exposes `detailedError` and the status code reported in the
+response body.
+
 `MattermostLiveSyncService` combines WebSocket events with REST backfill and applies updates into `MattermostStore`:
 
 ```swift
@@ -188,6 +205,10 @@ func runLiveSync(
             print("unread \(unread.channelId): \(unread.msgCount)")
         case .backfillFailed(let failure):
             print("live sync backfill failed on attempt \(failure.attempt): \(failure.message)")
+            print("error identity: \(failure.domain) \(failure.code)")
+            if failure.mattermostError?.isUnauthorized == true {
+                // Present authentication UI.
+            }
         default:
             break
         }

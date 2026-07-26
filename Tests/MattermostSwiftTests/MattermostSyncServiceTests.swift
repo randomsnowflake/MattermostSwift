@@ -102,7 +102,11 @@ func syncServicePropagatesPartialHTTPFailure() async throws {
     )
     let store = try MattermostStore(inMemory: true)
 
-    await #expect(throws: MattermostError.httpStatus(code: 503, message: "status unavailable")) {
+    await #expect(throws: MattermostError.httpStatus(
+        code: 503,
+        message: "status unavailable",
+        apiError: MattermostAPIErrorBody(message: "status unavailable")
+    )) {
         _ = try await client.syncService().sync(to: store)
     }
 }
