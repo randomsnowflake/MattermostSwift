@@ -2,6 +2,8 @@ import Foundation
 import Testing
 @testable import MattermostSwift
 
+private final class MattermostTestURLSessionDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {}
+
 @Test
 func configurationNormalizesServerURL() throws {
     let configuration = try MattermostConfiguration(
@@ -281,6 +283,27 @@ func clientUsesExplicitLiveEventSessionWhenProvided() throws {
 }
 
 @Test
+func clientRetainsTrustDelegateForDefaultRESTAndWebSocketSessions() throws {
+    var delegate: MattermostTestURLSessionDelegate? = MattermostTestURLSessionDelegate()
+    weak var retainedDelegate = delegate
+    let client = try MattermostClient(
+        serverURL: #require(URL(string: "https://mattermost.example.com")),
+        token: "token",
+        urlSessionDelegate: #require(delegate)
+    )
+    delegate = nil
+
+    #expect(retainedDelegate != nil)
+    #expect(client.urlSession.delegate === retainedDelegate)
+    #expect(client.liveEventStream().urlSession.delegate === retainedDelegate)
+    #expect(client.urlSession.configuration.timeoutIntervalForResource == 300)
+    #expect(client.liveEventStream().urlSession.configuration.timeoutIntervalForResource == 604_800)
+
+    client.urlSession.invalidateAndCancel()
+    client.liveEventStream().urlSession.invalidateAndCancel()
+}
+
+@Test
 func liveEventStreamConfiguresHeartbeatLiveness() throws {
     let configuration = try MattermostConfiguration(
         serverURL: #require(URL(string: "https://mattermost.example.com")),
@@ -354,6 +377,17 @@ func defaultSessionDoesNotPersistOrAcceptCookies() {
 
     #expect(!configuration.httpShouldSetCookies)
     #expect(configuration.httpCookieAcceptPolicy == .never)
+}
+
+@Test
+func defaultSessionsAllowConstrainedAndExpensiveNetworkPaths() {
+    let restConfiguration = URLSession.mattermost.configuration
+    let liveConfiguration = URLSession.mattermostLiveEvents.configuration
+
+    #expect(restConfiguration.allowsConstrainedNetworkAccess)
+    #expect(restConfiguration.allowsExpensiveNetworkAccess)
+    #expect(liveConfiguration.allowsConstrainedNetworkAccess)
+    #expect(liveConfiguration.allowsExpensiveNetworkAccess)
 }
 
 @Test

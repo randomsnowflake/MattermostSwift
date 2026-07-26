@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Channel, stats, membership, notify props, unread, and view-response models
 
 /// Mattermost channel metadata.
-public struct MattermostChannel: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostChannel: Decodable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let createAt: Int64?
     public let updateAt: Int64?

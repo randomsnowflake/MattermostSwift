@@ -3,7 +3,7 @@ import Foundation
 /// Immutable, sendable representation of a cached user.
 /// Create snapshots through `MattermostStore`; never retain a managed SwiftData object for
 /// background work.
-public struct MattermostCachedUserSnapshot: Equatable, Sendable, Identifiable {
+public struct MattermostCachedUserSnapshot: Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let username: String
     public let email: String?
@@ -28,7 +28,7 @@ public struct MattermostCachedUserSnapshot: Equatable, Sendable, Identifiable {
 }
 
 /// Immutable, sendable representation of a cached channel.
-public struct MattermostCachedChannelSnapshot: Equatable, Sendable, Identifiable {
+public struct MattermostCachedChannelSnapshot: Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let createAt: Int64?
     public let updateAt: Int64?
@@ -63,7 +63,7 @@ public struct MattermostCachedChannelSnapshot: Equatable, Sendable, Identifiable
 }
 
 /// Immutable, sendable representation of a cached post.
-public struct MattermostCachedPostSnapshot: Equatable, Sendable, Identifiable {
+public struct MattermostCachedPostSnapshot: Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let createAt: Int64
     public let updateAt: Int64
@@ -79,10 +79,16 @@ public struct MattermostCachedPostSnapshot: Equatable, Sendable, Identifiable {
     public let pendingPostID: String?
     public let fileIDs: [String]
     public let hasReactions: Bool?
-    public let props: [String: MattermostJSONValue]?
-    public let metadata: [String: MattermostJSONValue]?
+    /// The cached post props exactly as stored JSON.
+    ///
+    /// Call ``decodedProps()`` only when the typed values are needed.
+    public let propsJSON: String?
+    /// The cached post metadata exactly as stored JSON.
+    ///
+    /// Call ``decodedMetadata()`` only when typed file or reaction metadata is needed.
+    public let metadataJSON: String?
 
-    @MainActor init(_ cached: MattermostCachedPost) throws {
+    @MainActor init(_ cached: MattermostCachedPost) {
         id = cached.id
         createAt = cached.createAt
         updateAt = cached.updateAt
@@ -98,7 +104,41 @@ public struct MattermostCachedPostSnapshot: Equatable, Sendable, Identifiable {
         pendingPostID = cached.pendingPostId
         fileIDs = cached.fileIds
         hasReactions = cached.hasReactions
-        props = try cached.decodedProps()
-        metadata = try cached.decodedMetadata()
+        propsJSON = cached.propsJSON
+        metadataJSON = cached.metadataJSON
+    }
+
+    /// Decodes the raw props JSON on demand, preserving arbitrary Mattermost keys.
+    ///
+    /// - Returns: The post's property bag, or `nil` when no props were cached.
+    /// - Throws: A decoding error when ``propsJSON`` is not a JSON object whose values
+    ///   can be represented by ``MattermostJSONValue``.
+    public func decodedProps() throws -> [String: MattermostJSONValue]? {
+        guard let propsJSON else {
+            return nil
+        }
+
+        return try JSONDecoder().decode(
+            [String: MattermostJSONValue].self,
+            from: Data(propsJSON.utf8)
+        )
+    }
+
+    /// Decodes typed file and reaction metadata from the raw metadata JSON on demand.
+    ///
+    /// - Returns: Typed metadata, or `nil` when no metadata was cached.
+    /// - Throws: A decoding error when ``metadataJSON`` does not match
+    ///   ``MattermostPostMetadata``.
+    public func decodedMetadata() throws -> MattermostPostMetadata? {
+        guard let metadataJSON else {
+            return nil
+        }
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode(
+            MattermostPostMetadata.self,
+            from: Data(metadataJSON.utf8)
+        )
     }
 }

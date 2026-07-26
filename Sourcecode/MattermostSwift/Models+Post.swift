@@ -32,7 +32,7 @@ public struct MattermostPostSearchResults: Decodable, Equatable, Sendable {
 /// Typed subset of the `metadata` payload the server embeds with each post
 /// (files and reactions). Lets clients skip the per-post `fileInfos`/`reactions`
 /// lookups when the server already delivered them inline.
-public struct MattermostPostMetadata: Decodable, Equatable, Sendable {
+public struct MattermostPostMetadata: Decodable, Equatable, Hashable, Sendable {
     public let files: [MattermostFileInfo]?
     public let reactions: [MattermostReaction]?
 
@@ -43,7 +43,7 @@ public struct MattermostPostMetadata: Decodable, Equatable, Sendable {
 }
 
 /// Mattermost post/message metadata.
-public struct MattermostPost: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostPost: Decodable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let createAt: Int64
     public let updateAt: Int64
@@ -194,7 +194,7 @@ public struct MattermostStatusOK: Decodable, Equatable, Sendable {
 }
 
 /// A reaction attached to a Mattermost post.
-public struct MattermostReaction: Codable, Equatable, Sendable {
+public struct MattermostReaction: Codable, Equatable, Hashable, Sendable {
     public let userId: String
     public let postId: String
     public let emojiName: String

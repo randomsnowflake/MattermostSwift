@@ -20,7 +20,7 @@ public struct MattermostSidebarCategoryList: Decodable, Equatable, Sendable {
 }
 
 /// Sidebar category metadata for a user's team sidebar.
-public struct MattermostSidebarCategory: Decodable, Equatable, Sendable, Identifiable {
+public struct MattermostSidebarCategory: Decodable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
     public let userId: String?
     public let teamId: String?
@@ -34,6 +34,30 @@ public struct MattermostSidebarCategory: Decodable, Equatable, Sendable, Identif
 
     public var isCustom: Bool {
         type == .custom
+    }
+
+    init(
+        id: String,
+        userId: String?,
+        teamId: String?,
+        displayName: String,
+        type: MattermostSidebarCategoryType,
+        sortOrder: Int?,
+        channelIds: [String],
+        sorting: MattermostSidebarCategorySorting?,
+        muted: Bool?,
+        collapsed: Bool?
+    ) {
+        self.id = id
+        self.userId = userId
+        self.teamId = teamId
+        self.displayName = displayName
+        self.type = type
+        self.sortOrder = sortOrder
+        self.channelIds = channelIds
+        self.sorting = sorting
+        self.muted = muted
+        self.collapsed = collapsed
     }
 
     enum CodingKeys: String, CodingKey {

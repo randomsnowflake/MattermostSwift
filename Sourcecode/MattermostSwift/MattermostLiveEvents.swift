@@ -138,7 +138,7 @@ public struct MattermostLiveEvent: Decodable, Equatable, Sendable {
 
         // Plain decoder: the keys are channel ids and must not be snake-case rewritten.
         let channelTimes = jsonData("channel_times").flatMap {
-            try? JSONDecoder().decode([String: Int64].self, from: $0)
+            try? mattermostPlainDecoder.decode([String: Int64].self, from: $0)
         }
         return MattermostMultipleChannelsViewedEvent(
             userID: anyString("user_id", "userId", broadcast: \.userId),
@@ -433,7 +433,7 @@ public struct MattermostLiveBroadcast: Decodable, Equatable, Sendable {
 }
 
 /// Generic JSON value used for tolerant Mattermost JSON payloads.
-public enum MattermostJSONValue: Codable, Equatable, Sendable {
+public enum MattermostJSONValue: Codable, Equatable, Hashable, Sendable {
     case string(String)
     /// A signed JSON integer preserved without converting through `Double`.
     case integer(Int64)

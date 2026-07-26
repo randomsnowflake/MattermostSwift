@@ -8,27 +8,49 @@ Run local package tests:
 scripts/test-unit.sh
 ```
 
+GitHub Actions also builds the `MattermostSwift` library scheme for generic iOS 18, macOS 15,
+tvOS 18, watchOS 11, and visionOS 2 destinations. These compile-only jobs keep every platform
+declared in `Package.swift` covered without requiring simulators, signing, or live credentials.
+
 The current unit tests cover:
 
 - server URL normalization,
+- explicit default allowance of Low Data Mode/constrained and expensive network paths,
 - environment credential validation,
 - username/password login request construction and environment validation,
+- bearer-token redaction in session, authentication, and configuration descriptions,
 - request construction,
 - post update request construction with the `since` timestamp query,
 - unread-context and collapsed-thread request construction,
 - thread inbox request construction, thread read-state request construction, decoding, and cache upserts,
 - query item construction,
-- REST error handling for Mattermost error bodies, non-JSON error bodies, empty successful JSON responses, and binary/data endpoints,
+- REST error handling for Mattermost error bodies, non-JSON error bodies, empty successful JSON responses, binary/data endpoints, bounded 429 retries with `Retry-After`, dedicated rate-limit errors, and mutation replay prevention,
+- scoped sync-list ETag persistence and `If-None-Match` request construction, HTTP 304 cached
+  readback, exclusion of post/unread requests, and V1-to-V2 SwiftData cache migration,
 - initial Mattermost response decoding,
 - typed channel/user-status/post/sidebar domain values, including unknown-value Codable round trips
   and exact request-wire encoding,
-- post props/metadata decoding, outbound props request encoding, and SwiftData cache preservation,
+- post props/metadata decoding, outbound props request encoding, SwiftData cache preservation, and
+  zero-decode cached post snapshots with throwing on-demand props/metadata accessors,
 - channel search, batch user lookup, user search/autocomplete/known-user request construction, direct/group channel request construction, and custom emoji request/response decoding,
 - user preference request construction and decoding,
-- WebSocket live event decoding, typed post create/edit/delete/unread and thread update/read/follow event helpers, embedded post/channel/user/member decoding, and tolerant invalidation events,
-- WebSocket reconnect backoff policy,
-- live-sync reconnect orchestration with an injected lifecycle stream, including backfill on each connecting event, cursor-based recovery of posts missed while disconnected, host-visible connection-state projection, backfill failure diagnostics, capped/all-channel backfill selection, live-event application into SwiftData, unread refresh on `post_unread` and `multiple_channels_viewed` invalidations, and thread-state refresh on thread invalidation,
-- SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, timestamp merge policy, and sync cursors.
+- WebSocket live event decoding, observable nonfatal malformed-frame handling, typed post create/edit/delete/unread and thread update/read/follow event helpers, embedded post/channel/user/member decoding, and tolerant invalidation events,
+- default REST/WebSocket trust-delegate installation and delegate lifetime, plus the bounded
+  256-event WebSocket authentication-handshake buffer,
+- WebSocket full-jitter reconnect backoff, including deterministic lower/midpoint/upper samples
+  and bounds at the configured and integer caps,
+- live-sync reconnect orchestration with an injected lifecycle stream, including deterministic
+  rapid-gap backfill suppression, long-gap and first-connect backfill, configurable/disabled gap
+  filtering, cursor-based recovery of posts missed while disconnected, host-visible connection-state
+  projection, backfill failure diagnostics, capped/all-channel backfill selection, live-event
+  application into SwiftData, unread refresh on `post_unread` and `multiple_channels_viewed`
+  invalidations, and thread-state refresh on thread invalidation,
+- host-task cancellation propagation through live sync to the injected WebSocket lifecycle,
+- complete channel-user profile hydration across mocked multi-page responses,
+- SwiftData cache upserts, cached reads, unified channel/thread timeline reads, deleted-post filtering, post/thread ordering, reactions, files, live-event merging, channel/post deletion state, dependent thread cleanup during post pruning and channel-content deletion, timestamp merge policy, sync cursors, conditional-list ETags, and configurable disk-store permissions/file protection,
+- restrictive default and custom CLI cache-directory creation,
+- CLI parser diagnostics plus real executable-process verification that credential-free help writes
+  to stdout with status 0 and malformed invocations write only to stderr with status 2.
 
 ## Live Verification
 
@@ -69,7 +91,7 @@ The current live script verifies:
 - opt-in all-joined-channel live-sync backfill using an in-memory store,
 - offline cache readback with `cache-check`, including cached joined-team metadata.
 
-`sync` writes to `.mattermostswift/MattermostSwift.sqlite` by default, or to `MATTERMOST_STORE_PATH` when set. The directory is ignored by git.
+`sync` writes to `.mattermostswift/MattermostSwift.sqlite` by default, or to `MATTERMOST_STORE_PATH` when set. The cache directory uses owner-only permissions and is ignored by git.
 When username/password credentials are present, `scripts/test-live.sh` runs `login-test`; otherwise password-login probing is skipped. On the current development server, `login-test` verifies direct password login, prints the non-secret token source, and then proves the returned session token by loading `me`. Unit tests cover both the documented `Token` response header and the official `MMAUTHTOKEN` cookie fallback.
 
 ## End-to-End Verification
