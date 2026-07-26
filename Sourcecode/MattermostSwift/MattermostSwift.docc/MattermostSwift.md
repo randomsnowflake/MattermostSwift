@@ -221,6 +221,10 @@ Live sync refreshes every affected channel after `channel_viewed`,
 options are enabled. This keeps cached channel badges aligned with reads from other sessions and
 devices, including servers with collapsed reply threads enabled.
 
+Reconnects use full-jitter exponential backoff. For each attempt, the stream chooses a uniform
+delay from zero through the policy's capped exponential base, spreading clients across the retry
+window after a shared server or network outage.
+
 For small workspaces or an explicit catch-up action, set `backfillAllJoinedChannelPosts` to `true` to sweep every joined channel during connect and reconnect backfill:
 
 ```swift
