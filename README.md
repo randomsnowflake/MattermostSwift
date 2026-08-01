@@ -171,6 +171,8 @@ sessions directly can use `URLSession.mattermost(delegate:)` and
 Hosts that need connection diagnostics can consume `lifecycleEvents()`. Malformed event frames
 are skipped without disconnecting and yield `eventDecodeFailed` with a
 `MattermostLiveEventStreamFailure`, so wire-format changes remain observable.
+Successful WebSocket pings yield `heartbeat`, allowing host freshness monitors to recognize a
+healthy idle connection without recycling it.
 
 Live sync always performs its REST backfill before the first connection. Reconnects skip that
 fan-out when the socket was down for less than 10 seconds by default, avoiding a full workspace

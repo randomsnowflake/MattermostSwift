@@ -271,8 +271,10 @@ func liveSyncEventsExposeConnectionStateForHostUI() async throws {
         lifecycleEvents: {
             AsyncThrowingStream { continuation in
                 continuation.yield(.connecting(attempt: 0))
+                continuation.yield(.heartbeat)
                 continuation.yield(.reconnecting(attempt: 0, delay: .milliseconds(250)))
                 continuation.yield(.connecting(attempt: 1))
+                continuation.yield(.heartbeat)
                 continuation.finish()
             }
         },

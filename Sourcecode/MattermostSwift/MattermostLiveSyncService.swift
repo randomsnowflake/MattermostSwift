@@ -391,6 +391,9 @@ public struct MattermostLiveSyncService: Sendable {
                         case .eventDecodeFailed:
                             break
 
+                        case .heartbeat:
+                            break
+
                         case .event(let event):
                             let application: MattermostLiveEventApplication
                             do {
@@ -672,6 +675,8 @@ public struct MattermostLiveEventStreamFailure: Equatable, Sendable {
 public enum MattermostLiveEventStreamLifecycleEvent: Sendable {
     case connecting(attempt: Int)
     case connected(attempt: Int)
+    /// A WebSocket ping completed and the URL session task remains available.
+    case heartbeat
     case eventDecodeFailed(MattermostLiveEventStreamFailure)
     case event(MattermostLiveEvent)
     case reconnecting(attempt: Int, delay: Duration, failure: MattermostLiveEventStreamFailure? = nil)

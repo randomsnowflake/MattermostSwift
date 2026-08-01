@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Live-event lifecycle streams now emit `heartbeat` after each successful WebSocket ping,
+  allowing hosts to distinguish a healthy idle connection from a silent broken stream.
 - Fixed the live post-props verification to preserve integer JSON values and fail when
   either the server or SwiftData cache round trip changes the tested property bag.
 - Replaced the CLI's hand-written parser/help with `swift-argument-parser`, scoped to
