@@ -30,6 +30,7 @@ public struct MattermostLiveEventStream: Sendable {
                 do {
                     try await runAuthenticatedConnection(
                         onConnected: {},
+                        onHeartbeat: {},
                         onEventDecodeFailed: { _ in },
                         onEvent: { try Self.yield($0, to: continuation) }
                     )
@@ -78,6 +79,9 @@ public struct MattermostLiveEventStream: Sendable {
                         try await runAuthenticatedConnection(
                             onConnected: {
                                 try Self.yield(.connected(attempt: currentAttempt), to: continuation)
+                            },
+                            onHeartbeat: {
+                                try Self.yield(.heartbeat, to: continuation)
                             },
                             onEventDecodeFailed: { try Self.yield($0, to: continuation) },
                             onEvent: { event in
@@ -134,6 +138,7 @@ public struct MattermostLiveEventStream: Sendable {
 
     private func runAuthenticatedConnection(
         onConnected: @escaping @Sendable () async throws -> Void,
+        onHeartbeat: @escaping @Sendable () async throws -> Void,
         onEventDecodeFailed: @escaping @Sendable (MattermostLiveEventStreamLifecycleEvent) async throws -> Void,
         onEvent: @escaping @Sendable (MattermostLiveEvent) async throws -> Void
     ) async throws {
@@ -171,7 +176,10 @@ public struct MattermostLiveEventStream: Sendable {
             }
             if isHeartbeatEnabled {
                 group.addTask {
-                    try await self.keepConnectionAlive(webSocketTask)
+                    try await self.keepConnectionAlive(
+                        webSocketTask,
+                        onHeartbeat: onHeartbeat
+                    )
                 }
             }
 
@@ -213,26 +221,46 @@ public struct MattermostLiveEventStream: Sendable {
         }
     }
 
-    private func keepConnectionAlive(_ webSocketTask: URLSessionWebSocketTask) async throws {
+    private func keepConnectionAlive(
+        _ webSocketTask: URLSessionWebSocketTask,
+        onHeartbeat: @escaping @Sendable () async throws -> Void
+    ) async throws {
+        try await runHeartbeatLoop(
+            sleep: { duration in
+                try await Task.sleep(for: duration)
+            },
+            performHeartbeat: {
+                // CFNetwork can mark a WebSocket task cancelled after route loss without
+                // promptly resuming an outstanding receive or ping callback. Checking the
+                // URLSession task state on every heartbeat turns that silent half-dead
+                // connection into the normal reconnect path.
+                try Self.validateWebSocketTaskState(webSocketTask.state)
+                try await Self.withTimeout(
+                    heartbeatTimeout,
+                    timeoutMessage: "Mattermost WebSocket ping timed out.",
+                    onTimeout: {
+                        webSocketTask.cancel(with: .goingAway, reason: nil)
+                    }
+                ) {
+                    try await self.sendPing(to: webSocketTask)
+                }
+                try Self.validateWebSocketTaskState(webSocketTask.state)
+            },
+            onHeartbeat: onHeartbeat
+        )
+    }
+
+    func runHeartbeatLoop(
+        sleep: @escaping @Sendable (Duration) async throws -> Void,
+        performHeartbeat: @escaping @Sendable () async throws -> Void,
+        onHeartbeat: @escaping @Sendable () async throws -> Void
+    ) async throws {
         guard isHeartbeatEnabled else { return }
         while !Task.isCancelled {
-            try await Task.sleep(for: heartbeatInterval)
+            try await sleep(heartbeatInterval)
             try Task.checkCancellation()
-            // CFNetwork can mark a WebSocket task cancelled after route loss without
-            // promptly resuming an outstanding receive or ping callback. Checking the
-            // URLSession task state on every heartbeat turns that silent half-dead
-            // connection into the normal reconnect path.
-            try Self.validateWebSocketTaskState(webSocketTask.state)
-            try await Self.withTimeout(
-                heartbeatTimeout,
-                timeoutMessage: "Mattermost WebSocket ping timed out.",
-                onTimeout: {
-                    webSocketTask.cancel(with: .goingAway, reason: nil)
-                }
-            ) {
-                try await self.sendPing(to: webSocketTask)
-            }
-            try Self.validateWebSocketTaskState(webSocketTask.state)
+            try await performHeartbeat()
+            try await onHeartbeat()
         }
     }
 

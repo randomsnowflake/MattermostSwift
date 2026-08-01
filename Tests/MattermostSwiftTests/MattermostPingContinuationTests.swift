@@ -79,3 +79,37 @@ func webSocketHeartbeatRejectsUnavailableTaskStates(_ state: URLSessionTask.Stat
 func webSocketHeartbeatAcceptsRunningTaskState() throws {
     try MattermostLiveEventStream.validateWebSocketTaskState(.running)
 }
+
+@Test
+func successfulWebSocketHeartbeatReportsTransportActivity() async throws {
+    let stream = try MattermostLiveEventStream(
+        configuration: MattermostConfiguration(
+            serverURL: #require(URL(string: "https://mattermost.example.com")),
+            authentication: .bearerToken("token")
+        )
+    )
+    let calls = MattermostRequestLog()
+
+    await #expect(throws: HeartbeatLoopTestError.finished) {
+        try await stream.runHeartbeatLoop(
+            sleep: { _ in
+                calls.append("sleep")
+            },
+            performHeartbeat: {
+                calls.append("heartbeat")
+                if calls.values.filter({ $0 == "heartbeat" }).count == 2 {
+                    throw HeartbeatLoopTestError.finished
+                }
+            },
+            onHeartbeat: {
+                calls.append("activity")
+            }
+        )
+    }
+
+    #expect(calls.values == ["sleep", "heartbeat", "activity", "sleep", "heartbeat"])
+}
+
+private enum HeartbeatLoopTestError: Error {
+    case finished
+}

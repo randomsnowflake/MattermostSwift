@@ -193,6 +193,8 @@ provide `webSocketURLSession` to `MattermostClient` when live events need a diff
 Use `lifecycleEvents()` when the host needs transport diagnostics as well as raw events.
 Undecodable event frames yield `MattermostLiveEventStreamLifecycleEvent.eventDecodeFailed`
 with structured failure details, then the stream continues reading from the same connection.
+Successful WebSocket pings yield `MattermostLiveEventStreamLifecycleEvent.heartbeat`, so a
+host-level freshness monitor can recognize healthy idle connections without recycling them.
 
 Deployments that require custom server-trust evaluation can pass a `URLSessionDelegate` to the
 client. The SDK installs it on both default sessions, so the same pinning policy protects REST
