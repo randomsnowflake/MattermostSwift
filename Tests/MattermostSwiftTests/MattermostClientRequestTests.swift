@@ -180,6 +180,19 @@ struct MattermostClientRequestTests {
         #expect(state.lastViewedAt == 1_780_000_000_123)
     }
 
+    @Test
+    func markAllThreadsReadUsesTeamScopedEndpoint() async throws {
+        let client = try await Self.makeClient { request in
+            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/teams/team-id/threads/read")
+            #expect(request.httpMethod == "PUT")
+            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+        }
+
+        let response = try await client.markAllThreadsRead(teamID: "team-id")
+
+        #expect(response.isOK)
+    }
+
     // MARK: - Helpers
 
     private static func makeClient(

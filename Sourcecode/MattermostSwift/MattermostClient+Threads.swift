@@ -236,6 +236,17 @@ extension MattermostClient {
         )
     }
 
+    /// Marks every thread in a team's per-user thread inbox as read.
+    @discardableResult
+    public func markAllThreadsRead(
+        teamID: String,
+        userID: String = "me"
+    ) async throws -> MattermostStatusOK {
+        try await httpClient.put(
+            "/users/\(userID)/teams/\(teamID)/threads/read"
+        )
+    }
+
     @available(*, deprecated, renamed: "markThreadRead(teamID:threadID:userID:timestamp:)")
     @discardableResult
     public func markThreadRead(
