@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Post creation now accepts an optional `pendingPostID` and encodes it as
+  `pending_post_id`, allowing durable outboxes to reuse one idempotency key
+  across ambiguous retries.
 - Exposed the authenticated user's mention notification preferences through
   `MattermostUser.notifyProps`, including parsed mention keys and first-name and
   channel-wide mention switches for host-side notification presentation.

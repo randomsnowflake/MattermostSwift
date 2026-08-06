@@ -73,6 +73,23 @@ struct MattermostCreatePostRequest: Encodable, Sendable {
     let rootId: String?
     let fileIds: [String]
     let props: [String: MattermostJSONValue]
+    let pendingPostId: String?
+
+    init(
+        channelId: String,
+        message: String,
+        rootId: String?,
+        fileIds: [String],
+        props: [String: MattermostJSONValue],
+        pendingPostId: String? = nil
+    ) {
+        self.channelId = channelId
+        self.message = message
+        self.rootId = rootId
+        self.fileIds = fileIds
+        self.props = props
+        self.pendingPostId = pendingPostId
+    }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -87,6 +104,9 @@ struct MattermostCreatePostRequest: Encodable, Sendable {
         if !props.isEmpty {
             try container.encode(props, forKey: .props)
         }
+        if let pendingPostId, !pendingPostId.isEmpty {
+            try container.encode(pendingPostId, forKey: .pendingPostId)
+        }
     }
 
     enum CodingKeys: String, CodingKey {
@@ -95,6 +115,7 @@ struct MattermostCreatePostRequest: Encodable, Sendable {
         case rootId
         case fileIds
         case props
+        case pendingPostId
     }
 }
 

@@ -133,7 +133,8 @@ extension MattermostClient {
         message: String,
         rootID: String? = nil,
         fileIDs: [String] = [],
-        props: [String: MattermostJSONValue] = [:]
+        props: [String: MattermostJSONValue] = [:],
+        pendingPostID: String? = nil
     ) async throws -> MattermostPost {
         try await httpClient.post(
             "/posts",
@@ -142,7 +143,8 @@ extension MattermostClient {
                 message: message,
                 rootId: rootID,
                 fileIds: fileIDs,
-                props: props
+                props: props,
+                pendingPostId: pendingPostID
             )
         )
     }

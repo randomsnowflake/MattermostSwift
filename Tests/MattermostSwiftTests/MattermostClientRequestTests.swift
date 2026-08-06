@@ -58,6 +58,7 @@ struct MattermostClientRequestTests {
             #expect(body?["channel_id"] as? String == "channel-id")
             #expect(body?["message"] as? String == "hello world")
             #expect(body?["root_id"] as? String == "root-id")
+            #expect(body?["pending_post_id"] as? String == "user-id:stable-client-id")
             let responseBody = Data(#"""
             {"id":"post-id","create_at":1780000000000,"update_at":1780000000000,"edit_at":0,"delete_at":0,"user_id":"user-id","channel_id":"channel-id","root_id":"root-id","message":"hello world","type":""}
             """#.utf8)
@@ -67,7 +68,8 @@ struct MattermostClientRequestTests {
         let post = try await client.sendPost(
             channelID: "channel-id",
             message: "hello world",
-            rootID: "root-id"
+            rootID: "root-id",
+            pendingPostID: "user-id:stable-client-id"
         )
 
         #expect(post.id == "post-id")
