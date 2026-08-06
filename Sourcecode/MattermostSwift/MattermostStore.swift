@@ -1313,6 +1313,9 @@ public final class MattermostStore {
              .threadUpdated,
              .threadFollowChanged,
              .threadReadChanged,
+             .draftCreated,
+             .draftUpdated,
+             .draftDeleted,
              .cacheInvalidated,
              .unknown:
             mutatesStore = false

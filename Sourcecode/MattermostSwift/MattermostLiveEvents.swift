@@ -83,6 +83,15 @@ public struct MattermostLiveEvent: Codable, Equatable, Sendable {
         return try mattermostSnakeCaseDecoder.decode(MattermostReaction.self, from: data)
     }
 
+    /// Decodes the draft payload carried by synced-draft WebSocket events.
+    public func decodedDraft() throws -> MattermostDraft? {
+        guard let data = jsonData("draft") else {
+            return nil
+        }
+
+        return try mattermostSnakeCaseDecoder.decode(MattermostDraft.self, from: data)
+    }
+
     /// Returns a channel id from event data or broadcast metadata.
     public func decodedChannelID() throws -> String? {
         if let channelID = anyString("channel_id", "channelId", broadcast: \.channelID) {
@@ -243,6 +252,12 @@ public struct MattermostLiveEvent: Codable, Equatable, Sendable {
             .threadFollowChanged(try decodedThreadEvent())
         case .threadReadChanged:
             .threadReadChanged(try decodedThreadEvent())
+        case .draftCreated:
+            .draftCreated(try decodedDraft())
+        case .draftUpdated:
+            .draftUpdated(try decodedDraft())
+        case .draftDeleted:
+            .draftDeleted(try decodedDraft())
         case .userAdded, .userRemoved:
             .cacheInvalidated(self)
         case .none:
@@ -286,6 +301,9 @@ public enum MattermostLiveEventName: String, Sendable {
     case threadUpdated = "thread_updated"
     case threadFollowChanged = "thread_follow_changed"
     case threadReadChanged = "thread_read_changed"
+    case draftCreated = "draft_created"
+    case draftUpdated = "draft_updated"
+    case draftDeleted = "draft_deleted"
 }
 
 /// Strongly typed view of common Mattermost WebSocket events.
@@ -312,6 +330,9 @@ public enum MattermostTypedLiveEvent: Equatable, Sendable {
     case threadUpdated(MattermostThreadEvent)
     case threadFollowChanged(MattermostThreadEvent)
     case threadReadChanged(MattermostThreadEvent)
+    case draftCreated(MattermostDraft?)
+    case draftUpdated(MattermostDraft?)
+    case draftDeleted(MattermostDraft?)
     case cacheInvalidated(MattermostLiveEvent)
     case unknown(MattermostLiveEvent)
 }

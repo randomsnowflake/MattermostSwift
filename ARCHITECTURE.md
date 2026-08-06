@@ -47,6 +47,8 @@ Implemented flow:
 32. Live-verify WebSocket message lifecycle delivery for posted, edited, and deleted posts through the CLI harness.
 33. Expose consistent `ID`-spelled models, options-backed long requests, millisecond `Date`
     bridges, and lazy cursor-based `allPosts` iteration while retaining deprecated source aliases.
+34. Feature-detect, load, upsert, delete, and live-decode channel/thread drafts when
+    `AllowSyncedDrafts` is enabled by the server.
 
 The CLI reads credentials from environment variables:
 
@@ -118,6 +120,8 @@ Public models are intentionally small and stable while the first flow hardens:
 - `MattermostThreadListRequest`
 - `MattermostThreadResponse`
 - `MattermostThreadList`
+- `MattermostDraft`
+- `MattermostDraftUpsertRequest`
 - `MattermostReaction`
 - `MattermostPostSearchResults`
 - `MattermostFileInfo`

@@ -49,6 +49,8 @@ reading server-shaped snake-case payloads.
 - ``MattermostPost``
 - ``MattermostPostList``
 - ``MattermostThreadResponse``
+- ``MattermostDraft``
+- ``MattermostDraftUpsertRequest``
 - ``MattermostFileInfo``
 - ``MattermostReaction``
 

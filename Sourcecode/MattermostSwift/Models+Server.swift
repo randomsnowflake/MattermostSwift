@@ -46,7 +46,14 @@ public struct MattermostClientConfig: Codable, Equatable, Sendable {
     public let enableOutgoingWebhooks: String?
     public let enablePostUsernameOverride: String?
     public let enablePostIconOverride: String?
+    public let allowSyncedDrafts: String?
     public let siteName: String?
+
+    /// Whether the server advertises the synced-drafts API to clients.
+    public var supportsSyncedDrafts: Bool {
+        guard let allowSyncedDrafts else { return false }
+        return ["true", "1", "on", "yes"].contains(allowSyncedDrafts.lowercased())
+    }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: MattermostServerCodingKey.self)
@@ -62,6 +69,7 @@ public struct MattermostClientConfig: Codable, Equatable, Sendable {
         enableOutgoingWebhooks = try container.decodeStringIfPresent(matching: "EnableOutgoingWebhooks")
         enablePostUsernameOverride = try container.decodeStringIfPresent(matching: "EnablePostUsernameOverride")
         enablePostIconOverride = try container.decodeStringIfPresent(matching: "EnablePostIconOverride")
+        allowSyncedDrafts = try container.decodeStringIfPresent(matching: "AllowSyncedDrafts")
         siteName = try container.decodeStringIfPresent(matching: "SiteName")
     }
 }

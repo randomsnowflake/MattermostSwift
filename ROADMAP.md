@@ -19,6 +19,7 @@
 - Unread-context post loading around the oldest unread post, including collapsed-thread query flags and a read-only live CLI verification.
 - Thread loading through Mattermost root/reply semantics.
 - Per-user/team thread inbox state loading and SwiftData caching for Collapsed Reply Threads, with a read-only live CLI verification.
+- Feature-detected synced-draft list/upsert/delete APIs with typed draft WebSocket events.
 - Unified `MattermostTimelineService` for channel and thread timelines, with SwiftData cache reads/sync and a live CLI timeline check.
 - Post props/metadata decoding, outbound post props, SwiftData cache preservation, and a live props round-trip CLI check.
 - Reaction add/list/remove and a reaction e2e CLI flow.
