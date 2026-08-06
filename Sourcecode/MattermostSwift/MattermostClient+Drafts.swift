@@ -12,8 +12,11 @@ extension MattermostClient {
     }
 
     /// Creates or replaces the channel/thread draft identified by the request.
+    ///
+    /// Mattermost treats an empty message as a deletion and returns JSON `null`,
+    /// represented here as `nil`.
     @discardableResult
-    public func upsertDraft(_ request: MattermostDraftUpsertRequest) async throws -> MattermostDraft {
+    public func upsertDraft(_ request: MattermostDraftUpsertRequest) async throws -> MattermostDraft? {
         try await httpClient.post("/drafts", body: request)
     }
 

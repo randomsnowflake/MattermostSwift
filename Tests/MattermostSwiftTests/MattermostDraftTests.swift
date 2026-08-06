@@ -47,8 +47,24 @@ struct MattermostDraftTests {
             channelID: "channel-id",
             rootID: "root-id",
             message: "typing"
-        )).rootID == "root-id")
+        ))?.rootID == "root-id")
         #expect(try await client.deleteDraft(channelID: "channel-id", rootID: "root-id").isOK)
+    }
+
+    @Test("empty draft upsert decodes the server deletion response")
+    func emptyDraftUpsertReturnsNil() async throws {
+        let client = try await Self.makeClient { request in
+            #expect(request.httpMethod == "POST")
+            #expect(request.url?.path == "/api/v4/drafts")
+            return try Self.response(statusCode: 201, body: Data("null".utf8), request: request)
+        }
+
+        let draft: MattermostDraft? = try await client.upsertDraft(MattermostDraftUpsertRequest(
+            channelID: "channel-id",
+            message: ""
+        ))
+
+        #expect(draft == nil)
     }
 
     @Test("draft live events decode their embedded payload")

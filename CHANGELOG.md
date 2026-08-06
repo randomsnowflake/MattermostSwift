@@ -8,7 +8,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 - Added feature-detectable synced-draft support: client configuration exposes
   `AllowSyncedDrafts`, draft list/upsert/delete endpoints preserve channel and
-  thread identity, and draft create/update/delete WebSocket events decode into
+  thread identity (including the server's `null` response when an empty upsert
+  deletes a draft), and draft create/update/delete WebSocket events decode into
   typed payloads.
 - Post creation now accepts an optional `pendingPostID` and encodes it as
   `pending_post_id`, allowing durable outboxes to reuse one idempotency key
