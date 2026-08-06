@@ -157,6 +157,27 @@ struct MattermostClientRequestTests {
         #expect(response.isOK)
     }
 
+    @Test
+    func setPostUnreadUsesNativeFrontierEndpointAndDecodesState() async throws {
+        let client = try await Self.makeClient { request in
+            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/me/posts/post-id/set_unread")
+            #expect(request.httpMethod == "POST")
+            let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
+            #expect(body?["collapsed_threads_supported"] as? Bool == true)
+            let responseBody = Data(#"{"team_id":"team-id","user_id":"user-id","channel_id":"channel-id","msg_count":41,"mention_count":2,"mention_count_root":1,"urgent_mention_count":0,"msg_count_root":17,"last_viewed_at":1780000000123}"#.utf8)
+            return try Self.response(statusCode: 200, body: responseBody, request: request)
+        }
+
+        let state = try await client.setPostUnread(
+            postID: "post-id",
+            collapsedThreadsSupported: true
+        )
+
+        #expect(state.channelID == "channel-id")
+        #expect(state.msgCountRoot == 17)
+        #expect(state.lastViewedAt == 1_780_000_000_123)
+    }
+
     // MARK: - Helpers
 
     private static func makeClient(

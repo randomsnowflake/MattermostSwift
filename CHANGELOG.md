@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Exposed the authenticated user's mention notification preferences through
+  `MattermostUser.notifyProps`, including parsed mention keys and first-name and
+  channel-wide mention switches for host-side notification presentation.
 - Live-event lifecycle streams now emit `heartbeat` after each successful WebSocket ping,
   allowing hosts to distinguish a healthy idle connection from a silent broken stream.
 - Fixed the live post-props verification to preserve integer JSON values and fail when

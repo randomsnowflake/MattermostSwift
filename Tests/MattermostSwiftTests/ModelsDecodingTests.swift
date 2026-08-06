@@ -64,7 +64,12 @@ func decodesMattermostUser() throws {
         "email": "jdoe@example.com",
         "firstName": "Jane",
         "timezone": {"useAutomaticTimezone": "true"},
-        "lastPictureUpdate": 1700000000000
+        "lastPictureUpdate": 1700000000000,
+        "notifyProps": {
+            "mentionKeys": "jdoe, @jdoe, release train",
+            "channel": "true",
+            "firstName": "false"
+        }
     }
     """
     let user = try JSONDecoder().decode(MattermostUser.self, from: Data(payload.utf8))
@@ -74,6 +79,30 @@ func decodesMattermostUser() throws {
     #expect(user.firstName == "Jane")
     #expect(user.timezone?["useAutomaticTimezone"] == "true")
     #expect(user.lastPictureUpdate == 1_700_000_000_000)
+    #expect(user.notifyProps?.parsedMentionKeys == ["jdoe", "@jdoe", "release train"])
+    #expect(user.notifyProps?.includesChannelMentions == true)
+    #expect(user.notifyProps?.includesFirstName == false)
+}
+
+@Test
+func decodesMattermostUserNotifyPropsFromSnakeCase() throws {
+    let payload = """
+    {
+        "id": "user123",
+        "username": "jdoe",
+        "notify_props": {
+            "mention_keys": "jdoe,@jdoe, incident ",
+            "channel": "false",
+            "first_name": "true"
+        }
+    }
+    """
+
+    let user = try mattermostSnakeCaseDecoder.decode(MattermostUser.self, from: Data(payload.utf8))
+
+    #expect(user.notifyProps?.parsedMentionKeys == ["jdoe", "@jdoe", "incident"])
+    #expect(user.notifyProps?.includesChannelMentions == false)
+    #expect(user.notifyProps?.includesFirstName == true)
 }
 
 @Test

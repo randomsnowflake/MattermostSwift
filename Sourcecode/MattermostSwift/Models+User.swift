@@ -2,6 +2,45 @@ import Foundation
 
 // MARK: - User, session, status, and autocomplete models
 
+/// Notification preferences embedded on the authenticated Mattermost user.
+///
+/// Mattermost stores boolean-like values as strings and supplies the configured
+/// mention terms as one comma-separated value. Keeping the wire representation
+/// here lets hosts apply the same user-specific mention rules without guessing
+/// from the username alone.
+public struct MattermostUserNotifyProps: Codable, Equatable, Hashable, Sendable {
+    public let mentionKeys: String?
+    public let channel: String?
+    public let firstName: String?
+
+    public init(
+        mentionKeys: String? = nil,
+        channel: String? = nil,
+        firstName: String? = nil
+    ) {
+        self.mentionKeys = mentionKeys
+        self.channel = channel
+        self.firstName = firstName
+    }
+
+    /// Configured mention terms with whitespace and empty entries removed.
+    public var parsedMentionKeys: [String] {
+        mentionKeys?
+            .split(separator: ",", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty } ?? []
+    }
+
+    public var includesChannelMentions: Bool {
+        channel?.lowercased() != "false"
+    }
+
+    public var includesFirstName: Bool? {
+        guard let firstName else { return nil }
+        return firstName.lowercased() == "true"
+    }
+}
+
 /// Authenticated Mattermost user profile data.
 public struct MattermostUser: Codable, Equatable, Hashable, Sendable, Identifiable {
     public let id: String
@@ -18,6 +57,34 @@ public struct MattermostUser: Codable, Equatable, Hashable, Sendable, Identifiab
     /// generated fallback. Changes act as a cache-busting token for the
     /// `/users/{id}/image` bytes.
     public let lastPictureUpdate: Int64?
+    /// Present for the authenticated user (or callers with permission to view it).
+    public let notifyProps: MattermostUserNotifyProps?
+
+    public init(
+        id: String,
+        username: String,
+        email: String? = nil,
+        firstName: String? = nil,
+        lastName: String? = nil,
+        nickname: String? = nil,
+        position: String? = nil,
+        locale: String? = nil,
+        timezone: [String: String]? = nil,
+        lastPictureUpdate: Int64? = nil,
+        notifyProps: MattermostUserNotifyProps? = nil
+    ) {
+        self.id = id
+        self.username = username
+        self.email = email
+        self.firstName = firstName
+        self.lastName = lastName
+        self.nickname = nickname
+        self.position = position
+        self.locale = locale
+        self.timezone = timezone
+        self.lastPictureUpdate = lastPictureUpdate
+        self.notifyProps = notifyProps
+    }
 
     public var lastPictureUpdatedAt: Date? {
         lastPictureUpdate.map(Date.init(mattermostMilliseconds:))

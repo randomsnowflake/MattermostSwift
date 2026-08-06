@@ -242,6 +242,10 @@ struct MattermostViewChannelRequest: Encodable, Sendable {
     let collapsedThreadsSupported: Bool   // encodes to collapsed_threads_supported
 }
 
+struct MattermostSetPostUnreadRequest: Encodable, Sendable {
+    let collapsedThreadsSupported: Bool
+}
+
 struct MattermostSidebarCategoryRequest: Encodable, Sendable {
     let id: String?
     let userId: String

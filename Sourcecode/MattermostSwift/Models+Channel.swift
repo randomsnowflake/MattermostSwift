@@ -470,6 +470,57 @@ public struct MattermostChannelUnread: Codable, Equatable, Sendable {
     }
 }
 
+/// Channel membership frontier returned after marking a post unread.
+///
+/// Unlike ``MattermostChannelUnread``, `msgCount` is the member's message-count
+/// frontier, not the number of unread messages. Consumers that need an unread
+/// count should fetch ``MattermostClient/channelUnread(channelID:userID:)``.
+public struct MattermostChannelUnreadAt: Codable, Equatable, Sendable {
+    public let teamID: String
+    public let userID: String
+    public let channelID: String
+    public let msgCount: Int64
+    public let mentionCount: Int64
+    public let mentionCountRoot: Int64
+    public let urgentMentionCount: Int64
+    public let msgCountRoot: Int64
+    public let lastViewedAt: Int64
+
+    public init(
+        teamID: String,
+        userID: String,
+        channelID: String,
+        msgCount: Int64,
+        mentionCount: Int64,
+        mentionCountRoot: Int64,
+        urgentMentionCount: Int64,
+        msgCountRoot: Int64,
+        lastViewedAt: Int64
+    ) {
+        self.teamID = teamID
+        self.userID = userID
+        self.channelID = channelID
+        self.msgCount = msgCount
+        self.mentionCount = mentionCount
+        self.mentionCountRoot = mentionCountRoot
+        self.urgentMentionCount = urgentMentionCount
+        self.msgCountRoot = msgCountRoot
+        self.lastViewedAt = lastViewedAt
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case teamID = "teamId"
+        case userID = "userId"
+        case channelID = "channelId"
+        case msgCount
+        case mentionCount
+        case mentionCountRoot
+        case urgentMentionCount
+        case msgCountRoot
+        case lastViewedAt
+    }
+}
+
 /// Result of marking a channel as viewed.
 public struct MattermostChannelViewResponse: Codable, Equatable, Sendable {
     public let status: String

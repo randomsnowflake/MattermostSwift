@@ -108,6 +108,25 @@ extension MattermostClient {
         try await httpClient.get("/posts/\(id)")
     }
 
+    /// Marks the post's channel unread starting at the supplied post.
+    ///
+    /// Mattermost stores one chronological channel read frontier. Passing
+    /// `collapsedThreadsSupported: true` keeps root-post and followed-thread
+    /// unread state consistent with clients that support collapsed threads.
+    @discardableResult
+    public func setPostUnread(
+        postID: String,
+        userID: String = "me",
+        collapsedThreadsSupported: Bool = false
+    ) async throws -> MattermostChannelUnreadAt {
+        try await httpClient.post(
+            "/users/\(userID)/posts/\(postID)/set_unread",
+            body: MattermostSetPostUnreadRequest(
+                collapsedThreadsSupported: collapsedThreadsSupported
+            )
+        )
+    }
+
     /// Sends a post to a channel. Set `rootID` to create a reply.
     public func sendPost(
         channelID: String,
