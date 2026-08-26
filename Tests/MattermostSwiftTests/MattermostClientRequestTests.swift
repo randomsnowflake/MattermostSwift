@@ -50,6 +50,19 @@ struct MattermostClientRequestTests {
     }
 
     @Test
+    func reactionsTreatNullResponseAsEmpty() async throws {
+        let client = try await Self.makeClient { request in
+            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/posts/post-id/reactions")
+            #expect(request.httpMethod == "GET")
+            return try Self.response(statusCode: 200, body: Data("null".utf8), request: request)
+        }
+
+        let reactions = try await client.reactions(postID: "post-id")
+
+        #expect(reactions.isEmpty)
+    }
+
+    @Test
     func sendPostEncodesRequestBodyAndDecodesPost() async throws {
         let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/posts")

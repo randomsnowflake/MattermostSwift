@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Reaction lists now normalize the server's `null` response for posts without
+  reactions to an empty array instead of failing JSON decoding.
 - Added feature-detectable synced-draft support: client configuration exposes
   `AllowSyncedDrafts`, draft list/upsert/delete endpoints preserve channel and
   thread identity (including the server's `null` response when an empty upsert

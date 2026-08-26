@@ -21,7 +21,8 @@ extension MattermostClient {
 
     /// Lists reactions on a post.
     public func reactions(postID: String) async throws -> [MattermostReaction] {
-        try await httpClient.get("/posts/\(postID)/reactions")
+        let reactions: [MattermostReaction]? = try await httpClient.get("/posts/\(postID)/reactions")
+        return reactions ?? []
     }
 
     /// Removes an emoji reaction from a post.
