@@ -470,3 +470,11 @@ Live sync skips an individual WebSocket event when its embedded payload cannot b
 emits `eventApplyFailed` so the host can report schema drift without reconnecting. Failed unread,
 sidebar-category, and thread-state refreshes are likewise emitted through their corresponding
 `MattermostLiveSyncEvent` failure cases; cancellation still stops the stream.
+
+### Two-factor password login
+
+The `/users/mfa` preflight is absent on newer servers. Call `login` and catch
+`MattermostError` with `isMFARequired == true`; ask for the current six-digit
+code, then repeat `login` with `mfaToken`. A rejected or expired code has the same
+error identity and should keep the code-entry screen available. Do not interpret
+all HTTP 401 responses as MFA challenges.

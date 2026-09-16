@@ -106,7 +106,7 @@ The current live script verifies:
 - offline cache readback with `cache-check`, including cached joined-team metadata.
 
 `sync` writes to `.mattermostswift/MattermostSwift.sqlite` by default, or to `MATTERMOST_STORE_PATH` when set. The cache directory uses owner-only permissions and is ignored by git.
-When username/password credentials are present, `scripts/test-live.sh` runs `login-test`; otherwise password-login probing is skipped. On the current development server, `login-test` verifies direct password login, prints the non-secret token source, and then proves the returned session token by loading `me`. Unit tests cover both the documented `Token` response header and the official `MMAUTHTOKEN` cookie fallback.
+When username/password credentials are present, `scripts/test-live.sh` runs `login-test`; otherwise password-login probing is skipped. `login-test` verifies password login, the MFA challenge when a code is supplied, the returned session via `me`, and session logout. Unit tests cover both the documented `Token` response header and the official `MMAUTHTOKEN` cookie fallback.
 
 ## End-to-End Verification
 
@@ -152,3 +152,27 @@ covered deterministically by unit decoding tests because their delivery depends 
 server collapsed-thread/follow state.
 
 Future live tests should continue using the `mmswift-test-` prefix and clean up where safe.
+
+### Two-factor password login
+
+The `/users/mfa` preflight is absent on newer servers. Call `login` and catch
+`MattermostError` with `isMFARequired == true`; ask for the current six-digit
+code, then repeat `login` with `mfaToken`. A rejected or expired code has the same
+error identity and should keep the code-entry screen available. Do not interpret
+all HTTP 401 responses as MFA challenges.
+
+To check authentication without creating posts or channels:
+
+```sh
+scripts/test-login.sh
+```
+
+The script prompts privately for URL, username, password, and an optional current
+MFA code. Automation may supply `MATTERMOST_URL`, `MATTERMOST_USERNAME`,
+`MATTERMOST_PASSWORD`, and either `MATTERMOST_MFA_TOKEN` or
+`MATTERMOST_MFA_SECRET` in the environment. The setup secret stays in the Python
+wrapper, which generates a fresh TOTP after compilation. Do not save credentials
+in tracked files or put them in command arguments. The test verifies the no-code
+challenge when an MFA code is supplied, checks `/users/me`, and revokes its session.
+`test-live.sh` and `test-e2e.sh` include this check when password credentials are
+configured; their other checks still require the existing bearer-token settings.

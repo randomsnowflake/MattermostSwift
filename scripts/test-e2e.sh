@@ -6,6 +6,10 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 1
 fi
 
+if [ -n "${MATTERMOST_USERNAME:-}" ] && [ -n "${MATTERMOST_PASSWORD:-}" ]; then
+    scripts/test-login.sh
+fi
+
 test_channel_id=""
 cleanup_test_channel() {
     if [ -n "$test_channel_id" ]; then

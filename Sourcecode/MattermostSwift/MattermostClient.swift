@@ -161,6 +161,7 @@ public extension MattermostClient {
     /// - `MATTERMOST_URL`
     /// - `MATTERMOST_USERNAME`
     /// - `MATTERMOST_PASSWORD`
+    /// Optional: `MATTERMOST_MFA_TOKEN` for the current six-digit authenticator code.
     static func loginFromEnvironment(
         _ environment: [String: String] = ProcessInfo.processInfo.environment,
         urlSession: URLSession = .mattermost
@@ -182,6 +183,7 @@ public extension MattermostClient {
             serverURL: serverURL,
             loginID: username,
             password: password,
+            mfaToken: environment["MATTERMOST_MFA_TOKEN"].nonEmpty,
             urlSession: urlSession
         )
     }

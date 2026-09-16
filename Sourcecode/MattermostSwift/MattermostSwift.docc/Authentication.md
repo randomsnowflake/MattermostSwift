@@ -75,3 +75,11 @@ Don't bundle environment credentials into an app or commit them to source contro
 - <doc:ErrorHandling>
 - ``MattermostSession``
 - ``MattermostAuthentication``
+
+### Two-factor password login
+
+The `/users/mfa` preflight is absent on newer servers. Call `login` and catch
+`MattermostError` with `isMFARequired == true`; ask for the current six-digit
+code, then repeat `login` with `mfaToken`. A rejected or expired code has the same
+error identity and should keep the code-entry screen available. Do not interpret
+all HTTP 401 responses as MFA challenges.

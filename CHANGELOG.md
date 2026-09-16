@@ -6,6 +6,11 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Expose `MattermostError.isMFARequired` for password-login challenges on servers
+  without the deprecated `/users/mfa` preflight. Environment login accepts
+  `MATTERMOST_MFA_TOKEN`. Authentication-only E2E checks verify the challenge,
+  authenticated user, and session logout with `scripts/test-login.sh`.
+
 - Reaction lists now normalize the server's `null` response for posts without
   reactions to an empty array instead of failing JSON decoding.
 - Added feature-detectable synced-draft support: client configuration exposes

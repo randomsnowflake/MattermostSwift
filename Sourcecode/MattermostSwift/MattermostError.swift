@@ -51,6 +51,15 @@ public enum MattermostError: Error, Equatable, Sendable {
 }
 
 public extension MattermostError {
+    /// Password login needs a TOTP code, or the supplied code was rejected.
+    /// Match the stable server identifier, never a generic 401 or localized message.
+    var isMFARequired: Bool {
+        if case .httpStatus(401, _, let body) = self {
+            return body?.id == "mfa.validate_token.authenticate.app_error"
+        }
+        return false
+    }
+
     /// Whether this error represents an HTTP 401 response.
     var isUnauthorized: Bool {
         if case .httpStatus(401, _, _) = self {

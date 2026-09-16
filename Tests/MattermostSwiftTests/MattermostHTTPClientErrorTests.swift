@@ -692,6 +692,35 @@ struct MattermostHTTPClientErrorTests {
     }
 
     @Test
+    func loginClassifiesMFAChallengeWithoutConfusingBadCredentials() async throws {
+        let session = await Self.urlSession { request in
+            try Self.response(statusCode: 401, body: Data(#"{"id":"mfa.validate_token.authenticate.app_error","message":"Invalid MFA token."}"#.utf8), request: request)
+        }
+        do {
+            _ = try await MattermostClient.login(serverURL: URL(string: "https://example.com")!, loginID: "user", password: "password", urlSession: session)
+            Issue.record("Expected MFA challenge")
+        } catch let error as MattermostError {
+            #expect(error.isMFARequired)
+        }
+        #expect(!MattermostError.httpStatus(code: 401, message: "Invalid MFA token.", apiError: nil).isMFARequired)
+        #expect(!MattermostError.httpStatus(code: 403, message: nil, apiError: MattermostAPIErrorBody(id: "mfa.validate_token.authenticate.app_error")).isMFARequired)
+    }
+
+    @Test(arguments: [true, false])
+    func environmentLoginSendsOptionalMFACode(withMFA: Bool) async throws {
+        var environment = ["MATTERMOST_URL": "https://example.com", "MATTERMOST_USERNAME": "user", "MATTERMOST_PASSWORD": "password"]
+        if withMFA { environment["MATTERMOST_MFA_TOKEN"] = "012345" }
+        let session = try await MattermostClient.loginFromEnvironment(environment, urlSession: await Self.urlSession { request in
+            let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
+            #expect(body?["token"] as? String == (withMFA ? "012345" : nil))
+            let url = try #require(request.url)
+            let response = try #require(HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Token": "test-token"]))
+            return (response, Data(#"{"id":"user-id","username":"user"}"#.utf8))
+        })
+        #expect(session.token == "test-token")
+    }
+
+    @Test
     func loginUsesTokenResponseHeaderWhenPresent() async throws {
         let session = try await MattermostClient.login(
             serverURL: try #require(URL(string: "https://mattermost.example.com")),

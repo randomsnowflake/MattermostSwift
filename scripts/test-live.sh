@@ -67,5 +67,5 @@ swift run MattermostSwiftCLI diag all-channel-backfill-test >/dev/null
 swift run MattermostSwiftCLI cache-check >/dev/null
 
 if [ -n "${MATTERMOST_USERNAME:-}" ] && [ -n "${MATTERMOST_PASSWORD:-}" ]; then
-    swift run MattermostSwiftCLI diag login-test >/dev/null
+    scripts/test-login.sh
 fi
