@@ -6,9 +6,11 @@ extension MattermostClient {
     /// Loads every synced draft belonging to a user in one team.
     ///
     /// Servers expose this endpoint only when `AllowSyncedDrafts` is enabled in
-    /// ``MattermostClientConfig``.
+    /// ``MattermostClientConfig``. A user without drafts gets JSON `null` rather
+    /// than an empty array; that is returned as an empty list.
     public func drafts(teamID: String, userID: String = "me") async throws -> [MattermostDraft] {
-        try await httpClient.get("/users/\(userID)/teams/\(teamID)/drafts")
+        let drafts: [MattermostDraft]? = try await httpClient.get("/users/\(userID)/teams/\(teamID)/drafts")
+        return drafts ?? []
     }
 
     /// Creates or replaces the channel/thread draft identified by the request.

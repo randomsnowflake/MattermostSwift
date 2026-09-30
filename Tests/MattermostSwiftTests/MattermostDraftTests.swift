@@ -51,6 +51,16 @@ struct MattermostDraftTests {
         #expect(try await client.deleteDraft(channelID: "channel-id", rootID: "root-id").isOK)
     }
 
+    @Test("a user without drafts gets JSON null, decoded as an empty list")
+    func nullDraftListDecodesEmpty() async throws {
+        let client = try await Self.makeClient { request in
+            #expect(request.url?.path == "/api/v4/users/me/teams/team-id/drafts")
+            return try Self.response(statusCode: 200, body: Data("null".utf8), request: request)
+        }
+
+        #expect(try await client.drafts(teamID: "team-id").isEmpty)
+    }
+
     @Test("empty draft upsert decodes the server deletion response")
     func emptyDraftUpsertReturnsNil() async throws {
         let client = try await Self.makeClient { request in

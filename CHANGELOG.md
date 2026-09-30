@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- `drafts(teamID:)` returns an empty list when the server answers JSON `null` for a user
+  without drafts, instead of throwing a decoding error that disabled draft sync.
 - Fixed `thread_updated` decoding: Mattermost sends `data.thread` as a JSON-encoded
   `ThreadResponse` string, which the SDK ignored, so the event carried no thread id and the
   live-sync thread refresh never ran. `MattermostLiveEvent.decodedThread()` and the new
