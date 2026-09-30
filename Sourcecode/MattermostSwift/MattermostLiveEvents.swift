@@ -166,18 +166,32 @@ public struct MattermostLiveEvent: Codable, Equatable, Sendable {
         )
     }
 
+    /// Decodes the per-user thread state carried by `thread_updated` events.
+    ///
+    /// Mattermost sends `data.thread` as a JSON-encoded string of its `ThreadResponse`.
+    public func decodedThread() throws -> MattermostThreadResponse? {
+        guard let data = jsonData("thread") else {
+            return nil
+        }
+
+        return try mattermostSnakeCaseDecoder.decode(MattermostThreadResponse.self, from: data)
+    }
+
     /// Returns tolerant thread-update data for `response` and collapsed-thread WebSocket events.
     public func decodedThreadEvent() throws -> MattermostThreadEvent {
         let post = try decodedPost()
+        let thread = try decodedThread()
         let postRootID = post?.rootID.isEmpty == false ? post?.rootID : nil
         return MattermostThreadEvent(
             event: event,
             userID: anyString("user_id", "userId", broadcast: \.userID) ?? post?.userID,
-            channelID: anyString("channel_id", "channelId", broadcast: \.channelID) ?? post?.channelID,
+            channelID: anyString("channel_id", "channelId", broadcast: \.channelID)
+                ?? post?.channelID ?? thread?.post?.channelID,
             teamID: anyString("team_id", "teamId", broadcast: \.teamID),
             postID: anyString("post_id", "postId") ?? post?.id,
             rootID: anyString("root_id", "rootId") ?? postRootID,
-            threadID: anyString("thread_id", "threadId") ?? postRootID ?? post?.id
+            threadID: anyString("thread_id", "threadId") ?? thread?.id ?? postRootID ?? post?.id,
+            thread: thread
         )
     }
 
@@ -384,6 +398,9 @@ public struct MattermostThreadEvent: Equatable, Sendable {
     public let postID: String?
     public let rootID: String?
     public let threadID: String?
+    /// Full per-user thread state when the server pushes it (`thread_updated`), so hosts can
+    /// apply it without a follow-up `GET .../threads/{thread_id}`.
+    public let thread: MattermostThreadResponse?
 }
 
 /// Broadcast metadata attached to a Mattermost WebSocket event.

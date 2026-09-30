@@ -6,6 +6,23 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Fixed `thread_updated` decoding: Mattermost sends `data.thread` as a JSON-encoded
+  `ThreadResponse` string, which the SDK ignored, so the event carried no thread id and the
+  live-sync thread refresh never ran. `MattermostLiveEvent.decodedThread()` and the new
+  `MattermostThreadEvent.thread` expose the pushed per-user thread state, and `threadID`
+  falls back to its id.
+- Reconnecting live-event streams now finish with an HTTP 401/403 `MattermostError` when the
+  token is rejected, instead of retrying forever. A rejected WebSocket upgrade is terminal
+  directly; because Mattermost upgrades anonymously and silently closes the socket on a bad
+  `authentication_challenge`, an upgraded socket that fails before authenticating is
+  confirmed with one `GET /users/me` and ends the stream only on HTTP 401.
+- REST, download, upload, and WebSocket tasks install a redirect guard: cross-origin
+  redirects drop `Authorization`/`Cookie`, and HTTPS-to-HTTP downgrades or cross-origin
+  replays of a request body are refused.
+- Added `flaggedPosts(userID:teamID:channelID:page:perPage:)` for
+  `GET /api/v4/users/{user_id}/posts/flagged`, loading saved posts as one post list instead
+  of one request per flag.
+
 - `MattermostUser.mfaActive` exposes whether the user has multi-factor
   authentication enabled.
 

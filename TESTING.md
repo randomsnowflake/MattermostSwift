@@ -43,6 +43,11 @@ The current unit tests cover:
 - WebSocket live event decoding, observable nonfatal malformed-frame handling, typed post create/edit/delete/unread and thread update/read/follow event helpers, embedded post/channel/user/member decoding, and tolerant invalidation events,
 - default REST/WebSocket trust-delegate installation and delegate lifetime, plus the bounded
   256-event WebSocket authentication-handshake buffer,
+- server-shaped `thread_updated` (string `data.thread`), `thread_read_changed`, and
+  `thread_follow_changed` payloads, terminal WebSocket authentication-failure classification
+  (upgrade 401/403 and REST-confirmed silent handshake close), the redirect credential guard
+  including a refused HTTPS-to-HTTP redirect through a mocked session, and saved-post
+  (`posts/flagged`) request construction,
 - WebSocket full-jitter reconnect backoff, including deterministic lower/midpoint/upper samples
   and bounds at the configured and integer caps,
 - live-sync reconnect orchestration with an injected lifecycle stream, including deterministic

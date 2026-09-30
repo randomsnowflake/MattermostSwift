@@ -6,6 +6,10 @@ public struct MattermostLiveEventStream: Sendable {
     let urlSession: URLSession
     let heartbeatInterval: Duration
     let heartbeatTimeout: Duration
+    /// REST check run when an upgraded socket fails before authenticating. Mattermost upgrades
+    /// the socket without a session and then silently closes it on a rejected
+    /// `authentication_challenge`, so only a REST 401 can tell a revoked token from a blip.
+    var authenticationProbe: (@Sendable () async throws -> Void)?
 
     public init(
         configuration: MattermostConfiguration,
@@ -97,6 +101,11 @@ public struct MattermostLiveEventStream: Sendable {
                     } catch is CancellationError {
                         continuation.finish()
                         return
+                    } catch let error as MattermostError where error.isUnauthorized || error.isForbidden {
+                        // A rejected credential cannot heal by reconnecting; surface it so the
+                        // host can end the session instead of retrying a dead token forever.
+                        continuation.finish(throwing: error)
+                        return
                     } catch {
                         let failure = MattermostLiveEventStreamFailure(error: error)
                         if Self.connectionWasStable(since: connectedAt) { attempt = 0 }
@@ -143,12 +152,23 @@ public struct MattermostLiveEventStream: Sendable {
         onEvent: @escaping @Sendable (MattermostLiveEvent) async throws -> Void
     ) async throws {
         let webSocketTask = urlSession.webSocketTask(with: makeWebSocketRequest())
+        webSocketTask.delegate = MattermostRedirectGuard.shared
         webSocketTask.resume()
         defer {
             webSocketTask.cancel(with: .goingAway, reason: nil)
         }
 
-        let pendingEvents = try await authenticate(webSocketTask)
+        let pendingEvents: [MattermostLiveEvent]
+        do {
+            pendingEvents = try await authenticate(webSocketTask)
+        } catch {
+            let upgradeStatusCode = (webSocketTask.response as? HTTPURLResponse)?.statusCode
+            throw await Self.authenticationFailure(
+                for: error,
+                upgradeStatusCode: upgradeStatusCode,
+                probe: authenticationProbe
+            ) ?? error
+        }
         try await onConnected()
         for event in pendingEvents {
             try await onEvent(event)
@@ -360,6 +380,35 @@ public struct MattermostLiveEventStream: Sendable {
     }
 
     static let maximumPendingHandshakeEvents = 256
+
+    /// Classifies a failure before WebSocket authentication completed. Returns an HTTP 401/403
+    /// `MattermostError` only when the credential itself was rejected: by the upgrade response,
+    /// or, after a successful upgrade, by the REST probe. Everything else stays retryable.
+    static func authenticationFailure(
+        for error: any Error,
+        upgradeStatusCode: Int?,
+        probe: (@Sendable () async throws -> Void)?
+    ) async -> MattermostError? {
+        if error is CancellationError || Task.isCancelled { return nil }
+        if let upgradeStatusCode, upgradeStatusCode == 401 || upgradeStatusCode == 403 {
+            return .httpStatus(
+                code: upgradeStatusCode,
+                message: "Mattermost WebSocket upgrade was rejected.",
+                apiError: nil
+            )
+        }
+        // Without a completed upgrade the server was never reached; probing would only add
+        // REST timeouts to an ordinary network outage.
+        guard upgradeStatusCode == 101, let probe else { return nil }
+        do {
+            try await probe()
+            return nil
+        } catch let probeError as MattermostError where probeError.isUnauthorized {
+            return probeError
+        } catch {
+            return nil
+        }
+    }
 
     static func appendPendingHandshakeEvent(
         _ event: MattermostLiveEvent,

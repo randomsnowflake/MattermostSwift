@@ -81,8 +81,13 @@ public struct MattermostClient: Sendable {
     }
 
     /// Creates a WebSocket live-event stream for this client.
+    ///
+    /// Reconnecting streams finish with an HTTP 401/403 `MattermostError` (`isUnauthorized` or
+    /// `isForbidden`) when the server rejects the token, instead of retrying it forever.
     public func liveEventStream() -> MattermostLiveEventStream {
-        MattermostLiveEventStream(configuration: configuration, urlSession: webSocketURLSession)
+        var stream = MattermostLiveEventStream(configuration: configuration, urlSession: webSocketURLSession)
+        stream.authenticationProbe = { _ = try await currentUser() }
+        return stream
     }
 
     static func clampedPage(_ page: Int) -> Int {

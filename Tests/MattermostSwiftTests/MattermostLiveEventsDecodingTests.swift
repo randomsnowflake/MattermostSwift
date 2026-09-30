@@ -319,3 +319,58 @@ func multipleChannelsViewedToleratesMissingChannelTimes() throws {
     #expect(viewed.channelTimes.isEmpty)
     #expect(try event.typedEvent() == .multipleChannelsViewed(viewed))
 }
+
+@Test
+func threadUpdatedDecodesServerThreadPayloadString() throws {
+    // Mattermost publishes `data.thread` as a JSON-encoded ThreadResponse string and routes
+    // the event to the recipient through `broadcast.user_id`.
+    let thread = """
+    {"id":"root-a","reply_count":3,"last_reply_at":30,"last_viewed_at":20,"participants":[{"id":"user-b","username":"bee"}],\
+    "post":{"id":"root-a","create_at":10,"update_at":10,"edit_at":0,"delete_at":0,"user_id":"user-b","channel_id":"channel-a","root_id":"","message":"root","type":""},\
+    "unread_replies":2,"unread_mentions":1,"is_urgent":false,"delete_at":0}
+    """
+    let envelope: [String: Any] = [
+        "event": "thread_updated",
+        "data": ["thread": thread, "previous_unread_mentions": 0, "previous_unread_replies": 1],
+        "broadcast": ["user_id": "user-a", "team_id": "team-a"],
+        "seq": 9,
+    ]
+    let event = try mattermostSnakeCaseDecoder.decode(
+        MattermostLiveEvent.self,
+        from: JSONSerialization.data(withJSONObject: envelope)
+    )
+
+    let threadEvent = try event.decodedThreadEvent()
+
+    #expect(threadEvent.threadID == "root-a")
+    #expect(threadEvent.userID == "user-a")
+    #expect(threadEvent.teamID == "team-a")
+    #expect(threadEvent.channelID == "channel-a")
+    #expect(threadEvent.thread?.replyCount == 3)
+    #expect(threadEvent.thread?.unreadReplies == 2)
+    #expect(threadEvent.thread?.unreadMentions == 1)
+    #expect(threadEvent.thread?.post?.message == "root")
+    #expect(threadEvent.thread?.participants.map(\.id) == ["user-b"])
+    #expect(try event.typedEvent() == .threadUpdated(threadEvent))
+}
+
+@Test
+func threadReadAndFollowEventsMatchServerPayloads() throws {
+    // Shapes from the server's UpdateThreadReadForUser and UpdateThreadFollowForUser.
+    let read = try mattermostSnakeCaseDecoder.decode(MattermostLiveEvent.self, from: Data("""
+    {"event":"thread_read_changed","data":{"thread_id":"root-a","timestamp":40,"unread_mentions":0,"unread_replies":0,\
+    "previous_unread_mentions":1,"previous_unread_replies":2,"channel_id":"channel-a"},"broadcast":{"user_id":"user-a","team_id":"team-a"},"seq":1}
+    """.utf8))
+    let follow = try mattermostSnakeCaseDecoder.decode(MattermostLiveEvent.self, from: Data("""
+    {"event":"thread_follow_changed","data":{"thread_id":"root-a","state":false,"reply_count":3},\
+    "broadcast":{"user_id":"user-a","team_id":"team-a"},"seq":2}
+    """.utf8))
+
+    for event in [read, follow] {
+        let threadEvent = try event.decodedThreadEvent()
+        #expect(threadEvent.threadID == "root-a")
+        #expect(threadEvent.userID == "user-a")
+        #expect(threadEvent.teamID == "team-a")
+        #expect(threadEvent.thread == nil)
+    }
+}

@@ -206,6 +206,28 @@ struct MattermostClientRequestTests {
         #expect(response.isOK)
     }
 
+    @Test
+    func flaggedPostsLoadsSavedPostsInOneScopedPage() async throws {
+        let client = try await Self.makeClient { request in
+            #expect(request.httpMethod == "GET")
+            #expect(request.url?.path == "/api/v4/users/me/posts/flagged")
+            let query = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)?
+                .queryItems?.reduce(into: [String: String]()) { $0[$1.name] = $1.value }
+            #expect(query == ["page": "2", "per_page": "200", "team_id": "team-id"])
+            let body = Data(#"""
+            {"order":["post-b","post-a"],"posts":{
+              "post-a":{"id":"post-a","create_at":1,"update_at":1,"edit_at":0,"delete_at":0,"user_id":"u","channel_id":"c","root_id":"","message":"a","type":""},
+              "post-b":{"id":"post-b","create_at":2,"update_at":2,"edit_at":0,"delete_at":0,"user_id":"u","channel_id":"c","root_id":"","message":"b","type":""}
+            }}
+            """#.utf8)
+            return try Self.response(statusCode: 200, body: body, request: request)
+        }
+
+        let list = try await client.flaggedPosts(teamID: "team-id", page: 2, perPage: 200)
+
+        #expect(list.orderedPosts.map(\.id) == ["post-b", "post-a"])
+    }
+
     // MARK: - Helpers
 
     private static func makeClient(

@@ -79,6 +79,28 @@ extension MattermostClient {
         try await httpClient.get("/channels/\(channelID)/pinned")
     }
 
+    /// Loads a page of the user's saved (flagged) posts in one request.
+    ///
+    /// Mattermost omits deleted posts and posts in channels the user can no longer read, and
+    /// filters after paging, so a page can hold fewer than `perPage` posts. Pass `teamID` or
+    /// `channelID` to scope the list; `channelID` wins when both are set.
+    public func flaggedPosts(
+        userID: String = "me",
+        teamID: String? = nil,
+        channelID: String? = nil,
+        page: Int = 0,
+        perPage: Int = 60
+    ) async throws -> MattermostPostList {
+        var queryItems = Self.pageQueryItems(page: page, perPage: perPage)
+        if let teamID = teamID.nonEmpty {
+            queryItems.append(URLQueryItem(name: "team_id", value: teamID))
+        }
+        if let channelID = channelID.nonEmpty {
+            queryItems.append(URLQueryItem(name: "channel_id", value: channelID))
+        }
+        return try await httpClient.get("/users/\(userID)/posts/flagged", queryItems: queryItems)
+    }
+
     /// Loads posts created or modified after a Unix timestamp in milliseconds.
     public func postsSince(
         channelID: String,

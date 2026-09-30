@@ -126,7 +126,10 @@ struct MattermostHTTPClient: Sendable {
         maximumSize: Int64? = nil
     ) async throws -> URL {
         let request = try makeRequest(endpoint: endpoint, method: "GET")
-        let (temporaryURL, response) = try await urlSession.download(for: request)
+        let (temporaryURL, response) = try await urlSession.download(
+            for: request,
+            delegate: MattermostRedirectGuard.shared
+        )
         let httpResponse = try validate(Data(), response)
         if let maximumSize,
            let length = httpResponse.value(forHTTPHeaderField: "Content-Length").flatMap(Int64.init),
@@ -174,7 +177,11 @@ struct MattermostHTTPClient: Sendable {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         let bodyURL = try makeMultipartBodyFile(parts: parts, filePart: filePart, boundary: boundary)
         defer { try? FileManager.default.removeItem(at: bodyURL) }
-        let (data, response) = try await urlSession.upload(for: request, fromFile: bodyURL)
+        let (data, response) = try await urlSession.upload(
+            for: request,
+            fromFile: bodyURL,
+            delegate: MattermostRedirectGuard.shared
+        )
         return try decodeResponse(data: data, response: response).value
     }
 
@@ -256,7 +263,7 @@ struct MattermostHTTPClient: Sendable {
         while true {
             let result: (Data, URLResponse)
             do {
-                result = try await urlSession.data(for: request)
+                result = try await urlSession.data(for: request, delegate: MattermostRedirectGuard.shared)
             } catch {
                 if Self.isCancellation(error) {
                     throw error
@@ -549,5 +556,46 @@ private extension String {
 private extension Data {
     mutating func appendString(_ string: String) {
         append(contentsOf: string.utf8)
+    }
+}
+
+/// Keeps Mattermost credentials on the configured server origin across HTTP redirects.
+///
+/// Installed as a task delegate on every SDK request, including hosts' injected sessions, so a
+/// session-level delegate (for example certificate pinning) still handles trust challenges.
+/// Same-origin redirects are followed unchanged. Cross-origin redirects are followed only for
+/// body-less requests and without `Authorization`/`Cookie`; HTTPS-to-HTTP downgrades and
+/// cross-origin replays of a request body (such as login credentials) are refused, which
+/// surfaces the 3xx response as an HTTP error.
+final class MattermostRedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
+    static let shared = MattermostRedirectGuard()
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest
+    ) async -> URLRequest? {
+        Self.redirectRequest(request, from: response.url ?? task.currentRequest?.url)
+    }
+
+    static func redirectRequest(_ request: URLRequest, from sourceURL: URL?) -> URLRequest? {
+        guard let sourceURL, let targetURL = request.url else { return nil }
+        let sourceScheme = sourceURL.scheme?.lowercased()
+        let targetScheme = targetURL.scheme?.lowercased()
+        if sourceScheme == "https", targetScheme != "https" { return nil }
+        if origin(of: sourceURL) == origin(of: targetURL) { return request }
+        let method = request.httpMethod?.uppercased() ?? "GET"
+        guard method == "GET" || method == "HEAD" else { return nil }
+        var stripped = request
+        stripped.setValue(nil, forHTTPHeaderField: "Authorization")
+        stripped.setValue(nil, forHTTPHeaderField: "Cookie")
+        return stripped
+    }
+
+    private static func origin(of url: URL) -> String {
+        let scheme = url.scheme?.lowercased() ?? ""
+        let port = url.port ?? (scheme == "https" || scheme == "wss" ? 443 : 80)
+        return "\(scheme)://\(url.host?.lowercased() ?? ""):\(port)"
     }
 }
