@@ -59,6 +59,9 @@ public struct MattermostUser: Codable, Equatable, Hashable, Sendable, Identifiab
     public let lastPictureUpdate: Int64?
     /// Present for the authenticated user (or callers with permission to view it).
     public let notifyProps: MattermostUserNotifyProps?
+    /// Whether multi-factor authentication is enabled. Present for the
+    /// authenticated user; `nil` when the server omits it.
+    public let mfaActive: Bool?
 
     public init(
         id: String,
@@ -71,7 +74,8 @@ public struct MattermostUser: Codable, Equatable, Hashable, Sendable, Identifiab
         locale: String? = nil,
         timezone: [String: String]? = nil,
         lastPictureUpdate: Int64? = nil,
-        notifyProps: MattermostUserNotifyProps? = nil
+        notifyProps: MattermostUserNotifyProps? = nil,
+        mfaActive: Bool? = nil
     ) {
         self.id = id
         self.username = username
@@ -84,6 +88,7 @@ public struct MattermostUser: Codable, Equatable, Hashable, Sendable, Identifiab
         self.timezone = timezone
         self.lastPictureUpdate = lastPictureUpdate
         self.notifyProps = notifyProps
+        self.mfaActive = mfaActive
     }
 
     public var lastPictureUpdatedAt: Date? {

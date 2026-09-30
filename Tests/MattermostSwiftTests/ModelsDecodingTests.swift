@@ -122,6 +122,13 @@ func decodesMattermostUserLastPictureUpdateFromSnakeCase() throws {
 }
 
 @Test
+func decodesMattermostUserMFAActiveFromSnakeCase() throws {
+    let payload = #"{"id": "user123", "username": "jdoe", "mfa_active": true}"#
+    let user = try mattermostSnakeCaseDecoder.decode(MattermostUser.self, from: Data(payload.utf8))
+    #expect(user.mfaActive == true)
+}
+
+@Test
 func decodesMattermostUserWithoutLastPictureUpdateAsNil() throws {
     // Servers that omit the field (or older versions) decode as nil because
     // the optional property uses `decodeIfPresent`.

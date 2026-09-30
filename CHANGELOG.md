@@ -6,6 +6,9 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- `MattermostUser.mfaActive` exposes whether the user has multi-factor
+  authentication enabled.
+
 - Expose `MattermostError.isMFARequired` for password-login challenges on servers
   without the deprecated `/users/mfa` preflight. Environment login accepts
   `MATTERMOST_MFA_TOKEN`. Authentication-only E2E checks verify the challenge,
