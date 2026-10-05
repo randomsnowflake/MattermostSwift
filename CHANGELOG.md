@@ -6,6 +6,8 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- `mattermostBoundedConcurrentMap(_:width:operation:)` is now public so apps can reuse the
+  SDK's bounded, order-preserving fan-out instead of hand-rolling task groups.
 - `drafts(teamID:)` returns an empty list when the server answers JSON `null` for a user
   without drafts, instead of throwing a decoding error that disabled draft sync.
 - Fixed `thread_updated` decoding: Mattermost sends `data.thread` as a JSON-encoded

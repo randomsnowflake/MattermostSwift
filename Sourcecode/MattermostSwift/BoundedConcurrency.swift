@@ -7,11 +7,10 @@ private struct MattermostIndexedTaskResult<Value: Sendable>: Sendable {
 
 /// Runs an async transform with manual task-group backpressure and returns results in input order.
 ///
-/// This stays internal so SDK fan-out uses one concurrency policy without exposing scheduling as
-/// public API. The operation is main-actor isolated because current consumers coordinate
-/// `MattermostStore` mutations there; each operation can still overlap while suspended on HTTP.
+/// Public so SDK consumers share one fan-out policy. The operation is main-actor isolated because
+/// consumers coordinate state mutations there; each operation can still overlap while suspended on HTTP.
 @MainActor
-func mattermostBoundedConcurrentMap<Input: Sendable, Output: Sendable>(
+public func mattermostBoundedConcurrentMap<Input: Sendable, Output: Sendable>(
     _ inputs: [Input],
     width: Int = 8,
     operation: @escaping @MainActor @Sendable (Input) async throws -> Output
