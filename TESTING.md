@@ -26,6 +26,10 @@ The current unit tests cover:
   cursor pagination/deduplication, insecure login/MFA, remembered session URLs, `Duration`
   reconnect delays, tolerant typed/raw metadata, and host-inspectable insecure configuration,
 - unread-context and collapsed-thread request construction,
+- team unread counts (`users/{id}/teams/unread`): `exclude_team`/`include_collapsed_threads`
+  query construction on root and subpath servers, wire decoding of full, minimal, null-optional
+  and empty-team aggregate rows, malformed-row and HTTP error propagation, and the CLI
+  `list-teams-unread` parse and JSON shape; client-config `DiagnosticId` decoding,
 - thread inbox request construction, thread read-state request construction, decoding, and cache upserts,
 - query item construction,
 - REST error handling for Mattermost error bodies, non-JSON error bodies, empty successful JSON responses, binary/data endpoints, bounded 429 retries with `Retry-After`, dedicated rate-limit errors, and mutation replay prevention,
@@ -93,6 +97,7 @@ The current live script verifies:
 - user lookup, profile/default profile image download, batch user lookup, user search/autocomplete/known-user probes, and current-user presence,
 - server health/config probing,
 - joined team listing, team metadata loading, and team member listing,
+- per-team unread counts (`list-teams-unread` returns an array of rows with `teamId`),
 - joined channel listing, public team channel discovery, channel detail lookup by id/name, and read-only channel stats/timezone/member-count lookup,
 - team-scoped channel search,
 - channel membership lookup, paginated channel member listing, unread counts, and typed notification props,

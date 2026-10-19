@@ -15,6 +15,7 @@ enum Command: Equatable, Sendable {
     case status(userID: String?)
     case serverInfo
     case listTeams
+    case listTeamsUnread(excludeTeamID: String?)
     case teamInfo(teamID: String?)
     case listTeamMembers(teamID: String?)
     case listChannels
@@ -116,6 +117,7 @@ struct RootCommand: AsyncParsableCommand {
             UserStatus.self,
             ServerInfo.self,
             ListTeams.self,
+            ListTeamsUnread.self,
             TeamInfo.self,
             ListTeamMembers.self,
             ListChannels.self,
@@ -283,6 +285,13 @@ struct ListTeams: RootCLICommand {
     static let configuration = CommandConfiguration(abstract: "List joined teams.")
     @ParentCommand var parent: RootCommand
     var command: Command { .listTeams }
+}
+
+struct ListTeamsUnread: RootCLICommand {
+    static let configuration = CommandConfiguration(abstract: "List unread and mention counts per joined team.")
+    @ParentCommand var parent: RootCommand
+    @Option(name: .customLong("exclude"), help: "Team id to leave out.") var excludeTeamID: String?
+    var command: Command { .listTeamsUnread(excludeTeamID: excludeTeamID) }
 }
 
 struct TeamInfo: RootCLICommand {

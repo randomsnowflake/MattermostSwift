@@ -9,6 +9,7 @@ fi
 swift run MattermostSwiftCLI check
 swift run MattermostSwiftCLI server-info
 swift run MattermostSwiftCLI list-teams >/dev/null
+swift run MattermostSwiftCLI --json list-teams-unread | jq -e 'type == "array" and all(.[]; has("teamId"))' >/dev/null
 swift run MattermostSwiftCLI team-info >/dev/null
 swift run MattermostSwiftCLI list-team-members >/dev/null
 current_user="$(swift run MattermostSwiftCLI --json me)"

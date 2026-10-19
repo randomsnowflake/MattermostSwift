@@ -6,6 +6,12 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Added `teamsUnread(userID:excludeTeamID:includeCollapsedThreads:)` for
+  `GET /api/v4/users/{user_id}/teams/unread` and the `MattermostTeamUnread` model. The rows are
+  returned as the server sends them: unordered, and with an excluded team possibly an
+  empty-`teamID` aggregate for direct and group messages. Callers decide which rows to show.
+- `MattermostClientConfig.diagnosticID` exposes the server `DiagnosticId`, which push payloads
+  carry as `server_id`. `server-info` prints it; new CLI command `list-teams-unread [--exclude]`.
 - `mattermostBoundedConcurrentMap(_:width:operation:)` is now public so apps can reuse the
   SDK's bounded, order-preserving fan-out instead of hand-rolling task groups.
 - `drafts(teamID:)` returns an empty list when the server answers JSON `null` for a user

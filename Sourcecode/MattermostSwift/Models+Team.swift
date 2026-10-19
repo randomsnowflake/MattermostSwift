@@ -45,3 +45,50 @@ public struct MattermostTeamMember: Codable, Equatable, Sendable, Identifiable {
         return Date(mattermostMilliseconds: deleteAt)
     }
 }
+
+/// Unread and mention counts for one team, from `GET /users/{id}/teams/unread`.
+///
+/// Root and thread counters are absent on older servers.
+public struct MattermostTeamUnread: Codable, Equatable, Hashable, Sendable, Identifiable {
+    public let teamID: String
+    public let msgCount: Int
+    public let mentionCount: Int
+    public let msgCountRoot: Int?
+    public let mentionCountRoot: Int?
+    public let threadCount: Int?
+    public let threadMentionCount: Int?
+    public let threadUrgentMentionCount: Int?
+
+    public var id: String { teamID }
+
+    public init(
+        teamID: String,
+        msgCount: Int,
+        mentionCount: Int,
+        msgCountRoot: Int? = nil,
+        mentionCountRoot: Int? = nil,
+        threadCount: Int? = nil,
+        threadMentionCount: Int? = nil,
+        threadUrgentMentionCount: Int? = nil
+    ) {
+        self.teamID = teamID
+        self.msgCount = msgCount
+        self.mentionCount = mentionCount
+        self.msgCountRoot = msgCountRoot
+        self.mentionCountRoot = mentionCountRoot
+        self.threadCount = threadCount
+        self.threadMentionCount = threadMentionCount
+        self.threadUrgentMentionCount = threadUrgentMentionCount
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case teamID = "teamId"
+        case msgCount
+        case mentionCount
+        case msgCountRoot
+        case mentionCountRoot
+        case threadCount
+        case threadMentionCount
+        case threadUrgentMentionCount
+    }
+}

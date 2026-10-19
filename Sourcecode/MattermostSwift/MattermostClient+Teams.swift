@@ -18,6 +18,27 @@ extension MattermostClient {
         try await httpClient.get("/users/\(userID)/teams")
     }
 
+    /// Unread and mention counts for the user's teams.
+    ///
+    /// The server aggregates these rows and returns them unordered. With an
+    /// `excludeTeamID`, it can also return a row with an empty `teamID` that
+    /// aggregates direct and group messages. The SDK returns the raw rows;
+    /// callers decide which rows count toward their own badges.
+    public func teamsUnread(
+        userID: String = "me",
+        excludeTeamID: String? = nil,
+        includeCollapsedThreads: Bool = true
+    ) async throws -> [MattermostTeamUnread] {
+        var queryItems: [URLQueryItem] = []
+        if let excludeTeamID, !excludeTeamID.isEmpty {
+            queryItems.append(URLQueryItem(name: "exclude_team", value: excludeTeamID))
+        }
+        queryItems.append(
+            URLQueryItem(name: "include_collapsed_threads", value: includeCollapsedThreads ? "true" : "false")
+        )
+        return try await httpClient.get("/users/\(userID)/teams/unread", queryItems: queryItems)
+    }
+
     /// Lists team membership records for users on a team.
     public func teamMembers(
         teamID: String,

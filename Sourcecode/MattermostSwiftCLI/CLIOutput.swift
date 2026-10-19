@@ -90,6 +90,10 @@ extension MattermostSwiftCLI {
         if let collapsedThreads = serverInfo.clientConfig.collapsedThreads, !collapsedThreads.isEmpty {
             print("collapsed-threads: \(collapsedThreads)")
         }
+
+        if let diagnosticID = serverInfo.clientConfig.diagnosticID, !diagnosticID.isEmpty {
+            print("diagnostic-id: \(diagnosticID)")
+        }
     }
 
     static func printUser(_ user: MattermostUser) {
@@ -218,6 +222,14 @@ extension MattermostSwiftCLI {
         guard !writeJSONIfRequested(sortedTeams) else { return }
         for team in sortedTeams {
             print("\(team.id)\t\(team.name)\t\(team.displayName)")
+        }
+    }
+
+    static func printTeamUnreads(_ unreads: [MattermostTeamUnread]) {
+        let sorted = unreads.sorted { $0.teamID < $1.teamID }
+        guard !writeJSONIfRequested(sorted) else { return }
+        for unread in sorted {
+            print("\(unread.teamID)\tmessages=\(unread.msgCount)\tmentions=\(unread.mentionCount)")
         }
     }
 
