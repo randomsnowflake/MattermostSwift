@@ -48,6 +48,8 @@ public struct MattermostClientConfig: Codable, Equatable, Sendable {
     public let enablePostIconOverride: String?
     public let allowSyncedDrafts: String?
     public let siteName: String?
+    /// Server identity; push payloads carry it as `server_id`.
+    public let diagnosticID: String?
 
     /// Whether the server advertises the synced-drafts API to clients.
     public var supportsSyncedDrafts: Bool {
@@ -71,6 +73,7 @@ public struct MattermostClientConfig: Codable, Equatable, Sendable {
         enablePostIconOverride = try container.decodeStringIfPresent(matching: "EnablePostIconOverride")
         allowSyncedDrafts = try container.decodeStringIfPresent(matching: "AllowSyncedDrafts")
         siteName = try container.decodeStringIfPresent(matching: "SiteName")
+        diagnosticID = try container.decodeStringIfPresent(matching: "DiagnosticId")
     }
 }
 

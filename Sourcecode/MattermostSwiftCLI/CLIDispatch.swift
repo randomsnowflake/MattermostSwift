@@ -65,6 +65,9 @@ extension MattermostSwiftCLI {
         case .listTeams:
             let teams = try await client.teams()
             printTeams(teams)
+        case .listTeamsUnread(let excludeTeamID):
+            let unreads = try await client.teamsUnread(excludeTeamID: excludeTeamID)
+            printTeamUnreads(unreads)
         case .teamInfo(let teamID):
             let team = try await client.team(id: try await resolvedTeamID(teamID, client: client))
             printTeam(team)
