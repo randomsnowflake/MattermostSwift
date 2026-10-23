@@ -6,6 +6,7 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Added README navigation, a CI badge, and links to the MattCha app and hosted SDK documentation.
 - Added `teamsUnread(userID:excludeTeamID:includeCollapsedThreads:)` for
   `GET /api/v4/users/{user_id}/teams/unread` and the `MattermostTeamUnread` model. The rows are
   returned as the server sends them: unordered, and with an excluded team possibly an

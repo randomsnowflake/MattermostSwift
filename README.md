@@ -1,11 +1,17 @@
 # MattermostSwift
 
+[![CI](https://github.com/randomsnowflake/MattermostSwift/actions/workflows/ci.yml/badge.svg)](https://github.com/randomsnowflake/MattermostSwift/actions/workflows/ci.yml)
 [![Swift Package Index](https://img.shields.io/endpoint?url=https://swiftpackageindex.com/api/packages/randomsnowflake/MattermostSwift/badge?type=swift-versions)](https://swiftpackageindex.com/randomsnowflake/MattermostSwift)
 [![Swift Package Index](https://img.shields.io/endpoint?url=https://swiftpackageindex.com/api/packages/randomsnowflake/MattermostSwift/badge?type=platforms)](https://swiftpackageindex.com/randomsnowflake/MattermostSwift)
 [![Documentation](https://img.shields.io/badge/documentation-DocC-blue)](https://swiftpackageindex.com/randomsnowflake/MattermostSwift/documentation/mattermostswift)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-MattermostSwift is an unofficial Swift SDK for Mattermost. It gives you the core loop for building your own Swift-based Mattermost app: authenticate, load teams and channels, read timelines, send and edit posts, sync local state, and react to live WebSocket events.
+MattermostSwift is an unofficial Swift SDK for Mattermost on Apple platforms. Build clients with async/await, REST APIs, live WebSocket events, and a SwiftData cache.
+
+**[Install](#installation)** · **[Quick start](#quick-start)** · **[API documentation](https://swiftpackageindex.com/randomsnowflake/MattermostSwift/documentation/mattermostswift)** · **[Supported APIs](#supported-apis)** · **[Contributing](CONTRIBUTING.md)**
+
+The SDK powers [MattCha](https://www.mattcha.app), a free, native Mattermost app for iPhone, iPad, and Mac.
+Visit the MattCha website for the app, screenshots, and download links. Use this repository to build your own Mattermost client.
 
 This project is not affiliated with, endorsed by, sponsored by, or supported by Mattermost, Inc. Mattermost is a trademark of Mattermost, Inc.; this repository uses the name only to describe API compatibility.
 
@@ -16,7 +22,8 @@ The package is written with Swift concurrency, ships as a Swift Package, and kee
 - Swift tools version: 6.0
 - Library platforms: iOS 18, macOS 15, tvOS 18, watchOS 11, and visionOS 2
 - Products: `MattermostSwift` library and `MattermostSwiftCLI` executable
-- Documentation: hosted by Swift Package Index at `https://swiftpackageindex.com/randomsnowflake/MattermostSwift`
+- Documentation: [API reference and guides on Swift Package Index](https://swiftpackageindex.com/randomsnowflake/MattermostSwift/documentation/mattermostswift)
+- App: [MattCha for iPhone, iPad, and Mac](https://www.mattcha.app)
 - Stability: pre-`1.0.0`; public APIs may evolve between minor releases
 
 The `MattermostSwift` library is built in CI for every declared Apple platform. The
@@ -85,7 +92,7 @@ The package includes curated DocC guides for authentication, pagination, caching
 error handling alongside the symbol reference. Swift Package Index builds and hosts the latest
 documentation from the package page:
 
-`https://swiftpackageindex.com/randomsnowflake/MattermostSwift`
+[Read the API reference and guides](https://swiftpackageindex.com/randomsnowflake/MattermostSwift/documentation/mattermostswift).
 
 ## Quick Start
 
@@ -316,7 +323,7 @@ Source lives in `Sourcecode/`:
 - `Sourcecode/MattermostSwift`: reusable SDK library.
 - `Sourcecode/MattermostSwiftCLI`: executable test/debug harness.
 
-The SwiftUI app lives in the separate `MattCha` repository and consumes this package as a dependency.
+The [MattCha app](https://www.mattcha.app) lives in a separate repository and consumes this package as a dependency.
 
 ## Environment
 
