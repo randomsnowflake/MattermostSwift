@@ -70,78 +70,92 @@ public struct MattermostLiveEventStream: Sendable {
     public func lifecycleEvents(
         policy: MattermostLiveEventReconnectPolicy = .default
     ) -> AsyncThrowingStream<MattermostLiveEventStreamLifecycleEvent, Error> {
-        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(512)) { continuation in
+        Self.lifecycleEvents(policy: policy) { onConnected, onHeartbeat, onEventDecodeFailed, onEvent in
+            try await runAuthenticatedConnection(
+                onConnected: onConnected,
+                onHeartbeat: onHeartbeat,
+                onEventDecodeFailed: onEventDecodeFailed,
+                onEvent: onEvent
+            )
+        }
+    }
+
+    typealias LifecycleConnection = @Sendable (
+        _ onConnected: @escaping @Sendable () async throws -> Void,
+        _ onHeartbeat: @escaping @Sendable () async throws -> Void,
+        _ onEventDecodeFailed: @escaping @Sendable (MattermostLiveEventStreamLifecycleEvent) async throws -> Void,
+        _ onEvent: @escaping @Sendable (MattermostLiveEvent) async throws -> Void
+    ) async throws -> Void
+
+    /// Reconnect loop with an injectable connection. Every exit, including a yield that overflows
+    /// the queue, finishes the continuation so a draining consumer can never wait forever.
+    static func lifecycleEvents(
+        policy: MattermostLiveEventReconnectPolicy,
+        bufferLimit: Int = 512,
+        connect: @escaping LifecycleConnection
+    ) -> AsyncThrowingStream<MattermostLiveEventStreamLifecycleEvent, Error> {
+        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(bufferLimit)) { continuation in
             let streamTask = Task {
-                var attempt = 0
-
-                while !Task.isCancelled {
-                    try Self.yield(.connecting(attempt: attempt), to: continuation)
-
-                    let connectedAt = ContinuousClock.now
-                    let currentAttempt = attempt
-                    do {
-                        try await runAuthenticatedConnection(
-                            onConnected: {
-                                try Self.yield(.connected(attempt: currentAttempt), to: continuation)
-                            },
-                            onHeartbeat: {
-                                try Self.yield(.heartbeat, to: continuation)
-                            },
-                            onEventDecodeFailed: { try Self.yield($0, to: continuation) },
-                            onEvent: { event in
-                                try Self.yield(.event(event), to: continuation)
-                            }
-                        )
-
-                        if Self.connectionWasStable(since: connectedAt) { attempt = 0 }
-                        guard policy.reconnectAfterCleanClose, policy.canRetry(attempt: attempt) else {
-                            continuation.finish()
-                            return
-                        }
-                    } catch is CancellationError {
-                        continuation.finish()
-                        return
-                    } catch let error as MattermostError where error.isUnauthorized || error.isForbidden {
-                        // A rejected credential cannot heal by reconnecting; surface it so the
-                        // host can end the session instead of retrying a dead token forever.
-                        continuation.finish(throwing: error)
-                        return
-                    } catch {
-                        let failure = MattermostLiveEventStreamFailure(error: error)
-                        if Self.connectionWasStable(since: connectedAt) { attempt = 0 }
-                        guard policy.canRetry(attempt: attempt) else {
-                            continuation.finish(throwing: error)
-                            return
-                        }
-                        let delay = policy.delay(for: attempt)
-                        try Self.yield(.reconnecting(attempt: attempt, delay: delay, failure: failure), to: continuation)
-                        do {
-                            try await Task.sleep(for: delay)
-                        } catch {
-                            continuation.finish()
-                            return
-                        }
-                        attempt += 1
-                        continue
-                    }
-
-                    let delay = policy.delay(for: attempt)
-                    try Self.yield(.reconnecting(attempt: attempt, delay: delay), to: continuation)
-                    do {
-                        try await Task.sleep(for: delay)
-                    } catch {
-                        continuation.finish()
-                        return
-                    }
-                    attempt += 1
+                do {
+                    try await runLifecycle(policy: policy, connect: connect, continuation: continuation)
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
                 }
-
-                continuation.finish()
             }
 
             continuation.onTermination = { @Sendable _ in
                 streamTask.cancel()
             }
+        }
+    }
+
+    private static func runLifecycle(
+        policy: MattermostLiveEventReconnectPolicy,
+        connect: LifecycleConnection,
+        continuation: AsyncThrowingStream<MattermostLiveEventStreamLifecycleEvent, Error>.Continuation
+    ) async throws {
+        var attempt = 0
+
+        while !Task.isCancelled {
+            try yield(.connecting(attempt: attempt), to: continuation)
+
+            let connectedAt = ContinuousClock.now
+            let currentAttempt = attempt
+            do {
+                try await connect(
+                    { try yield(.connected(attempt: currentAttempt), to: continuation) },
+                    { try yield(.heartbeat, to: continuation) },
+                    { try yield($0, to: continuation) },
+                    { event in try yield(.event(event), to: continuation) }
+                )
+
+                if connectionWasStable(since: connectedAt) { attempt = 0 }
+                guard policy.reconnectAfterCleanClose, policy.canRetry(attempt: attempt) else { return }
+            } catch let error as MattermostError where error.isUnauthorized || error.isForbidden {
+                // A rejected credential cannot heal by reconnecting; surface it so the
+                // host can end the session instead of retrying a dead token forever.
+                throw error
+            } catch is CancellationError {
+                return
+            } catch {
+                let failure = MattermostLiveEventStreamFailure(error: error)
+                if connectionWasStable(since: connectedAt) { attempt = 0 }
+                guard policy.canRetry(attempt: attempt) else { throw error }
+                let delay = policy.delay(for: attempt)
+                // An overflowed queue throws `liveEventGap` here too; it ends the stream above.
+                try yield(.reconnecting(attempt: attempt, delay: delay, failure: failure), to: continuation)
+                try await Task.sleep(for: delay)
+                attempt += 1
+                continue
+            }
+
+            let delay = policy.delay(for: attempt)
+            try yield(.reconnecting(attempt: attempt, delay: delay), to: continuation)
+            try await Task.sleep(for: delay)
+            attempt += 1
         }
     }
 
@@ -521,225 +535,6 @@ public struct MattermostLiveEventStream: Sendable {
 private enum MattermostTimeoutResult<Value: Sendable>: Sendable {
     case value(Value)
     case timedOut
-}
-/// Bridges URLSessionWebSocketTask.sendPing's callback API to cancellation-aware
-/// async code. Both cancellation and the callback may race; only the first one
-/// resumes the continuation.
-final class MattermostPingContinuation: @unchecked Sendable {
-    private enum Completion {
-        case success
-        case failure(Error)
-    }
-
-    private let lock = NSLock()
-    private var continuation: CheckedContinuation<Void, Error>?
-    private var completion: Completion?
-
-    func install(_ continuation: CheckedContinuation<Void, Error>) {
-        let completion = lock.withLock { () -> Completion? in
-            if let completion = self.completion {
-                return completion
-            }
-            self.continuation = continuation
-            return nil
-        }
-        guard let completion else { return }
-        switch completion {
-        case .success:
-            continuation.resume()
-        case .failure(let error):
-            continuation.resume(throwing: error)
-        }
-    }
-
-    func finish(_ error: Error?) {
-        let continuation = lock.withLock { () -> CheckedContinuation<Void, Error>? in
-            guard completion == nil else { return nil }
-            completion = error.map(Completion.failure) ?? .success
-            defer { self.continuation = nil }
-            return self.continuation
-        }
-        guard let continuation else { return }
-        if let error {
-            continuation.resume(throwing: error)
-        } else {
-            continuation.resume()
-        }
-    }
-}
-
-final class MattermostOneShotCallback<Value: Sendable>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var callback: (@Sendable (Value) -> Void)?
-
-    init(_ callback: @escaping @Sendable (Value) -> Void) {
-        self.callback = callback
-    }
-
-    func callAsFunction(_ value: Value) {
-        let callback = lock.withLock {
-            defer { self.callback = nil }
-            return self.callback
-        }
-        callback?(value)
-    }
-}
-
-/// Backoff controls for reconnecting Mattermost WebSocket event streams.
-public struct MattermostLiveEventReconnectPolicy: Equatable, Sendable {
-    // Keep a margin below `Int.max`: converting a rounded `Double(Int.max)` can
-    // otherwise cross the signed-integer boundary on some architectures.
-    private static let maximumDelayMilliseconds = Int.max / 2
-    public static let `default` = MattermostLiveEventReconnectPolicy()
-
-    public static let disabled = MattermostLiveEventReconnectPolicy(maxRetries: 0)
-
-    public let initialDelay: Duration
-    public let maximumDelay: Duration
-    public let multiplier: Double
-    public let maxRetries: Int?
-    public let reconnectAfterCleanClose: Bool
-
-    public init(
-        initialDelay: Duration = .seconds(1),
-        maximumDelay: Duration = .seconds(60),
-        multiplier: Double = 2,
-        maxRetries: Int? = nil,
-        reconnectAfterCleanClose: Bool = true
-    ) {
-        let initialMilliseconds = Self.normalizedMilliseconds(
-            initialDelay,
-            fallback: 1_000
-        )
-        let maximumMilliseconds = max(
-            initialMilliseconds,
-            Self.normalizedMilliseconds(maximumDelay, fallback: 60_000)
-        )
-        self.initialDelay = .milliseconds(initialMilliseconds)
-        self.maximumDelay = .milliseconds(maximumMilliseconds)
-        self.multiplier = multiplier.isFinite && multiplier >= 1 ? multiplier : 1
-        self.maxRetries = maxRetries.map { max(0, $0) }
-        self.reconnectAfterCleanClose = reconnectAfterCleanClose
-    }
-
-    public func canRetry(attempt: Int) -> Bool {
-        guard let maxRetries else {
-            return true
-        }
-        return attempt < maxRetries
-    }
-
-    /// Returns a full-jitter reconnect delay from zero through the capped exponential backoff.
-    public func delay(for attempt: Int) -> Duration {
-        delay(for: attempt, jitterFraction: .random(in: 0...1))
-    }
-
-    func delay(for attempt: Int, jitterFraction: Double) -> Duration {
-        let exponent = pow(multiplier, Double(max(0, attempt)))
-        let initialMilliseconds = Self.milliseconds(from: initialDelay)
-        let maximumMilliseconds = Self.milliseconds(from: maximumDelay)
-        let computedMilliseconds = Double(initialMilliseconds) * exponent
-        // Cap in the integer domain: Double cannot represent every millisecond value near
-        // the saturating maximum, and rounding there would drift the cap by a millisecond.
-        let baseMilliseconds: Int
-        if computedMilliseconds.isFinite,
-           computedMilliseconds < Double(maximumMilliseconds) {
-            baseMilliseconds = max(0, Int(computedMilliseconds))
-        } else {
-            baseMilliseconds = maximumMilliseconds
-        }
-        let normalizedJitter = jitterFraction.isFinite
-            ? min(1, max(0, jitterFraction))
-            : 0
-        let jitteredMilliseconds = normalizedJitter >= 1
-            ? baseMilliseconds
-            : max(0, Int(Double(baseMilliseconds) * normalizedJitter))
-        return .milliseconds(min(
-            Self.maximumDelayMilliseconds,
-            jitteredMilliseconds
-        ))
-    }
-
-    @available(*, deprecated, message: "Use init(initialDelay:maximumDelay:multiplier:maxRetries:reconnectAfterCleanClose:)")
-    public init(
-        initialDelaySeconds: Double,
-        maxDelaySeconds: Double = 60,
-        multiplier: Double = 2,
-        maxRetries: Int? = nil,
-        reconnectAfterCleanClose: Bool = true
-    ) {
-        self.init(
-            initialDelay: Self.duration(seconds: initialDelaySeconds, fallback: 1),
-            maximumDelay: Self.duration(seconds: maxDelaySeconds, fallback: 60),
-            multiplier: multiplier,
-            maxRetries: maxRetries,
-            reconnectAfterCleanClose: reconnectAfterCleanClose
-        )
-    }
-
-    @available(*, deprecated, message: "Use init(initialDelay:maximumDelay:multiplier:maxRetries:reconnectAfterCleanClose:)")
-    public init(
-        maxDelaySeconds: Double,
-        multiplier: Double = 2,
-        maxRetries: Int? = nil,
-        reconnectAfterCleanClose: Bool = true
-    ) {
-        self.init(
-            initialDelay: .seconds(1),
-            maximumDelay: Self.duration(seconds: maxDelaySeconds, fallback: 60),
-            multiplier: multiplier,
-            maxRetries: maxRetries,
-            reconnectAfterCleanClose: reconnectAfterCleanClose
-        )
-    }
-
-    @available(*, deprecated, renamed: "initialDelay")
-    public var initialDelaySeconds: Double {
-        Double(Self.milliseconds(from: initialDelay)) / 1_000
-    }
-
-    @available(*, deprecated, renamed: "maximumDelay")
-    public var maxDelaySeconds: Double {
-        Double(Self.milliseconds(from: maximumDelay)) / 1_000
-    }
-
-    private static func normalizedMilliseconds(_ value: Duration, fallback: Int) -> Int {
-        let components = value.components
-        guard components.seconds >= 0, components.attoseconds >= 0 else {
-            return fallback
-        }
-        return milliseconds(from: value)
-    }
-
-    private static func milliseconds(from value: Duration) -> Int {
-        let components = value.components
-        guard components.seconds > 0 || components.attoseconds > 0 else {
-            return 0
-        }
-        // Saturate on the exact millisecond cap. Clamping the seconds first and then
-        // multiplying would round the cap down to a whole second.
-        guard components.seconds < Int64(maximumDelayMilliseconds / 1_000) else {
-            return maximumDelayMilliseconds
-        }
-        let wholeMilliseconds = Int(components.seconds) * 1_000
-        let fractionalMilliseconds = max(
-            0,
-            Int(components.attoseconds / 1_000_000_000_000_000)
-        )
-        return min(maximumDelayMilliseconds, wholeMilliseconds + fractionalMilliseconds)
-    }
-
-    private static func duration(seconds: Double, fallback: Double) -> Duration {
-        guard seconds.isFinite, seconds >= 0 else {
-            return .milliseconds(Int(fallback * 1_000))
-        }
-        let cappedSeconds = min(
-            seconds,
-            Double(maximumDelayMilliseconds) / 1_000
-        )
-        let milliseconds = Int(cappedSeconds * 1_000)
-        return .milliseconds(milliseconds)
-    }
 }
 
 private struct MattermostWebSocketAuthentication: Encodable, Sendable {
