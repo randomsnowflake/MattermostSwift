@@ -320,13 +320,13 @@ public struct MattermostLiveSyncService: Sendable {
         AsyncThrowingStream(bufferingPolicy: .bufferingNewest(256)) { continuation in
             let streamTask = Task { @MainActor in
                 do {
+                    // `teamID`/`teamName` stay the caller's backfill scope for every reconnect and
+                    // refresh; `activeTeamID` is only the context for sidebar/thread fallbacks, so an
+                    // unscoped sync never narrows to the first team it happened to see.
                     var activeTeamID = teamID
                     var activeUserID: String?
                     var currentAttempt = 0
-                    var completedInitialBackfill = false
-                    var disconnectedAt: ContinuousClock.Instant?
-                    var backfilledDuringCurrentDisconnect = false
-                    var backfilledForCurrentConnectionAttempt = false
+                    var backfillPolicy = MattermostLiveBackfillPolicy(minimumGap: options.minimumBackfillGap)
                     for try await lifecycleEvent in lifecycleEvents() {
                         try Task.checkCancellation()
 
@@ -334,22 +334,7 @@ public struct MattermostLiveSyncService: Sendable {
                         case .connecting(let attempt):
                             currentAttempt = attempt
                             try Self.yield(.connecting(attempt: attempt), to: continuation)
-                            backfilledForCurrentConnectionAttempt = false
-                            let shouldBackfill: Bool
-                            if !completedInitialBackfill || options.minimumBackfillGap == nil {
-                                shouldBackfill = true
-                            } else if backfilledDuringCurrentDisconnect {
-                                shouldBackfill = false
-                            } else if let minimumBackfillGap = options.minimumBackfillGap,
-                                      let disconnectedAt {
-                                shouldBackfill = now() - disconnectedAt >= minimumBackfillGap
-                            } else {
-                                // A missing disconnect timestamp means the gap cannot be proven
-                                // trivial, so prefer the authoritative recovery path.
-                                shouldBackfill = true
-                            }
-
-                            guard shouldBackfill else {
+                            guard backfillPolicy.shouldBackfillOnConnecting(now: now) else {
                                 break
                             }
 
@@ -359,17 +344,13 @@ public struct MattermostLiveSyncService: Sendable {
                             do {
                                 let backfillResult = try await backfill(
                                     store,
-                                    activeTeamID,
+                                    teamID,
                                     teamName,
                                     options
                                 )
                                 activeTeamID = backfillResult.sync.teamID ?? activeTeamID
                                 activeUserID = backfillResult.sync.user.id
-                                completedInitialBackfill = true
-                                if disconnectedAt != nil {
-                                    backfilledDuringCurrentDisconnect = true
-                                }
-                                backfilledForCurrentConnectionAttempt = true
+                                backfillPolicy.didBackfillOnConnecting()
                                 try Self.yield(.backfilled(backfillResult), to: continuation)
                             } catch is CancellationError {
                                 throw CancellationError()
@@ -382,11 +363,10 @@ public struct MattermostLiveSyncService: Sendable {
 
                         case .connected(let attempt):
                             currentAttempt = attempt
-                            if !backfilledForCurrentConnectionAttempt {
+                            if !backfillPolicy.backfilledForCurrentConnectionAttempt {
                                 try Self.yield(.connected(teamID: activeTeamID), to: continuation)
                             }
-                            disconnectedAt = nil
-                            backfilledDuringCurrentDisconnect = false
+                            backfillPolicy.didConnect()
 
                         case .eventDecodeFailed:
                             break
@@ -415,11 +395,28 @@ public struct MattermostLiveSyncService: Sendable {
                             // Membership broadcasts do not carry a complete enough collection to
                             // safely delete locally. Re-run the bounded authoritative sync so a
                             // user_added/user_removed event cannot leave stale navigation or data.
+                            // A failed refresh is reported and retried on the next connect; the
+                            // already-applied event and later ones keep flowing.
                             if typedEvent.requiresAuthoritativeWorkspaceRefresh {
-                                let result = try await backfill(store, activeTeamID, teamName, options)
-                                activeTeamID = result.sync.teamID ?? activeTeamID
-                                activeUserID = result.sync.user.id
-                                try Self.yield(.backfilled(result), to: continuation)
+                                let result: MattermostLiveBackfillResult?
+                                do {
+                                    result = try await backfill(store, teamID, teamName, options)
+                                } catch is CancellationError {
+                                    throw CancellationError()
+                                } catch {
+                                    result = nil
+                                    backfillPolicy.workspaceRefreshFailed()
+                                    try Self.yield(.backfillFailed(MattermostLiveSyncFailure(
+                                        attempt: currentAttempt,
+                                        error: error
+                                    )), to: continuation)
+                                }
+                                if let result {
+                                    activeTeamID = result.sync.teamID ?? activeTeamID
+                                    activeUserID = result.sync.user.id
+                                    backfillPolicy.workspaceRefreshSucceeded()
+                                    try Self.yield(.backfilled(result), to: continuation)
+                                }
                             }
 
                             var unreadResults: [MattermostChannelUnread] = []
@@ -539,10 +536,7 @@ public struct MattermostLiveSyncService: Sendable {
                             }
 
                         case .reconnecting(let attempt, let delay, _):
-                            if disconnectedAt == nil {
-                                disconnectedAt = now()
-                                backfilledDuringCurrentDisconnect = false
-                            }
+                            backfillPolicy.didDisconnect(now: now)
                             try Self.yield(.reconnecting(attempt: attempt, delay: delay), to: continuation)
                         }
                     }
@@ -698,6 +692,54 @@ private struct MattermostLiveSyncThreadStateRefreshRequest: Equatable {
 private struct MattermostLiveSyncUnreadRefreshRequest: Equatable, Sendable {
     let userID: String
     let channelID: String
+}
+
+/// When a live-sync connection backfills: the first connect always does; a reconnect does
+/// after a gap of at least `minimumGap` (nil: always), at most once per disconnect, and
+/// always while a failed workspace refresh is pending. Pure state, so each rule is testable.
+struct MattermostLiveBackfillPolicy: Equatable {
+    let minimumGap: Duration?
+    private var completedInitialBackfill = false
+    private var workspaceRefreshPending = false
+    private var disconnectedAt: ContinuousClock.Instant?
+    private var backfilledDuringCurrentDisconnect = false
+    private(set) var backfilledForCurrentConnectionAttempt = false
+
+    init(minimumGap: Duration?) {
+        self.minimumGap = minimumGap
+    }
+
+    mutating func shouldBackfillOnConnecting(now: () -> ContinuousClock.Instant) -> Bool {
+        backfilledForCurrentConnectionAttempt = false
+        if !completedInitialBackfill || workspaceRefreshPending { return true }
+        guard let minimumGap else { return true }
+        if backfilledDuringCurrentDisconnect { return false }
+        // A missing disconnect timestamp means the gap cannot be proven trivial,
+        // so prefer the authoritative recovery path.
+        guard let disconnectedAt else { return true }
+        return now() - disconnectedAt >= minimumGap
+    }
+
+    mutating func didBackfillOnConnecting() {
+        completedInitialBackfill = true
+        workspaceRefreshPending = false
+        if disconnectedAt != nil { backfilledDuringCurrentDisconnect = true }
+        backfilledForCurrentConnectionAttempt = true
+    }
+
+    mutating func didConnect() {
+        disconnectedAt = nil
+        backfilledDuringCurrentDisconnect = false
+    }
+
+    mutating func didDisconnect(now: () -> ContinuousClock.Instant) {
+        guard disconnectedAt == nil else { return }
+        disconnectedAt = now()
+        backfilledDuringCurrentDisconnect = false
+    }
+
+    mutating func workspaceRefreshFailed() { workspaceRefreshPending = true }
+    mutating func workspaceRefreshSucceeded() { workspaceRefreshPending = false }
 }
 
 private extension MattermostTypedLiveEvent {

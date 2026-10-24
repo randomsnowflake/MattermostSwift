@@ -6,6 +6,19 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- `lifecycleEvents(policy:)` always finishes its stream: a lifecycle queue overflow that also
+  overflowed the reconnect record used to escape the producer, so a draining host waited forever.
+  It now ends with `MattermostError.liveEventGap`.
+- Live sync keeps the caller's backfill scope across reconnects and membership refreshes. An
+  unscoped sync no longer narrows to the first channel's team after the initial backfill.
+- A failed membership (`user_added`/`user_removed`) refresh is reported as `.backfillFailed` and
+  retried on the next connect instead of terminating an otherwise healthy live-sync stream.
+- `deleteChannelContent(channelID:)` also drops the channel and thread timeline sync cursors, so
+  a rejoined channel reloads its history instead of asking only for changes since a stale cursor.
+- Downloads replace an existing destination only after the new file is staged beside it; a failed
+  install keeps the original. Multipart upload bodies are removed when their construction fails.
+- `scripts/test-unit.sh` forwards its arguments to `swift test` (for example `--filter`).
+
 - Added README navigation, a CI badge, and links to the MattCha app and hosted SDK documentation.
 - Added `teamsUnread(userID:excludeTeamID:includeCollapsedThreads:)` for
   `GET /api/v4/users/{user_id}/teams/unread` and the `MattermostTeamUnread` model. The rows are

@@ -124,7 +124,8 @@ func liveSyncSkipsRapidReconnectBackfillButRunsItAfterLongGap() async throws {
     #expect(backfillCount == 2)
     #expect(connectedWithoutBackfillCount == 1)
     #expect(reconnectingAttempts == [0, 1])
-    #expect(requestedTeamIDs == [nil, "team-1"])
+    // An unscoped sync stays unscoped on reconnect instead of narrowing to the first team seen.
+    #expect(requestedTeamIDs == [nil, nil])
     #expect(times.isEmpty)
 }
 
@@ -1134,6 +1135,104 @@ func liveSyncRefreshesThreadStateOnThreadInvalidation() async throws {
     #expect(cachedUser.username == "alice")
 }
 
+@MainActor
+@Test(arguments: [nil, "team-a"] as [String?])
+func liveSyncKeepsCallerBackfillScopeAcrossReconnectAndMembershipRefresh(requestedTeam: String?) async throws {
+    let service = try MattermostClient(
+        serverURL: try #require(URL(string: "https://mattermost.example.com")),
+        token: "test-token"
+    ).liveSyncService()
+    let store = try MattermostStore(inMemory: true)
+    var requestedTeamIDs: [String?] = []
+
+    let stream = service.events(
+        to: store,
+        teamID: requestedTeam,
+        options: MattermostLiveSyncOptions(maxBackfillChannels: 1, minimumBackfillGap: nil),
+        lifecycleEvents: {
+            AsyncThrowingStream { continuation in
+                continuation.yield(.connecting(attempt: 0))
+                continuation.yield(.connected(attempt: 0))
+                continuation.yield(.event(liveSyncMembershipEvent()))
+                continuation.yield(.reconnecting(attempt: 0, delay: .milliseconds(1)))
+                continuation.yield(.connecting(attempt: 1))
+                continuation.finish()
+            }
+        },
+        backfill: { _, teamID, _, _ in
+            requestedTeamIDs.append(teamID)
+            // The first channel's team is "team-b": it must never become the backfill scope.
+            return liveSyncBackfillResult(teamID: teamID ?? "team-b")
+        }
+    )
+    for try await _ in stream {}
+
+    #expect(requestedTeamIDs == [requestedTeam, requestedTeam, requestedTeam])
+}
+
+@MainActor
+@Test
+func liveSyncMembershipRefreshFailureKeepsDeliveringEventsAndRetriesOnReconnect() async throws {
+    let service = try MattermostClient(
+        serverURL: try #require(URL(string: "https://mattermost.example.com")),
+        token: "test-token"
+    ).liveSyncService()
+    let store = try MattermostStore(inMemory: true)
+    var backfillCalls = 0
+    let posted = MattermostLiveEvent(
+        event: "posted",
+        data: ["post": .string("""
+        {"id": "post-1", "create_at": 1, "update_at": 2, "edit_at": 0, "delete_at": 0,
+         "user_id": "user-1", "channel_id": "channel-1", "root_id": "", "message": "after refresh failure", "type": ""}
+        """)],
+        broadcast: nil,
+        seq: 2
+    )
+
+    let stream = service.events(
+        to: store,
+        options: MattermostLiveSyncOptions(maxBackfillChannels: 1, minimumBackfillGap: .seconds(3600)),
+        lifecycleEvents: {
+            AsyncThrowingStream { continuation in
+                continuation.yield(.connecting(attempt: 0))
+                continuation.yield(.connected(attempt: 0))
+                continuation.yield(.event(liveSyncMembershipEvent()))
+                continuation.yield(.event(posted))
+                continuation.yield(.reconnecting(attempt: 0, delay: .milliseconds(1)))
+                continuation.yield(.connecting(attempt: 1))
+                continuation.finish()
+            }
+        },
+        backfill: { _, teamID, _, _ in
+            backfillCalls += 1
+            if backfillCalls == 2 { throw MattermostError.transportFailure("membership refresh failed") }
+            return liveSyncBackfillResult(teamID: teamID ?? "team-1")
+        }
+    )
+
+    var failures = 0
+    var appliedPostID: String?
+    for try await event in stream {
+        if case .backfillFailed = event { failures += 1 }
+        if case .eventApplied(_, .posted(let post)) = event { appliedPostID = post.id }
+    }
+
+    #expect(failures == 1)
+    #expect(appliedPostID == "post-1")
+    #expect(try store.cachedPost(id: "post-1")?.message == "after refresh failure")
+    // The 3600 s gap would normally skip reconnect backfill; the pending refresh forces it.
+    #expect(backfillCalls == 3)
+}
+
+private func liveSyncMembershipEvent() -> MattermostLiveEvent {
+    MattermostLiveEvent(
+        event: "user_added",
+        data: ["user_id": .string("user-1"), "team_id": .string("team-b")],
+        broadcast: nil,
+        seq: 1
+    )
+}
+
 private func liveSyncChannel(id: String, teamID: String = "team-1") -> MattermostChannel {
     MattermostChannel(
         id: id,
@@ -1250,4 +1349,45 @@ private func liveSyncStorePostSync(
         cursorLastSyncAt: post.cacheTimestamp,
         cursorLastItemID: post.id
     )
+}
+
+@Test
+func liveBackfillPolicyDecidesReconnectBackfillDeterministically() {
+    let start = ContinuousClock.now
+    var clock = start
+    let now = { clock }
+    var policy = MattermostLiveBackfillPolicy(minimumGap: .seconds(10))
+
+    let decision1 = policy.shouldBackfillOnConnecting(now: now)
+    #expect(decision1, "the first connect always backfills")
+    policy.didBackfillOnConnecting()
+    policy.didConnect()
+
+    policy.didDisconnect(now: now)
+    clock = start.advanced(by: .seconds(1))
+    policy.didDisconnect(now: now)  // a second failure keeps the first disconnect time
+    clock = start.advanced(by: .seconds(5))
+    let decision2 = policy.shouldBackfillOnConnecting(now: now)
+    #expect(!decision2, "a short gap skips")
+    clock = start.advanced(by: .seconds(11))
+    let decision3 = policy.shouldBackfillOnConnecting(now: now)
+    #expect(decision3, "measured from the first disconnect")
+    policy.didBackfillOnConnecting()
+    let decision4 = policy.shouldBackfillOnConnecting(now: now)
+    #expect(!decision4, "once per disconnect")
+    policy.didConnect()
+
+    policy.workspaceRefreshFailed()
+    let decision5 = policy.shouldBackfillOnConnecting(now: now)
+    #expect(decision5, "a failed refresh forces the next connect")
+    policy.didBackfillOnConnecting()
+    policy.didConnect()
+    policy.didDisconnect(now: now)
+    let decision6 = policy.shouldBackfillOnConnecting(now: now)
+    #expect(!decision6, "cleared by the successful backfill")
+
+    var always = MattermostLiveBackfillPolicy(minimumGap: nil)
+    always.didBackfillOnConnecting()
+    let decision7 = always.shouldBackfillOnConnecting(now: now)
+    #expect(decision7)
 }

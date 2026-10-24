@@ -12,7 +12,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Verification
 
-- Run `scripts/test-unit.sh` for normal code changes.
+- Run `scripts/test-unit.sh` for normal code changes. Iterate with `scripts/test-unit.sh --filter <Suite>`; its arguments forward to `swift test` (checked by `scripts/tests/test-unit-forwarding.sh`).
 - Run `scripts/test-live.sh` only when live Mattermost credentials are configured and read-only/live behavior needs verification.
 - Run `scripts/test-e2e.sh` only against a workspace where mutating test activity is expected.
 

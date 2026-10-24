@@ -1214,6 +1214,35 @@ func deletingChannelContentRemovesCachedThreadStates() throws {
 
 @MainActor
 @Test
+func deletingChannelContentDropsTimelineCursorsSoNextSyncReloadsHistory() throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appending(path: "cache.store")
+
+    do {
+        let store = try MattermostStore(url: url)
+        try store.upsert(post: storeTestPost(id: "root-1", channelID: "channel-1", message: "hello", createAt: 10))
+        try store.upsert(post: storeTestPost(id: "other", channelID: "channel-2", message: "kept", createAt: 10))
+        try store.setSyncCursor(scope: "channel-posts:channel-1", lastSyncAt: 10)
+        try store.setSyncCursor(scope: "thread-posts:root-1", lastSyncAt: 10)
+        try store.setSyncCursor(scope: "channel-posts:channel-2", lastSyncAt: 10)
+        try store.save()
+
+        // Authoritative removal (leave) purges content; a later rejoin must not resume `since`.
+        try store.replaceJoinedChannels([], teamID: "team-1")
+        try store.deleteChannelContent(channelID: "channel-1")
+        try store.save()
+    }
+
+    let reopened = try MattermostStore(url: url)
+    #expect(try reopened.cachedSyncCursor(scope: "channel-posts:channel-1") == nil)
+    #expect(try reopened.cachedSyncCursor(scope: "thread-posts:root-1") == nil)
+    #expect(try reopened.cachedSyncCursor(scope: "channel-posts:channel-2")?.lastSyncAt == 10)
+}
+
+@MainActor
+@Test
 func channelDeletedLiveEventPurgesCachedChannelContent() throws {
     let store = try MattermostStore(inMemory: true)
     let channel = MattermostChannel(

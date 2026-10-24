@@ -140,12 +140,7 @@ struct MattermostHTTPClient: Sendable {
         guard maximumSize == nil || size <= maximumSize! else {
             throw MattermostError.fileTooLarge(limit: maximumSize!)
         }
-        let fileManager = FileManager.default
-        try fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if fileManager.fileExists(atPath: destinationURL.path) {
-            try fileManager.removeItem(at: destinationURL)
-        }
-        try fileManager.moveItem(at: temporaryURL, to: destinationURL)
+        try Self.installDownload(from: temporaryURL, to: destinationURL)
         return destinationURL
     }
 
@@ -443,46 +438,6 @@ struct MattermostHTTPClient: Sendable {
         return body
     }
 
-    private func makeMultipartBodyFile(
-        parts: [MattermostMultipartPart],
-        filePart: MattermostMultipartFilePart,
-        boundary: String
-    ) throws -> URL {
-        let bodyURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("MattermostSwift-\(UUID().uuidString).multipart")
-        FileManager.default.createFile(atPath: bodyURL.path, contents: nil)
-        let output = try FileHandle(forWritingTo: bodyURL)
-        defer { try? output.close() }
-
-        func write(_ value: String) throws {
-            try output.write(contentsOf: Data(value.utf8))
-        }
-        func writeHeaders(for part: some MattermostMultipartPartProtocol) throws {
-            try write("--\(boundary)\r\n")
-            try write(part.contentDisposition)
-            try write("\r\n")
-            if let contentType = part.contentType {
-                try write("Content-Type: \(contentType)\r\n")
-            }
-            try write("\r\n")
-        }
-
-        for part in parts {
-            try writeHeaders(for: part)
-            try output.write(contentsOf: part.data)
-            try write("\r\n")
-        }
-        try writeHeaders(for: filePart)
-        let input = try FileHandle(forReadingFrom: filePart.fileURL)
-        defer { try? input.close() }
-        while let chunk = try input.read(upToCount: 64 * 1024), !chunk.isEmpty {
-            try output.write(contentsOf: chunk)
-        }
-        try write("\r\n--\(boundary)--\r\n")
-        return bodyURL
-    }
-
-
     private func decodeMattermostAPIError(from data: Data) -> MattermostAPIErrorBody? {
         guard !data.isEmpty else {
             return nil
@@ -496,7 +451,7 @@ struct MattermostHTTPResponse<Value: Sendable>: Sendable {
     let httpResponse: HTTPURLResponse
 }
 
-private protocol MattermostMultipartPartProtocol {
+protocol MattermostMultipartPartProtocol {
     var contentDisposition: String { get }
     var contentType: String? { get }
 }

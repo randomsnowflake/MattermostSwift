@@ -6,6 +6,7 @@ Run local package tests:
 
 ```sh
 scripts/test-unit.sh
+scripts/test-unit.sh --filter MattermostStoreTests   # arguments forward to swift test
 ```
 
 GitHub Actions also builds the `MattermostSwift` library scheme for generic iOS 18, macOS 15,
