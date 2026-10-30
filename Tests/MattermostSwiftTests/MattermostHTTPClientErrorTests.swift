@@ -224,6 +224,23 @@ struct MattermostHTTPClientErrorTests {
     }
 
     @Test
+    func clientPreservesSecureConnectionErrors() async throws {
+        // https to a plain-http port (e.g. Mattermost's default :8065) fails the TLS handshake.
+        let client = try await Self.makeClient { _ in
+            throw URLError(.secureConnectionFailed)
+        }
+
+        do {
+            _ = try await client.currentUser()
+            Issue.record("Expected the TLS failure to be preserved.")
+        } catch let error as URLError {
+            #expect(error.code == .secureConnectionFailed)
+        } catch {
+            Issue.record("Expected URLError.secureConnectionFailed, got \(error).")
+        }
+    }
+
+    @Test
     func dataRequestMapsHTTPStatusMessage() async throws {
         let configuration = try MattermostConfiguration(
             serverURL: try #require(URL(string: "https://mattermost.example.com")),

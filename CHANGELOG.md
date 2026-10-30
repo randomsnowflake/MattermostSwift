@@ -6,6 +6,10 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- TLS and certificate failures (`URLError.secureConnectionFailed`, `.serverCertificate*`,
+  `.clientCertificate*`) are rethrown as the original `URLError` instead of
+  `MattermostError.transportFailure`, so a host can tell "no HTTPS on that port" or "untrusted
+  certificate" from an unreachable server.
 - `lifecycleEvents(policy:)` always finishes its stream: a lifecycle queue overflow that also
   overflowed the reconnect record used to escape the producer, so a draining host waited forever.
   It now ends with `MattermostError.liveEventGap`.

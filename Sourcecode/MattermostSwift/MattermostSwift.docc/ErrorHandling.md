@@ -56,6 +56,10 @@ bound and retry.
 potentially stale and restart ``MattermostLiveSyncService`` so it performs REST backfill before
 resuming live delivery.
 
+TLS and certificate failures surface as the original `URLError` (for example
+`.secureConnectionFailed` for https to a plain-http port, `.serverCertificateUntrusted` for a
+self-signed certificate) so a host can explain them instead of reporting an unreachable server.
+
 Cancellation can surface as `CancellationError` rather than ``MattermostError``. Preserve it when
 ending tasks or async sequences instead of presenting it as a network failure.
 

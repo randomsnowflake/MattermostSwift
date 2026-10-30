@@ -260,7 +260,8 @@ struct MattermostHTTPClient: Sendable {
             do {
                 result = try await urlSession.data(for: request, delegate: MattermostRedirectGuard.shared)
             } catch {
-                if Self.isCancellation(error) {
+                // A TLS failure is no outage: the caller needs its URLError code to explain it.
+                if Self.isCancellation(error) || Self.isSecureConnectionFailure(error) {
                     throw error
                 }
                 guard attempt < Self.maxTransientRetries,
@@ -343,6 +344,17 @@ struct MattermostHTTPClient: Sendable {
             return true
         }
         return (error as? URLError)?.code == .cancelled
+    }
+
+    private static func isSecureConnectionFailure(_ error: Error) -> Bool {
+        switch (error as? URLError)?.code {
+        case .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
+             .serverCertificateHasUnknownRoot, .serverCertificateNotYetValid,
+             .clientCertificateRejected, .clientCertificateRequired:
+            return true
+        default:
+            return false
+        }
     }
 
     private static func isTransient(_ error: Error) -> Bool {
