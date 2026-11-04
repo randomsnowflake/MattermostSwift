@@ -92,12 +92,18 @@ public struct MattermostLiveEventStream: Sendable {
     static func lifecycleEvents(
         policy: MattermostLiveEventReconnectPolicy,
         bufferLimit: Int = 512,
+        stabilityWindow: Duration = connectionStabilityWindow,
         connect: @escaping LifecycleConnection
     ) -> AsyncThrowingStream<MattermostLiveEventStreamLifecycleEvent, Error> {
         AsyncThrowingStream(bufferingPolicy: .bufferingNewest(bufferLimit)) { continuation in
             let streamTask = Task {
                 do {
-                    try await runLifecycle(policy: policy, connect: connect, continuation: continuation)
+                    try await runLifecycle(
+                        policy: policy,
+                        stabilityWindow: stabilityWindow,
+                        connect: connect,
+                        continuation: continuation
+                    )
                     continuation.finish()
                 } catch is CancellationError {
                     continuation.finish()
@@ -114,6 +120,7 @@ public struct MattermostLiveEventStream: Sendable {
 
     private static func runLifecycle(
         policy: MattermostLiveEventReconnectPolicy,
+        stabilityWindow: Duration,
         connect: LifecycleConnection,
         continuation: AsyncThrowingStream<MattermostLiveEventStreamLifecycleEvent, Error>.Continuation
     ) async throws {
@@ -122,17 +129,22 @@ public struct MattermostLiveEventStream: Sendable {
         while !Task.isCancelled {
             try yield(.connecting(attempt: attempt), to: continuation)
 
-            let connectedAt = ContinuousClock.now
+            // Measured from the handshake's success, not the attempt's start: a connect
+            // that hangs ~30 s and then fails must not count as a stable connection.
+            let connectedAt = MattermostConnectedInstant()
             let currentAttempt = attempt
             do {
                 try await connect(
-                    { try yield(.connected(attempt: currentAttempt), to: continuation) },
+                    {
+                        connectedAt.mark()
+                        try yield(.connected(attempt: currentAttempt), to: continuation)
+                    },
                     { try yield(.heartbeat, to: continuation) },
                     { try yield($0, to: continuation) },
                     { event in try yield(.event(event), to: continuation) }
                 )
 
-                if connectionWasStable(since: connectedAt) { attempt = 0 }
+                if connectedAt.wasStable(for: stabilityWindow) { attempt = 0 }
                 guard policy.reconnectAfterCleanClose, policy.canRetry(attempt: attempt) else { return }
             } catch let error as MattermostError where error.isUnauthorized || error.isForbidden {
                 // A rejected credential cannot heal by reconnecting; surface it so the
@@ -142,7 +154,7 @@ public struct MattermostLiveEventStream: Sendable {
                 return
             } catch {
                 let failure = MattermostLiveEventStreamFailure(error: error)
-                if connectionWasStable(since: connectedAt) { attempt = 0 }
+                if connectedAt.wasStable(for: stabilityWindow) { attempt = 0 }
                 guard policy.canRetry(attempt: attempt) else { throw error }
                 let delay = policy.delay(for: attempt)
                 // An overflowed queue throws `liveEventGap` here too; it ends the stream above.
@@ -434,13 +446,7 @@ public struct MattermostLiveEventStream: Sendable {
         pendingEvents.append(event)
     }
 
-    private static let connectionStabilityWindow: Duration = .seconds(30)
-
-    /// Treats a connection that stayed up at least `connectionStabilityWindow` as a fresh
-    /// success, so backoff only escalates for a genuinely flapping server.
-    private static func connectionWasStable(since start: ContinuousClock.Instant) -> Bool {
-        ContinuousClock.now - start >= connectionStabilityWindow
-    }
+    static let connectionStabilityWindow: Duration = .seconds(30)
 
     /// Runs `operation`, failing with a transport error if it does not finish within `duration`.
     static func withTimeout<T: Sendable>(
@@ -651,3 +657,19 @@ let mattermostSnakeCaseEncoder: JSONEncoder = {
     encoder.keyEncodingStrategy = .convertToSnakeCase
     return encoder
 }()
+
+/// When one connection attempt's handshake succeeded. A connection that stayed up at
+/// least the stability window counts as a fresh success, so backoff only escalates for a
+/// genuinely flapping server; an attempt that never connected always escalates.
+final class MattermostConnectedInstant: @unchecked Sendable {
+    private let lock = NSLock()
+    private var instant: ContinuousClock.Instant?
+
+    func mark() {
+        lock.withLock { instant = .now }
+    }
+
+    func wasStable(for window: Duration) -> Bool {
+        lock.withLock { instant.map { ContinuousClock.now - $0 >= window } ?? false }
+    }
+}

@@ -61,6 +61,49 @@ func lifecycleCancellationStopsConnection() async throws {
     try await withDeadline(.seconds(5)) { _ = try? await consumer.value }
 }
 
+private struct LifecycleTestFailure: Error {}
+
+private func reconnectAttempts(
+    stabilityWindow: Duration,
+    connect: @escaping MattermostLiveEventStream.LifecycleConnection
+) async throws -> [Int] {
+    let stream = MattermostLiveEventStream.lifecycleEvents(
+        policy: lifecycleTestPolicy,
+        stabilityWindow: stabilityWindow,
+        connect: connect
+    )
+    return try await withDeadline(.seconds(5)) {
+        var attempts: [Int] = []
+        do {
+            for try await event in stream {
+                if case .reconnecting(let attempt, _, _) = event { attempts.append(attempt) }
+                if attempts.count == 3 { break }
+            }
+        } catch is LifecycleTestFailure {}
+        return attempts
+    }
+}
+
+@Test
+func lifecycleFailedHandshakeEscalatesBackoffEvenAfterStabilityWindow() async throws {
+    // Regression: the stability clock started before the handshake, so a connect that hung
+    // past the window and then failed reset the backoff and retried at the base delay forever.
+    let attempts = try await reconnectAttempts(stabilityWindow: .zero) { _, _, _, _ in
+        throw LifecycleTestFailure()
+    }
+    #expect(attempts == [0, 1, 2])
+}
+
+@Test
+func lifecycleStableConnectionResetsBackoff() async throws {
+    let attempts = try await reconnectAttempts(stabilityWindow: .zero) { onConnected, _, _, _ in
+        try await onConnected()
+        throw LifecycleTestFailure()
+    }
+    // Every drop follows a connection that outlived the (zero) window, so each retry is fresh.
+    #expect(attempts == [0, 0, 0])
+}
+
 private func withDeadline<T: Sendable>(
     _ limit: Duration,
     _ operation: @escaping @Sendable () async throws -> T
