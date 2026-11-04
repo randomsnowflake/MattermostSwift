@@ -50,6 +50,15 @@ public struct MattermostClientConfig: Codable, Equatable, Sendable {
     public let siteName: String?
     /// Server identity; push payloads carry it as `server_id`.
     public let diagnosticID: String?
+    /// SSO switches; see ``ssoProviders``. Values are the server's `"true"`/`"false"` strings.
+    public let enableSignUpWithGitLab: String?
+    public let gitLabButtonText: String?
+    public let enableSignUpWithOpenId: String?
+    public let openIdButtonText: String?
+    public let enableSignUpWithGoogle: String?
+    public let enableSignUpWithOffice365: String?
+    public let enableSaml: String?
+    public let samlLoginButtonText: String?
 
     /// Whether the server advertises the synced-drafts API to clients.
     public var supportsSyncedDrafts: Bool {
@@ -74,6 +83,14 @@ public struct MattermostClientConfig: Codable, Equatable, Sendable {
         allowSyncedDrafts = try container.decodeStringIfPresent(matching: "AllowSyncedDrafts")
         siteName = try container.decodeStringIfPresent(matching: "SiteName")
         diagnosticID = try container.decodeStringIfPresent(matching: "DiagnosticId")
+        enableSignUpWithGitLab = try container.decodeStringIfPresent(matching: "EnableSignUpWithGitLab")
+        gitLabButtonText = try container.decodeStringIfPresent(matching: "GitLabButtonText")
+        enableSignUpWithOpenId = try container.decodeStringIfPresent(matching: "EnableSignUpWithOpenId")
+        openIdButtonText = try container.decodeStringIfPresent(matching: "OpenIdButtonText")
+        enableSignUpWithGoogle = try container.decodeStringIfPresent(matching: "EnableSignUpWithGoogle")
+        enableSignUpWithOffice365 = try container.decodeStringIfPresent(matching: "EnableSignUpWithOffice365")
+        enableSaml = try container.decodeStringIfPresent(matching: "EnableSaml")
+        samlLoginButtonText = try container.decodeStringIfPresent(matching: "SamlLoginButtonText")
     }
 }
 
