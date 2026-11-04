@@ -123,12 +123,15 @@ struct MattermostHTTPClient: Sendable {
     func download(
         _ endpoint: String,
         to destinationURL: URL,
-        maximumSize: Int64? = nil
+        maximumSize: Int64? = nil,
+        progress: (@Sendable (Int64, Int64) -> Void)? = nil
     ) async throws -> URL {
         let request = try makeRequest(endpoint: endpoint, method: "GET")
+        let delegate: any URLSessionTaskDelegate = progress.map { MattermostDownloadProgressDelegate(onProgress: $0) }
+            ?? MattermostRedirectGuard.shared
         let (temporaryURL, response) = try await urlSession.download(
             for: request,
-            delegate: MattermostRedirectGuard.shared
+            delegate: delegate
         )
         let httpResponse = try validate(Data(), response)
         if let maximumSize,
@@ -534,6 +537,41 @@ private extension Data {
 /// body-less requests and without `Authorization`/`Cookie`; HTTPS-to-HTTP downgrades and
 /// cross-origin replays of a request body (such as login credentials) are refused, which
 /// surfaces the 3xx response as an HTTP error.
+/// Per-download delegate: applies the same redirect policy as
+/// ``MattermostRedirectGuard`` and reports received bytes while the body streams.
+final class MattermostDownloadProgressDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let onProgress: @Sendable (Int64, Int64) -> Void
+    private let lock = NSLock()
+    private var observation: NSKeyValueObservation?
+
+    init(onProgress: @escaping @Sendable (Int64, Int64) -> Void) {
+        self.onProgress = onProgress
+    }
+
+    func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
+        let observation = task.observe(\.countOfBytesReceived, options: [.new]) { [onProgress] task, _ in
+            onProgress(task.countOfBytesReceived, task.countOfBytesExpectedToReceive)
+        }
+        lock.withLock { self.observation = observation }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
+        lock.withLock {
+            observation?.invalidate()
+            observation = nil
+        }
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest
+    ) async -> URLRequest? {
+        MattermostRedirectGuard.redirectRequest(request, from: response.url ?? task.currentRequest?.url)
+    }
+}
+
 final class MattermostRedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {
     static let shared = MattermostRedirectGuard()
 
