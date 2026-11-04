@@ -21,6 +21,8 @@ public struct MattermostFileInfo: Codable, Equatable, Hashable, Sendable, Identi
     public let id: String
     public let userID: String?
     public let postID: String?
+    /// Present in file search results; post metadata omits it.
+    public let channelID: String?
     public let createAt: Int64?
     public let updateAt: Int64?
     public let deleteAt: Int64?
@@ -31,6 +33,9 @@ public struct MattermostFileInfo: Codable, Equatable, Hashable, Sendable, Identi
     public let width: Int?
     public let height: Int?
     public let hasPreviewImage: Bool?
+    /// Tiny JPEG (about 16x16) the server embeds in post metadata for images
+    /// with a preview, meant as an instant blurred placeholder.
+    public let miniPreview: Data?
 
     public init(
         id: String,
@@ -45,11 +50,14 @@ public struct MattermostFileInfo: Codable, Equatable, Hashable, Sendable, Identi
         mimeType: String?,
         width: Int?,
         height: Int?,
-        hasPreviewImage: Bool?
+        hasPreviewImage: Bool?,
+        miniPreview: Data? = nil,
+        channelID: String? = nil
     ) {
         self.id = id
         self.userID = userID
         self.postID = postID
+        self.channelID = channelID
         self.createAt = createAt
         self.updateAt = updateAt
         self.deleteAt = deleteAt
@@ -60,6 +68,7 @@ public struct MattermostFileInfo: Codable, Equatable, Hashable, Sendable, Identi
         self.width = width
         self.height = height
         self.hasPreviewImage = hasPreviewImage
+        self.miniPreview = miniPreview
     }
 
     @available(*, deprecated, message: "Use the ID-spelled initializer")
@@ -99,6 +108,7 @@ public struct MattermostFileInfo: Codable, Equatable, Hashable, Sendable, Identi
         case id
         case userID = "userId"
         case postID = "postId"
+        case channelID = "channelId"
         case createAt
         case updateAt
         case deleteAt
@@ -109,6 +119,7 @@ public struct MattermostFileInfo: Codable, Equatable, Hashable, Sendable, Identi
         case width
         case height
         case hasPreviewImage
+        case miniPreview
     }
 
     @available(*, deprecated, renamed: "userID")
@@ -121,6 +132,46 @@ public struct MattermostFileInfo: Codable, Equatable, Hashable, Sendable, Identi
     public var deletedAt: Date? {
         guard let deleteAt, deleteAt > 0 else { return nil }
         return Date(mattermostMilliseconds: deleteAt)
+    }
+}
+
+/// One page of `POST /teams/{team_id}/files/search`, newest first.
+public struct MattermostFileSearchResults: Codable, Equatable, Sendable {
+    public let order: [String]
+    public let fileInfos: [String: MattermostFileInfo]
+    public let nextFileInfoID: String?
+    public let prevFileInfoID: String?
+
+    public init(
+        order: [String],
+        fileInfos: [String: MattermostFileInfo],
+        nextFileInfoID: String? = nil,
+        prevFileInfoID: String? = nil
+    ) {
+        self.order = order
+        self.fileInfos = fileInfos
+        self.nextFileInfoID = nextFileInfoID
+        self.prevFileInfoID = prevFileInfoID
+    }
+
+    public var orderedFiles: [MattermostFileInfo] {
+        order.compactMap { fileInfos[$0] }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case order
+        case fileInfos
+        case nextFileInfoID = "nextFileInfoId"
+        case prevFileInfoID = "prevFileInfoId"
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // The server sends `null` rather than empty collections when nothing matches.
+        order = try container.decodeIfPresent([String].self, forKey: .order) ?? []
+        fileInfos = try container.decodeIfPresent([String: MattermostFileInfo].self, forKey: .fileInfos) ?? [:]
+        nextFileInfoID = try container.decodeIfPresent(String.self, forKey: .nextFileInfoID)
+        prevFileInfoID = try container.decodeIfPresent(String.self, forKey: .prevFileInfoID)
     }
 }
 

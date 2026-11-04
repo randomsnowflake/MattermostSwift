@@ -6,6 +6,18 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- `MattermostFileInfo.miniPreview` decodes the server's `mini_preview` (a tiny base64 JPEG in post
+  metadata) for instant blurred image placeholders.
+- Added `filePreview(id:)` and `fileThumbnail(id:)` for `GET /files/{id}/preview` and
+  `/files/{id}/thumbnail`, the server-generated JPEGs of image attachments.
+- `downloadFile(id:to:maximumSize:progress:)` reports `(bytesReceived, bytesExpected)` while the
+  body streams. The progress delegate keeps the existing redirect policy.
+- Mobile SSO login: `MattermostSSOProvider` (GitLab, OpenID Connect, Google, Office 365, SAML)
+  builds the server's `mobile_login` URL with the `mmauth://callback` redirect,
+  `MattermostSSOCallback` parses the returned `MMAUTHTOKEN`/`MMCSRF`/`srv`, and
+  `MattermostClientConfig.ssoProviders` lists what a server offers. Unlicensed v11 servers omit
+  the GitLab keys, so a missing `EnableSignUpWithGitLab` still offers GitLab.
+- `MattermostClient.clientConfig(serverURL:)` loads the public client config before sign-in.
 - TLS and certificate failures (`URLError.secureConnectionFailed`, `.serverCertificate*`,
   `.clientCertificate*`) are rethrown as the original `URLError` instead of
   `MattermostError.transportFailure`, so a host can tell "no HTTPS on that port" or "untrusted
