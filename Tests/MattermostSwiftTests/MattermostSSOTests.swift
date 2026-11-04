@@ -61,3 +61,26 @@ func ssoCallbackWithoutTokenIsRejected() {
         }
     }
 }
+
+@Test
+func clientConfigLoadsWithoutAuthenticationBeforeSignIn() async throws {
+    let session = await MattermostTestSupport.urlSession { request in
+        #expect(request.url?.absoluteString == "https://chat.example.com/api/v4/config/client")
+        #expect(request.httpMethod == "GET")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+        let body = Data(#"{"EnableSignUpWithGoogle":"true","EnableSaml":"false"}"#.utf8)
+        return try MattermostTestSupport.response(statusCode: 200, body: body, request: request)
+    }
+
+    let config = try await MattermostClient.clientConfig(serverURL: URL(string: "https://chat.example.com")!, urlSession: session)
+
+    // GitLab keys absent (unlicensed v11) still count as "maybe GitLab".
+    #expect(config.ssoProviders == [.gitlab, .google])
+}
+
+@Test
+func clientConfigRefusesPlainHTTPUnlessAllowed() async throws {
+    await #expect(throws: (any Error).self) {
+        _ = try await MattermostClient.clientConfig(serverURL: URL(string: "http://chat.example.com")!)
+    }
+}
