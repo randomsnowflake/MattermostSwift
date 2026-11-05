@@ -6,6 +6,11 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Fixed push deregistration's HTTP 404: `setSessionDeviceNotificationsEnabled(_:)` uses
+  `PUT /users/sessions/device` with the server's string-valued notification setting.
+  `attachMobileDevice` enables delivery again. Deprecated `detachMobileDevice` now disables
+  this session's notifications; it does not remove the token or revoke the session.
+
 - `MattermostFileInfo.miniPreview` decodes the server's `mini_preview` (a tiny base64 JPEG in post
   metadata) for instant blurred image placeholders.
 - Added `filePreview(id:)` and `fileThumbnail(id:)` for `GET /files/{id}/preview` and

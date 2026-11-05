@@ -301,6 +301,20 @@ for try await post in client.allPosts(channelID: "channel-id", pageSize: 100) {
 milliseconds, with `Date(mattermostMilliseconds:)`, `Date.mattermostMilliseconds`, and model date
 accessors for application code.
 
+
+## Session push notifications
+
+`attachMobileDevice(deviceID:)` registers the token and enables this session's push delivery.
+Use `setSessionDeviceNotificationsEnabled(false)` to pause delivery before remote logout;
+`true` enables it again. This uses `PUT /users/sessions/device` with the string-valued
+`device_notification_disabled` property and requires a server that supports that property.
+It leaves the token attached and the session valid; `logoutCurrentSession()` performs session
+revocation. Sending an empty device ID does not detach a token.
+
+The deprecated `detachMobileDevice(deviceID:)` forwards to disabling this session's delivery.
+Its token argument is retained for source compatibility, not for selecting another session.
+Mattermost has no `DELETE /users/sessions/device` endpoint.
+
 ## Supported APIs
 
 The SDK currently covers:

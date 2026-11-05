@@ -36,6 +36,7 @@ public struct MattermostUserPatch: Encodable, Equatable, Sendable {
 
 struct MattermostMobileDeviceRequest: Encodable, Equatable, Sendable {
     let deviceId: String
+    let deviceNotificationDisabled: String = "false"
 }
 
 struct MattermostMFARequiredRequest: Encodable, Equatable, Sendable {
