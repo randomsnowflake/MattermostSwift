@@ -258,7 +258,7 @@ extension MattermostClient {
         try await httpClient.post("/users/\(userID)/sessions/revoke/all")
     }
 
-    /// Attaches a mobile device token to the current session for push notifications.
+    /// Attaches a mobile device token and enables push notifications for the current session.
     @discardableResult
     public func attachMobileDevice(deviceID: String) async throws -> MattermostStatusOK {
         try await httpClient.put(
@@ -267,12 +267,24 @@ extension MattermostClient {
         )
     }
 
-    /// Removes a mobile device token from the current session for push notifications.
+    /// Enables or disables push delivery for the authenticated session without
+    /// changing its device token or revoking the session. The server expects a
+    /// string boolean in the session device-properties endpoint.
     @discardableResult
-    public func detachMobileDevice(deviceID: String) async throws -> MattermostStatusOK {
-        try await httpClient.delete(
+    public func setSessionDeviceNotificationsEnabled(_ enabled: Bool) async throws -> MattermostStatusOK {
+        try await httpClient.put(
             "/users/sessions/device",
-            body: MattermostMobileDeviceRequest(deviceId: deviceID)
+            body: ["device_notification_disabled": enabled ? "false" : "true"]
         )
+    }
+
+    /// Disables this session's push notifications. Mattermost has no DELETE
+    /// device-token endpoint; the token remains attached until session cleanup.
+    /// `deviceID` is retained only for source compatibility; authentication
+    /// determines the affected session. Registration enables delivery again.
+    @available(*, deprecated, message: "Use setSessionDeviceNotificationsEnabled(false); Mattermost cannot detach a token separately from its session.")
+    @discardableResult
+    public func detachMobileDevice(deviceID _: String) async throws -> MattermostStatusOK {
+        try await setSessionDeviceNotificationsEnabled(false)
     }
 }

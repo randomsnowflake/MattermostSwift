@@ -83,3 +83,16 @@ The `/users/mfa` preflight is absent on newer servers. Call `login` and catch
 code, then repeat `login` with `mfaToken`. A rejected or expired code has the same
 error identity and should keep the code-entry screen available. Do not interpret
 all HTTP 401 responses as MFA challenges.
+
+## Session push notifications
+
+`attachMobileDevice(deviceID:)` registers the token and enables this session's push delivery.
+Use `setSessionDeviceNotificationsEnabled(false)` to pause delivery before remote logout;
+`true` enables it again. This uses `PUT /users/sessions/device` with the string-valued
+`device_notification_disabled` property and requires a server that supports that property.
+It leaves the token attached and the session valid; `logoutCurrentSession()` performs session
+revocation. Sending an empty device ID does not detach a token.
+
+The deprecated `detachMobileDevice(deviceID:)` forwards to disabling this session's delivery.
+Its token argument is retained for source compatibility, not for selecting another session.
+Mattermost has no `DELETE /users/sessions/device` endpoint.

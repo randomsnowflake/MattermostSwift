@@ -300,6 +300,7 @@ struct MattermostHTTPClientErrorTests {
             #expect(request.httpMethod == "PUT")
             let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
             #expect(body?["device_id"] as? String == "apple:apns-token")
+            #expect(body?["device_notification_disabled"] as? String == "false")
             return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
         }
 
@@ -312,15 +313,40 @@ struct MattermostHTTPClientErrorTests {
     func clientDetachesMobileDeviceFromSession() async throws {
         let client = try await Self.makeClient { request in
             #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/users/sessions/device")
-            #expect(request.httpMethod == "DELETE")
-            let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: Any]
-            #expect(body?["device_id"] as? String == "apple:apns-token")
-            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+            #expect(request.httpMethod == "PUT")
+            let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: String]
+            // Clearing device_id is a no-op on the server; disable this session's push instead.
+            #expect(body == ["device_notification_disabled": "true"])
+            let statusCode = request.httpMethod == "PUT" ? 200 : 404
+            return try Self.response(statusCode: statusCode, body: Data(#"{"status":"OK"}"#.utf8), request: request)
         }
 
         let status = try await client.detachMobileDevice(deviceID: "apple:apns-token")
 
         #expect(status.isOK)
+    }
+
+    @Test(arguments: [true, false])
+    func clientUpdatesSessionDeviceNotifications(enabled: Bool) async throws {
+        let client = try await Self.makeClient { request in
+            #expect(request.url?.path == "/api/v4/users/sessions/device")
+            #expect(request.httpMethod == "PUT")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token")
+            let body = try JSONSerialization.jsonObject(with: try Self.bodyData(from: request)) as? [String: String]
+            #expect(body == ["device_notification_disabled": enabled ? "false" : "true"])
+            return try Self.response(statusCode: 200, body: Data(#"{"status":"OK"}"#.utf8), request: request)
+        }
+        #expect(try await client.setSessionDeviceNotificationsEnabled(enabled).isOK)
+    }
+
+    @Test
+    func clientDoesNotHideDeviceNotificationUpdateFailures() async throws {
+        let client = try await Self.makeClient { request in
+            try Self.response(statusCode: 403, body: Data(#"{"id":"api.context.permissions.app_error","status_code":403}"#.utf8), request: request)
+        }
+        await #expect(throws: MattermostError.self) {
+            try await client.setSessionDeviceNotificationsEnabled(false)
+        }
     }
 
     @Test
