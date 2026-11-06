@@ -6,6 +6,11 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Fixed `clientConfig()` and `clientConfig(serverURL:)` on Mattermost servers before 11: both now
+  request `GET /config/client?format=old`. Those servers answer 501 without `format=old`, which broke
+  pre-login SSO discovery (`MattermostClientConfig.ssoProviders`) and any capability check built on
+  the client config. Mattermost 11 accepts both forms.
+
 - Fixed push deregistration's HTTP 404: `setSessionDeviceNotificationsEnabled(_:)` uses
   `PUT /users/sessions/device` with the server's string-valued notification setting.
   `attachMobileDevice` enables delivery again. Deprecated `detachMobileDevice` now disables
