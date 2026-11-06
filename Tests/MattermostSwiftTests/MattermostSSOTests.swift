@@ -65,7 +65,7 @@ func ssoCallbackWithoutTokenIsRejected() {
 @Test
 func clientConfigLoadsWithoutAuthenticationBeforeSignIn() async throws {
     let session = await MattermostTestSupport.urlSession { request in
-        #expect(request.url?.absoluteString == "https://chat.example.com/api/v4/config/client")
+        #expect(request.url?.absoluteString == "https://chat.example.com/api/v4/config/client?format=old")
         #expect(request.httpMethod == "GET")
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
         let body = Data(#"{"EnableSignUpWithGoogle":"true","EnableSaml":"false"}"#.utf8)

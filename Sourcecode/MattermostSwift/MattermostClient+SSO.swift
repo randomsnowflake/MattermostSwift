@@ -90,6 +90,6 @@ public extension MattermostClient {
             authentication: .none,
             allowInsecureHTTP: allowInsecureHTTP
         )
-        return try await MattermostHTTPClient(configuration: configuration, urlSession: urlSession).get("/config/client")
+        return try await MattermostHTTPClient(configuration: configuration, urlSession: urlSession).get("/config/client", queryItems: clientConfigQuery)
     }
 }
