@@ -80,6 +80,7 @@ public extension MattermostClientConfig {
 
 public extension MattermostClient {
     /// Loads the public client configuration before sign-in (login options, SSO buttons).
+    /// Sends `format=old`, so it works on Mattermost before 11 (which answer 501 without it) and on 11+.
     static func clientConfig(
         serverURL: URL,
         allowInsecureHTTP: Bool = false,
@@ -90,6 +91,6 @@ public extension MattermostClient {
             authentication: .none,
             allowInsecureHTTP: allowInsecureHTTP
         )
-        return try await MattermostHTTPClient(configuration: configuration, urlSession: urlSession).get("/config/client")
+        return try await MattermostHTTPClient(configuration: configuration, urlSession: urlSession).get("/config/client", queryItems: clientConfigQuery)
     }
 }

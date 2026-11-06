@@ -26,7 +26,11 @@ extension MattermostClient {
     }
 
     /// Loads the subset of server configuration exposed to clients.
+    /// Sends `format=old`, so it works on Mattermost before 11 (which answer 501 without it) and on 11+.
     public func clientConfig() async throws -> MattermostClientConfig {
-        try await httpClient.get("/config/client")
+        try await httpClient.get("/config/client", queryItems: Self.clientConfigQuery)
     }
+
+    /// Servers before 11 answer `/config/client` without `format=old` with 501; 11 accepts both.
+    static let clientConfigQuery = [URLQueryItem(name: "format", value: "old")]
 }
