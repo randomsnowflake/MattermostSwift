@@ -149,6 +149,46 @@ struct MattermostIntegrationsTests {
         #expect(request.dialog.elements[2].isOptional)
     }
 
+    @Test
+    func executeCommandSendsThreadContextAndDecodesTheResponse() async throws {
+        let client = try await Self.makeClient { request in
+            #expect(request.url?.absoluteString == "https://mattermost.example.com/api/v4/commands/execute")
+            #expect(request.httpMethod == "POST")
+            let body = try JSONSerialization.jsonObject(with: try MattermostTestSupport.bodyData(from: request)) as? [String: Any]
+            #expect(body?["command"] as? String == "/invite @sam ~town")
+            #expect(body?["channel_id"] as? String == "c")
+            #expect(body?["team_id"] as? String == "t")
+            #expect(body?["root_id"] as? String == "r")
+            let reply = #"{"response_type":"ephemeral","text":"Done","goto_location":"https://example.com/t/channels/town","trigger_id":"trig"}"#
+            return try MattermostTestSupport.response(statusCode: 200, body: Data(reply.utf8), contentType: "application/json", request: request)
+        }
+
+        let response = try await client.executeCommand("/invite @sam ~town", channelID: "c", teamID: "t", rootID: "r")
+
+        #expect(response == MattermostCommandResponse(
+            responseType: "ephemeral", text: "Done", gotoLocation: "https://example.com/t/channels/town", triggerID: "trig"
+        ))
+    }
+
+    @Test
+    func commandSuggestionsSendTheInputAndDecodeGoFieldNames() async throws {
+        let client = try await Self.makeClient { request in
+            let components = try #require(request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) })
+            #expect(components.path == "/api/v4/teams/t/commands/autocomplete_suggestions")
+            let query = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+            #expect(query == ["user_input": "/sn", "channel_id": "c"])
+            let reply = #"[{"Complete":"snip","Suggestion":"snip","Hint":"[name]","Description":"Personal text shortcuts","IconData":""},{"Complete":"snooze"}]"#
+            return try MattermostTestSupport.response(statusCode: 200, body: Data(reply.utf8), contentType: "application/json", request: request)
+        }
+
+        let suggestions = try await client.commandAutocompleteSuggestions(userInput: "/sn", teamID: "t", channelID: "c")
+
+        #expect(suggestions == [
+            MattermostCommandSuggestion(complete: "snip", suggestion: "snip", hint: "[name]", description: "Personal text shortcuts"),
+            MattermostCommandSuggestion(complete: "snooze", suggestion: ""),
+        ])
+    }
+
     private static func makeClient(
         handler: @escaping @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)
     ) async throws -> MattermostClient {

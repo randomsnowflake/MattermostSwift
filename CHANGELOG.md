@@ -6,6 +6,11 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Slash commands: `executeCommand(_:channelID:teamID:rootID:)` runs built-in, custom and plugin
+  commands (`POST /commands/execute`); replies arrive as `posted`, `ephemeralMessage` or `openDialog`
+  live events. `commandAutocompleteSuggestions(userInput:teamID:channelID:rootID:)` lists command and
+  argument suggestions (`GET /teams/{id}/commands/autocomplete_suggestions`).
+
 - Interactive messages: `MattermostPost.messageAttachments` decodes `props.attachments` into typed
   `MattermostMessageAttachment` cards (colour, pretext, author, title, text, fields, images, footer)
   with `MattermostPostAction` buttons and select menus. Malformed entries are skipped, not fatal.
