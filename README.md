@@ -324,6 +324,7 @@ The SDK currently covers:
 - Teams and team members.
 - Channels, direct messages, group messages, channel members, unread state, typing, notification props, and channel view state.
 - Posts, replies, pinned posts, edits, deletes, search, files, reactions, threads, per-user thread read state, synced drafts, and timeline loading.
+- Interactive messages: typed message attachments (`post.messageAttachments`), buttons and select menus (`doPostAction`), ephemeral posts and interactive dialogs (`ephemeralMessage`/`openDialog` live events, `submitDialog`).
 - Preferences, sidebar categories, category order, and channel moves.
 - Custom emoji listing, lookup, search, autocomplete, and image downloads.
 - Server ping and client configuration.

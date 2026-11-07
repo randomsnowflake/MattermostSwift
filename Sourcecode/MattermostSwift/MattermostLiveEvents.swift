@@ -92,6 +92,15 @@ public struct MattermostLiveEvent: Codable, Equatable, Sendable {
         return try mattermostSnakeCaseDecoder.decode(MattermostDraft.self, from: data)
     }
 
+    /// Decodes the `open_dialog` payload (`data.dialog`, a JSON-encoded string).
+    public func decodedOpenDialog() throws -> MattermostOpenDialogRequest? {
+        guard let data = jsonData("dialog") else {
+            return nil
+        }
+
+        return MattermostOpenDialogRequest(json: try mattermostPlainDecoder.decode(MattermostJSONValue.self, from: data))
+    }
+
     /// Returns a channel id from event data or broadcast metadata.
     public func decodedChannelID() throws -> String? {
         if let channelID = anyString("channel_id", "channelId", broadcast: \.channelID) {
@@ -214,6 +223,18 @@ public struct MattermostLiveEvent: Codable, Equatable, Sendable {
             }
         case .postDeleted:
             .postDeleted(try decodedPost())
+        case .ephemeralMessage:
+            if let post = try decodedPost() {
+                .ephemeralMessage(post)
+            } else {
+                .unknown(self)
+            }
+        case .openDialog:
+            if let dialog = try decodedOpenDialog() {
+                .openDialog(dialog)
+            } else {
+                .unknown(self)
+            }
         case .reactionAdded:
             .reactionAdded(try decodedReaction())
         case .reactionRemoved:
@@ -292,6 +313,8 @@ public enum MattermostLiveEventName: String, Sendable {
     case posted
     case postEdited = "post_edited"
     case postDeleted = "post_deleted"
+    case ephemeralMessage = "ephemeral_message"
+    case openDialog = "open_dialog"
     case postUnread = "post_unread"
     case reactionAdded = "reaction_added"
     case reactionRemoved = "reaction_removed"
@@ -326,6 +349,11 @@ public enum MattermostTypedLiveEvent: Equatable, Sendable {
     case posted(MattermostPost)
     case postEdited(MattermostPost)
     case postDeleted(MattermostPost?)
+    /// A post only this user sees (integration replies, bot-sent private cards). The server does
+    /// not store it; an update to it arrives as `post_edited` with the same id.
+    case ephemeralMessage(MattermostPost)
+    /// An integration asks this user to fill in an interactive dialog.
+    case openDialog(MattermostOpenDialogRequest)
     case reactionAdded(MattermostReaction?)
     case reactionRemoved(MattermostReaction?)
     case typing(MattermostTypingEvent)

@@ -25,8 +25,13 @@ extension MattermostStore {
 
         switch typedEvent {
         case .posted(let post), .postEdited(let post):
-            try upsert(post: post)
-            mutatesStore = true
+            // An edited ephemeral post (an integration updating a private card) is never stored.
+            if post.type == .systemEphemeral {
+                mutatesStore = false
+            } else {
+                try upsert(post: post)
+                mutatesStore = true
+            }
         case .postDeleted(let post):
             if let post {
                 try upsert(post: post)
@@ -117,6 +122,8 @@ extension MattermostStore {
                 mutatesStore = false
             }
         case .hello,
+             .ephemeralMessage,
+             .openDialog,
              .typing,
              .channelViewed,
              .multipleChannelsViewed,

@@ -118,6 +118,18 @@ struct MattermostHTTPClient: Sendable {
         return data
     }
 
+    /// POSTs a body encoded with its own coding keys (no snake-case rewrite) and returns the
+    /// validated raw response body. For payloads whose dictionary keys are caller data, such as
+    /// interactive dialog element names, which the shared snake-case coders would rewrite.
+    func postPlainJSON<Request: Encodable & Sendable>(_ endpoint: String, body: Request) async throws -> Data {
+        var request = try makeRequest(endpoint: endpoint, method: "POST")
+        request.httpBody = try JSONEncoder().encode(body)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let (data, response) = try await loadData(for: request)
+        _ = try validate(data, response)
+        return data
+    }
+
     /// Downloads a response to disk. The destination is replaced only after a successful
     /// HTTP response and optional size validation, so large payload bytes are not materialized.
     func download(
