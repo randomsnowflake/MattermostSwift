@@ -33,7 +33,10 @@ extension MattermostStore {
                 mutatesStore = true
             }
         case .postDeleted(let post):
-            if let post {
+            if let post, post.type == .systemEphemeral {
+                // A dismissed private card was never stored; a tombstone would orphan a row.
+                mutatesStore = false
+            } else if let post {
                 try upsert(post: post)
                 mutatesStore = true
             } else if let postID = liveEvent.stringData("post_id") ?? liveEvent.stringData("postId") {

@@ -159,3 +159,17 @@ struct MattermostIntegrationsTests {
         )
     }
 }
+
+@MainActor
+@Test
+func storeNeverCachesEphemeralPostsFromEditsOrDeletes() throws {
+    let store = try MattermostStore(inMemory: true)
+    let post = #"{\"id\":\"e\",\"create_at\":0,\"update_at\":2,\"edit_at\":0,\"delete_at\":2,\"user_id\":\"u\",\"channel_id\":\"\",\"root_id\":\"\",\"message\":\"\",\"type\":\"system_ephemeral\"}"#
+    for name in ["post_edited", "post_deleted"] {
+        let event = try mattermostSnakeCaseDecoder.decode(MattermostLiveEvent.self, from: Data("""
+        {"event":"\(name)","data":{"post":"\(post)"},"broadcast":{"user_id":"u"},"seq":1}
+        """.utf8))
+        #expect(try store.applyReportingMutation(liveEvent: event).mutatesStore == false)
+    }
+    #expect(try store.cachedPost(id: "e") == nil)
+}
