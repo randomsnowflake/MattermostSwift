@@ -25,10 +25,18 @@ extension MattermostStore {
 
         switch typedEvent {
         case .posted(let post), .postEdited(let post):
-            try upsert(post: post)
-            mutatesStore = true
+            // An edited ephemeral post (an integration updating a private card) is never stored.
+            if post.type == .systemEphemeral {
+                mutatesStore = false
+            } else {
+                try upsert(post: post)
+                mutatesStore = true
+            }
         case .postDeleted(let post):
-            if let post {
+            if let post, post.type == .systemEphemeral {
+                // A dismissed private card was never stored; a tombstone would orphan a row.
+                mutatesStore = false
+            } else if let post {
                 try upsert(post: post)
                 mutatesStore = true
             } else if let postID = liveEvent.stringData("post_id") ?? liveEvent.stringData("postId") {
@@ -117,6 +125,8 @@ extension MattermostStore {
                 mutatesStore = false
             }
         case .hello,
+             .ephemeralMessage,
+             .openDialog,
              .typing,
              .channelViewed,
              .multipleChannelsViewed,

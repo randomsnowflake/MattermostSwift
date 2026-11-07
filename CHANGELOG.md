@@ -6,6 +6,17 @@ This project follows semantic versioning before `1.0.0` with one caveat: public 
 
 ## Unreleased
 
+- Interactive messages: `MattermostPost.messageAttachments` decodes `props.attachments` into typed
+  `MattermostMessageAttachment` cards (colour, pretext, author, title, text, fields, images, footer)
+  with `MattermostPostAction` buttons and select menus. Malformed entries are skipped, not fatal.
+- `doPostAction(postID:actionID:selectedOption:cookie:)` runs a button or select menu
+  (`POST /posts/{id}/actions/{action_id}`) and returns the trigger id and `goto_location`.
+- New live events `ephemeralMessage(MattermostPost)` (`ephemeral_message`) and
+  `openDialog(MattermostOpenDialogRequest)` (`open_dialog`). The store never caches ephemeral posts,
+  also not when an integration edits one.
+- `submitDialog(_:)` submits or cancels an interactive dialog (`POST /actions/dialogs/submit`) and
+  returns per-element errors. Element names are sent and read verbatim (no snake-case rewrite).
+
 - Fixed `clientConfig()` and `clientConfig(serverURL:)` on Mattermost servers before 11: both now
   request `GET /config/client?format=old`. Those servers answer 501 without `format=old`, which broke
   pre-login SSO discovery (`MattermostClientConfig.ssoProviders`) and any capability check built on
